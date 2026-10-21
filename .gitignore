@@ -3,3 +3,6 @@ android/*.keystore
 android/build/
 *.apk
 *.idsig
+.vercel
+
+.vercel
