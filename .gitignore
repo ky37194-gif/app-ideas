@@ -1,0 +1,5 @@
+# Android signing key — never upload this
+android/*.keystore
+android/build/
+*.apk
+*.idsig

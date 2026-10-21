@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#6366f1" />
+<title>App Ideas Tracker</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💡</text></svg>" />
+
+<!--
+  =====================================================================
+  APP IDEAS TRACKER
+  ---------------------------------------------------------------------
+  A single-file web app (HTML + CSS + plain JavaScript, no build step).
+  - All data lives in your browser's localStorage (no login, no server).
+  - Open this file in any modern browser and it just works.
+
+  File layout:
+    1. <style>   -> all the design (colours, cards, dark mode, etc.)
+    2. <body>    -> a few empty containers that JavaScript fills in
+    3. <script>  -> all the logic, split into numbered sections
+  =====================================================================
+-->
+
+<style>
+  /* ---------- 1. Design tokens (colours) ---------- */
+  /* Light theme is the default. */
+  :root {
+    --bg: #f5f6fb;
+    --surface: #ffffff;
+    --surface-2: #eef0f6;
+    --text: #0f172a;
+    --muted: #64748b;
+    --border: #e2e6ef;
+    --primary: #6366f1;
+    --primary-ink: #ffffff;
+    --danger: #e11d48;
+    --success: #16a34a;
+    --warning: #d97706;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 6px 18px rgba(15, 23, 42, .06);
+    --radius: 18px;
+    color-scheme: light;
+  }
+
+  /* Dark theme: used when the phone/PC is in dark mode (unless user forced light) ... */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0f1a;
+      --surface: #141a29;
+      --surface-2: #1d2537;
+      --text: #e6eaf3;
+      --muted: #94a0b8;
+      --border: #263049;
+      --primary: #8b8ff8;
+      --primary-ink: #0b0f1a;
+      --danger: #fb7185;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --shadow: none;
+      color-scheme: dark;
+    }
+  }
+  /* ... or when the user picks dark mode with the toggle button. */
+  :root[data-theme="dark"] {
+    --bg: #0b0f1a;
+    --surface: #141a29;
+    --surface-2: #1d2537;
+    --text: #e6eaf3;
+    --muted: #94a0b8;
+    --border: #263049;
+    --primary: #8b8ff8;
+    --primary-ink: #0b0f1a;
+    --danger: #fb7185;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --shadow: none;
+    color-scheme: dark;
+  }
+
+  /* ---------- 2. Base ---------- */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    transition: background-color .2s;
+  }
+  a { color: var(--primary); }
+  h1, h2, h3, h4 { line-height: 1.25; }
+  .muted { color: var(--muted); }
+  .small { font-size: .85rem; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row-between { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .stack { display: grid; gap: 12px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  /* ---------- 3. Top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 4px;
+    padding: 8px 8px 8px 16px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar.has-back { padding-left: 4px; }
+  .topbar-title {
+    flex: 1; margin: 0; font-size: 1.1rem; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .page { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+  /* ---------- 4. Buttons ---------- */
+  .icon-btn {
+    min-width: 44px; height: 44px; padding: 0 6px;
+    border: 0; border-radius: 12px; background: transparent;
+    color: var(--text); font-size: 1.2rem; cursor: pointer;
+    display: inline-grid; place-items: center; text-decoration: none;
+  }
+  .icon-btn:hover { background: var(--surface-2); }
+  .btn {
+    min-height: 46px; padding: 0 16px;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface); color: var(--text);
+    font: inherit; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    text-decoration: none; transition: transform .1s, background-color .15s;
+  }
+  .btn:active, .icon-btn:active { transform: scale(.96); }
+  .btn.primary { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+  .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: transparent; }
+  .btn.ghost { background: transparent; }
+  .btn.block { width: 100%; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-row > .btn { flex: 1 1 140px; }
+
+  /* ---------- 5. Cards ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+  }
+  .list { display: grid; gap: 12px; }
+  .idea-card { display: block; color: inherit; text-decoration: none; transition: transform .15s, border-color .15s; }
+  .idea-card:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+  .idea-card:active { transform: scale(.985); }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .card-top h3 { margin: 0; font-size: 1.05rem; word-break: break-word; }
+  .card-desc {
+    margin: 4px 0 12px; color: var(--muted); font-size: .92rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .card-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: .8rem; color: var(--muted); flex-wrap: wrap; }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tag { font-size: .75rem; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+
+  /* ---------- 6. Badges (status / priority) ---------- */
+  /* Each badge gets its colour from the --c variable set inline in HTML. */
+  .badge {
+    --c: #888;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: .78rem; font-weight: 700; white-space: nowrap;
+    background: color-mix(in srgb, var(--c) 16%, transparent);
+    color: color-mix(in srgb, var(--c) 75%, var(--text));
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); display: inline-block; }
+
+  /* ---------- 7. Progress bars ---------- */
+  .progress { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .progress.lg { height: 12px; }
+  .bar {
+    height: 100%; width: 0; border-radius: inherit;
+    background: var(--c, var(--primary));
+    transition: width .9s cubic-bezier(.22, 1, .36, 1);
+  }
+  .progress-label { display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: 6px; }
+  .progress-label b { font-variant-numeric: tabular-nums; }
+
+  /* ---------- 8. Form controls ---------- */
+  input, select, textarea {
+    font: inherit; color: var(--text); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 12px; min-height: 46px; width: 100%;
+  }
+  textarea { resize: vertical; min-height: 80px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: 0; border-color: transparent; }
+  input[type="range"] { padding: 0; accent-color: var(--primary); border: 0; background: transparent; }
+  input[type="checkbox"] { width: 20px; min-height: 20px; height: 20px; accent-color: var(--primary); }
+  .field { display: grid; gap: 6px; margin-bottom: 16px; }
+  .field > .label { font-weight: 600; font-size: .9rem; }
+  .hint { font-size: .8rem; color: var(--muted); }
+  .form-section { margin-bottom: 16px; }
+  .form-section h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
+  .check { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-weight: 500; }
+
+  /* ---------- 9. Chips (filters, multi-select options) ---------- */
+  .chips-row {
+    display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+    margin: 12px -16px 4px; padding: 0 16px 4px;
+  }
+  .chips-row::-webkit-scrollbar { display: none; }
+  .chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    flex: none; position: relative; user-select: none;
+    min-height: 40px; padding: 0 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font: inherit; font-size: .9rem; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background-color .15s, color .15s;
+  }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+  .chip.active, .chip:has(input:checked) { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+  .chip:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .chip .count { font-size: .75rem; opacity: .75; }
+
+  /* ---------- 10. Home: search + sort ---------- */
+  .search { position: relative; }
+  .search input { padding-left: 42px; border-radius: 14px; }
+  .search::before { content: "🔍"; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .95rem; opacity: .6; }
+  .sort-select { width: auto; min-height: 40px; padding: 6px 10px; font-size: .9rem; }
+  .empty { text-align: center; padding: 40px 16px; }
+  .empty .big { font-size: 3rem; }
+
+  /* ---------- 11. Bottom navigation ---------- */
+  .bottom-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    display: flex; justify-content: space-around; align-items: center;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 4px 16px calc(4px + env(safe-area-inset-bottom));
+  }
+  .nav-item {
+    flex: 1; min-height: 56px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px;
+    color: var(--muted); text-decoration: none; font-size: .75rem; font-weight: 600;
+  }
+  .nav-item .ico { font-size: 1.3rem; line-height: 1; }
+  .nav-item.active { color: var(--primary); }
+  .fab {
+    width: 60px; height: 60px; margin-top: -30px; border-radius: 50%;
+    display: grid; place-items: center; text-decoration: none;
+    background: var(--primary); color: var(--primary-ink); font-size: 2rem; line-height: 1;
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--primary) 45%, transparent);
+    transition: transform .15s;
+  }
+  .fab:active { transform: scale(.92); }
+
+  /* ---------- 12. Idea detail ---------- */
+  .hero h1 { margin: 10px 0 4px; font-size: 1.5rem; word-break: break-word; }
+  .hero p { margin: 0 0 14px; color: var(--muted); }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .progress-grid { display: grid; gap: 14px; margin-top: 14px; }
+  .tabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); margin: 18px 0 12px; }
+  .tab {
+    flex: 1; min-height: 42px; border: 0; border-radius: 10px; background: transparent;
+    color: var(--muted); font: inherit; font-weight: 700; font-size: .9rem; cursor: pointer;
+  }
+  .tab.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+  .detail-block { margin-bottom: 16px; }
+  .detail-block h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 6px; }
+  .detail-block p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .link-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; min-height: 44px; }
+  .link-item:last-child { border-bottom: 0; }
+  .link-item .url { color: var(--primary); font-size: .85rem; word-break: break-all; }
+
+  /* ---------- 13. Feature list ---------- */
+  .add-form { display: grid; gap: 10px; margin-bottom: 14px; }
+  .feature-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .feature {
+    display: flex; align-items: flex-start; gap: 4px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 6px 6px 6px 2px;
+    transition: box-shadow .15s, border-color .15s;
+  }
+  .feature.dragging { border-color: var(--primary); box-shadow: 0 12px 30px rgba(0, 0, 0, .18); position: relative; z-index: 2; }
+  .drag-handle {
+    touch-action: none; cursor: grab; flex: none;
+    width: 32px; min-height: 48px; border: 0; background: transparent;
+    color: var(--muted); font-size: 1.1rem; letter-spacing: -3px;
+  }
+  .dragging .drag-handle { cursor: grabbing; }
+  .f-status {
+    flex: none; width: 36px; height: 36px; margin: 6px 4px 0 0;
+    border-radius: 50%; border: 2px solid var(--border); background: transparent;
+    color: var(--muted); font-weight: 800; cursor: pointer; transition: all .2s;
+  }
+  .feature[data-status="doing"] .f-status { border-color: var(--warning); color: var(--warning); }
+  .feature[data-status="done"] .f-status { border-color: var(--success); background: var(--success); color: #fff; }
+  .feature[data-status="done"] .f-title { text-decoration: line-through; color: var(--muted); }
+  .f-body { flex: 1; min-width: 0; padding: 6px 0; }
+  .f-title { font-weight: 600; word-break: break-word; }
+  .f-desc { font-size: .85rem; color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+  .f-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .mini {
+    min-height: 30px; padding: 0 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: transparent; color: var(--muted);
+    font: inherit; font-size: .75rem; font-weight: 700; cursor: pointer;
+  }
+  .mini.mvp { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); border-color: transparent; }
+  .mini.state-doing { color: var(--warning); }
+  .mini.state-done { color: var(--success); }
+
+  /* ---------- 14. Journal timeline ---------- */
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .log-day h4 { margin: 14px 0 6px; font-size: .85rem; color: var(--muted); }
+  .log-item { position: relative; margin-left: 6px; padding: 4px 0 14px 20px; border-left: 2px solid var(--border); }
+  .log-item::before {
+    content: ""; position: absolute; left: -7px; top: 9px;
+    width: 12px; height: 12px; border-radius: 50%; background: var(--primary);
+    box-shadow: 0 0 0 3px var(--bg);
+  }
+  .log-item .text { white-space: pre-wrap; word-break: break-word; }
+  .log-item .row-between { flex-wrap: nowrap; align-items: flex-start; }
+
+  /* ---------- 15. Dashboard ---------- */
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .stat .num { font-size: 1.9rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat .lbl { color: var(--muted); font-size: .82rem; }
+  .status-row { display: grid; grid-template-columns: 120px 1fr 28px; align-items: center; gap: 10px; padding: 6px 0; font-size: .9rem; }
+  .status-row .n { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .section-title { font-size: 1rem; margin: 22px 0 10px; }
+  .active-idea { display: block; text-decoration: none; color: inherit; }
+
+  /* ---------- 16. Bottom sheet dialog + toast ---------- */
+  dialog.sheet {
+    border: 0; padding: 0; width: 100%; max-width: 560px;
+    margin: auto auto 0; border-radius: 22px 22px 0 0;
+    background: var(--surface); color: var(--text);
+    max-height: 90vh;
+  }
+  dialog.sheet::backdrop { background: rgba(0, 0, 0, .45); }
+  .sheet-inner { padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .sheet-inner h2 { margin: 0 0 14px; font-size: 1.15rem; }
+  @media (min-width: 600px) { dialog.sheet { margin: auto; border-radius: 22px; } }
+
+  #toast {
+    position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 100;
+    transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+    background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 12px;
+    font-size: .9rem; font-weight: 600; max-width: 90vw; transition: opacity .25s, transform .25s;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* Respect users who prefer less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+
+<body>
+  <!-- JavaScript renders every screen into #app -->
+  <div id="app"></div>
+
+  <!-- Bottom sheet used for editing a feature -->
+  <dialog class="sheet" id="sheet"></dialog>
+
+  <!-- Small popup message ("Saved!", "Copied!") -->
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Hidden file picker used by "Import JSON" -->
+  <input type="file" id="import-file" accept="application/json,.json" hidden />
+
+<script>
+/* =====================================================================
+   SECTION 1: CONSTANTS
+   Lists of options used throughout the app. Change them here and the
+   whole app updates.
+   ===================================================================== */
+const STORAGE_KEY = 'appIdeasTracker.v1';
+
+const STATUSES = [
+  { key: 'idea',     emoji: '💡', label: 'Idea',     color: '#a855f7' },
+  { key: 'planning', emoji: '📝', label: 'Planning', color: '#3b82f6' },
+  { key: 'building', emoji: '🛠️', label: 'Building', color: '#f59e0b' },
+  { key: 'testing',  emoji: '🧪', label: 'Testing',  color: '#06b6d4' },
+  { key: 'launched', emoji: '🚀', label: 'Launched', color: '#22c55e' },
+  { key: 'onhold',   emoji: '⏸️', label: 'On Hold',  color: '#94a3b8' },
+];
+const PLATFORMS  = ['Android', 'iOS', 'Web', 'Meta Quest/VR', 'Desktop'];
+const PRIORITIES = ['High', 'Medium', 'Low'];
+const PRIORITY_COLORS = { High: '#ef4444', Medium: '#f59e0b', Low: '#22c55e' };
+const PRIORITY_RANK   = { High: 3, Medium: 2, Low: 1 };
+const MONETIZATION = ['Free', 'Paid', 'Ads', 'Subscription'];
+
+// Feature statuses, in the order a tap cycles through them.
+const FEATURE_STATUSES = ['todo', 'doing', 'done'];
+const FEATURE_LABEL = { todo: 'To Do', doing: 'In Progress', done: 'Done' };
+const FEATURE_ICON  = { todo: '', doing: '◐', done: '✓' };
+
+const DAY = 24 * 60 * 60 * 1000;
+
+
+/* =====================================================================
+   SECTION 2: SMALL HELPERS
+   ===================================================================== */
+
+// Unique id for ideas, features, log entries, links.
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// Escape text before putting it into HTML (prevents broken layout / XSS).
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Today's date as "YYYY-MM-DD" in the user's local timezone.
+function todayStr(ts = Date.now()) {
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// "21 Oct 2026"
+function fmtDate(input) {
+  // A "YYYY-MM-DD" string is parsed as local time (not UTC) by adding T00:00.
+  const d = typeof input === 'string' && input.length === 10 ? new Date(input + 'T00:00') : new Date(input);
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// "just now", "5m ago", "3h ago", "2d ago", or a date.
+function timeAgo(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60e3) return 'just now';
+  if (diff < 3600e3) return Math.floor(diff / 60e3) + 'm ago';
+  if (diff < DAY) return Math.floor(diff / 3600e3) + 'h ago';
+  if (diff < 7 * DAY) return Math.floor(diff / DAY) + 'd ago';
+  return fmtDate(ts);
+}
+
+const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+const statusOf = key => STATUSES.find(s => s.key === key) || STATUSES[0];
+const findIdea = id => state.ideas.find(i => i.id === id);
+
+// Make a link safe to click: add https:// if missing, block "javascript:" etc.
+function safeUrl(url) {
+  let u = String(url || '').trim();
+  if (!u) return '#';
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u;
+  return /^https?:\/\//i.test(u) ? u : '#';
+}
+
+// Turn "pharma, Productivity ,education" into ["pharma","productivity","education"].
+function parseTags(text) {
+  const tags = String(text || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  return [...new Set(tags)];
+}
+
+// Show a short message at the bottom of the screen.
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// Copy text to clipboard (with a fallback for older browsers / file:// pages).
+async function copyText(text) {
+  // Inside the Android app: use the phone's clipboard directly.
+  if (window.AndroidBridge) {
+    AndroidBridge.copy(text);
+    toast('📋 Copied to clipboard');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('📋 Copied to clipboard');
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); toast('📋 Copied to clipboard'); }
+    catch { toast('Copy failed'); }
+    ta.remove();
+  }
+}
+
+
+/* =====================================================================
+   SECTION 3: DATA (load / save / normalise)
+   Everything is stored as one JSON object in localStorage:
+   { ideas: [...], theme: 'system' | 'light' | 'dark', sort: '...' }
+   ===================================================================== */
+
+// Fill in any missing fields so old or imported data never breaks the app.
+function normalizeIdea(raw = {}) {
+  const now = Date.now();
+  const arr = v => (Array.isArray(v) ? v : []);
+  return {
+    id: raw.id || uid(),
+    name: String(raw.name || 'Untitled idea'),
+    desc: String(raw.desc || ''),
+    problem: String(raw.problem || ''),
+    target: String(raw.target || ''),
+    notes: String(raw.notes || ''),
+    platforms: arr(raw.platforms).filter(p => PLATFORMS.includes(p)),
+    status: STATUSES.some(s => s.key === raw.status) ? raw.status : 'idea',
+    priority: PRIORITIES.includes(raw.priority) ? raw.priority : 'Medium',
+    monetization: arr(raw.monetization).filter(m => MONETIZATION.includes(m)),
+    price: String(raw.price || ''),
+    tags: arr(raw.tags).map(String),
+    links: arr(raw.links).map(l => ({ id: l.id || uid(), label: String(l.label || ''), url: String(l.url || '') })),
+    features: arr(raw.features).map(f => ({
+      id: f.id || uid(),
+      title: String(f.title || 'Untitled feature'),
+      desc: String(f.desc || ''),
+      status: FEATURE_STATUSES.includes(f.status) ? f.status : 'todo',
+      mvp: f.mvp !== false, // default: Must have
+    })),
+    log: arr(raw.log).map(l => ({
+      id: l.id || uid(),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(l.date) ? l.date : todayStr(),
+      text: String(l.text || ''),
+      createdAt: Number(l.createdAt) || now,
+    })),
+    // null = automatic progress; a number 0-100 = manual override
+    manualProgress: typeof raw.manualProgress === 'number' ? clamp(Math.round(raw.manualProgress), 0, 100) : null,
+    // timestamps of every change, used for "most active idea this week"
+    activity: arr(raw.activity).filter(n => typeof n === 'number'),
+    createdAt: Number(raw.createdAt) || now,
+    updatedAt: Number(raw.updatedAt) || now,
+  };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      return {
+        ideas: Array.isArray(data.ideas) ? data.ideas.map(normalizeIdea) : [],
+        // ids of deleted ideas -> when they were deleted (so deletes also sync)
+        deleted: data.deleted && typeof data.deleted === 'object' ? data.deleted : {},
+        theme: data.theme || 'system',
+        sort: data.sort || 'updated',
+      };
+    }
+  } catch (err) {
+    console.error('Could not load saved data', err);
+  }
+  return { ideas: [], deleted: {}, theme: 'system', sort: 'updated' };
+}
+
+// fromSync = true when the sync code itself is saving (so it doesn't trigger another sync).
+function saveState(fromSync = false) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.error(err);
+    toast('⚠️ Could not save (storage full or blocked)');
+  }
+  if (!fromSync) scheduleSync();
+}
+
+// Call this whenever an idea changes: updates the date + activity history.
+function touch(idea) {
+  const now = Date.now();
+  idea.updatedAt = now;
+  idea.activity.push(now);
+  // keep only the last 30 days (and at most 300 entries) so storage stays small
+  idea.activity = idea.activity.filter(t => now - t < 30 * DAY).slice(-300);
+}
+
+// The app's whole saved state lives here.
+let state = loadState();
+
+// Temporary UI state (not saved): search text, filter, active tab, etc.
+const ui = {
+  search: '',
+  filter: 'all',
+  tab: 'features',
+  importMode: 'merge',
+  lastWidths: {}, // remembers progress-bar widths so they animate from old -> new
+};
+
+
+/* =====================================================================
+   SECTION 4: PROGRESS CALCULATIONS
+   ===================================================================== */
+
+// Overall progress: manual value if set, otherwise Done ÷ total features.
+function progressOf(idea) {
+  if (idea.manualProgress !== null) return idea.manualProgress;
+  return autoProgress(idea.features);
+}
+
+function autoProgress(features) {
+  if (!features.length) return 0;
+  const done = features.filter(f => f.status === 'done').length;
+  return Math.round((done / features.length) * 100);
+}
+
+// MVP progress: only "Must have" features. Returns null if there are none.
+function mvpProgressOf(idea) {
+  const mvp = idea.features.filter(f => f.mvp);
+  return mvp.length ? autoProgress(mvp) : null;
+}
+
+// How many changes happened to this idea in the last 7 days.
+function weeklyActivity(idea) {
+  const weekAgo = Date.now() - 7 * DAY;
+  return idea.activity.filter(t => t >= weekAgo).length;
+}
+
+
+/* =====================================================================
+   SECTION 5: THEME (light / dark / system)
+   ===================================================================== */
+const THEME_ICONS = { system: '🌓', light: '☀️', dark: '🌙' };
+
+function applyTheme() {
+  const root = document.documentElement;
+  if (state.theme === 'system') root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', state.theme);
+}
+
+function cycleTheme() {
+  const order = ['system', 'light', 'dark'];
+  state.theme = order[(order.indexOf(state.theme) + 1) % order.length];
+  applyTheme();
+  saveState();
+  toast({ system: '🌓 Theme: follow device', light: '☀️ Light mode', dark: '🌙 Dark mode' }[state.theme]);
+  render();
+}
+
+
+/* =====================================================================
+   SECTION 6: REUSABLE HTML PIECES
+   Each function returns an HTML string.
+   ===================================================================== */
+
+function statusBadge(key) {
+  const s = statusOf(key);
+  return `<span class="badge" style="--c:${s.color}">${s.emoji} ${s.label}</span>`;
+}
+
+function priorityBadge(p) {
+  return `<span class="badge" style="--c:${PRIORITY_COLORS[p]}"><span class="dot"></span>${p}</span>`;
+}
+
+// A progress bar. `key` lets it animate smoothly from its previous width.
+function progressBar(key, pct, color, large = false) {
+  const from = ui.lastWidths[key] ?? 0;
+  return `<div class="progress${large ? ' lg' : ''}" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+            <div class="bar" data-key="${esc(key)}" data-w="${pct}" style="width:${from}%;${color ? `--c:${color}` : ''}"></div>
+          </div>`;
+}
+
+// After the HTML is on screen, slide each bar to its real width.
+function animateBars() {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.querySelectorAll('.bar[data-w]').forEach(bar => {
+      bar.style.width = bar.dataset.w + '%';
+      ui.lastWidths[bar.dataset.key] = Number(bar.dataset.w);
+    });
+  }));
+}
+
+function topBar(title, { back = '', actions = '' } = {}) {
+  return `
+    <header class="topbar${back ? ' has-back' : ''}">
+      ${back ? `<a class="icon-btn" href="${back}" aria-label="Back">←</a>` : ''}
+      <h1 class="topbar-title">${title}</h1>
+      ${actions}
+      ${syncButton()}
+      <button class="icon-btn" data-action="theme" aria-label="Change theme" title="Change theme">${THEME_ICONS[state.theme]}</button>
+    </header>`;
+}
+
+function bottomNav(active) {
+  return `
+    <nav class="bottom-nav" aria-label="Main">
+      <a class="nav-item ${active === 'home' ? 'active' : ''}" href="#/"><span class="ico">🗂️</span>Ideas</a>
+      <a class="fab" href="#/new" aria-label="Add new idea">+</a>
+      <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
+    </nav>`;
+}
+
+
+/* =====================================================================
+   SECTION 7: SCREEN — HOME (ideas list)
+   ===================================================================== */
+
+function renderHome() {
+  const counts = {};
+  state.ideas.forEach(i => (counts[i.status] = (counts[i.status] || 0) + 1));
+
+  const filterChips = [`<button class="chip ${ui.filter === 'all' ? 'active' : ''}" data-action="filter" data-value="all">All <span class="count">${state.ideas.length}</span></button>`]
+    .concat(STATUSES.map(s => `
+      <button class="chip ${ui.filter === s.key ? 'active' : ''}" data-action="filter" data-value="${s.key}">
+        ${s.emoji} ${s.label} <span class="count">${counts[s.key] || 0}</span>
+      </button>`))
+    .join('');
+
+  return `
+    ${topBar('💡 App Ideas')}
+    <main class="page">
+      <div class="search">
+        <input id="search" type="search" placeholder="Search ideas, tags, features…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
+      </div>
+      <div class="chips-row" aria-label="Filter by status">${filterChips}</div>
+      <div class="row-between" style="margin:8px 0 12px">
+        <span class="muted small" id="result-count"></span>
+        <label class="row small muted">Sort
+          <select id="sort" class="sort-select" aria-label="Sort ideas">
+            <option value="updated"  ${state.sort === 'updated' ? 'selected' : ''}>Recently updated</option>
+            <option value="progress" ${state.sort === 'progress' ? 'selected' : ''}>Progress</option>
+            <option value="priority" ${state.sort === 'priority' ? 'selected' : ''}>Priority</option>
+          </select>
+        </label>
+      </div>
+      <div id="idea-list" class="list"></div>
+    </main>
+    ${bottomNav('home')}`;
+}
+
+// Only re-draw the list (so typing in the search box doesn't lose focus).
+function updateIdeaList() {
+  const listEl = document.getElementById('idea-list');
+  if (!listEl) return;
+
+  const q = ui.search.trim().toLowerCase();
+  let ideas = state.ideas.filter(i => {
+    if (ui.filter !== 'all' && i.status !== ui.filter) return false;
+    if (!q) return true;
+    const haystack = [i.name, i.desc, i.notes, i.problem, i.target, i.tags.join(' '), i.features.map(f => f.title).join(' ')]
+      .join(' ').toLowerCase();
+    return haystack.includes(q);
+  });
+
+  // Sorting
+  ideas.sort((a, b) => {
+    if (state.sort === 'progress') return progressOf(b) - progressOf(a) || b.updatedAt - a.updatedAt;
+    if (state.sort === 'priority') return PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority] || b.updatedAt - a.updatedAt;
+    return b.updatedAt - a.updatedAt;
+  });
+
+  document.getElementById('result-count').textContent = `${ideas.length} idea${ideas.length === 1 ? '' : 's'}`;
+
+  if (!state.ideas.length) {
+    listEl.innerHTML = `
+      <div class="card empty">
+        <div class="big">💡</div>
+        <h2>No ideas yet</h2>
+        <p class="muted">Apna pehla app idea add karo — ya ek sample idea load karke dekho app kaise kaam karta hai.</p>
+        <div class="btn-row" style="margin-top:16px">
+          <a class="btn primary" href="#/new">+ Add your first idea</a>
+          <button class="btn" data-action="load-sample">Load sample idea</button>
+        </div>
+      </div>`;
+    return;
+  }
+  if (!ideas.length) {
+    listEl.innerHTML = `<div class="card empty"><div class="big">🔎</div><p class="muted">No ideas match your search / filter.</p></div>`;
+    return;
+  }
+
+  listEl.innerHTML = ideas.map(ideaCard).join('');
+  animateBars();
+}
+
+function ideaCard(idea) {
+  const pct = progressOf(idea);
+  const s = statusOf(idea.status);
+  const doneCount = idea.features.filter(f => f.status === 'done').length;
+  return `
+    <a class="card idea-card" href="#/idea/${idea.id}">
+      <div class="card-top">
+        <h3>${esc(idea.name)}</h3>
+        ${statusBadge(idea.status)}
+      </div>
+      <p class="card-desc">${esc(idea.desc) || '<i>No description</i>'}</p>
+      ${progressBar('card-' + idea.id, pct, s.color)}
+      <div class="card-meta">
+        <span><b style="color:var(--text)">${pct}%</b> · ${doneCount}/${idea.features.length} features</span>
+        <span class="row" style="gap:10px">
+          <span title="Priority"><span class="dot" style="--c:${PRIORITY_COLORS[idea.priority]}"></span> ${idea.priority}</span>
+          <span>Updated ${timeAgo(idea.updatedAt)}</span>
+        </span>
+      </div>
+      ${idea.tags.length ? `<div class="tag-list">${idea.tags.slice(0, 4).map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}
+    </a>`;
+}
+
+
+/* =====================================================================
+   SECTION 8: SCREEN — ADD / EDIT IDEA
+   ===================================================================== */
+
+function renderEdit(idea) {
+  const isNew = !idea;
+  const d = idea || normalizeIdea({});
+  if (isNew) d.name = '';
+  const manualOn = d.manualProgress !== null;
+  const manualVal = manualOn ? d.manualProgress : autoProgress(d.features);
+  const showPrice = d.monetization.includes('Paid') || d.monetization.includes('Subscription');
+
+  const chips = (name, options, selected, type = 'checkbox') => options.map(o => `
+      <label class="chip"><input type="${type}" name="${name}" value="${esc(o)}" ${selected.includes(o) ? 'checked' : ''}>${esc(o)}</label>`).join('');
+
+  return `
+    ${topBar(isNew ? 'New idea' : 'Edit idea', { back: isNew ? '#/' : `#/idea/${d.id}` })}
+    <main class="page">
+      <form id="idea-form" data-id="${isNew ? '' : d.id}" autocomplete="off" novalidate>
+
+        <section class="card form-section">
+          <h2>Basics</h2>
+          <label class="field"><span class="label">App name *</span>
+            <input name="name" required maxlength="80" value="${esc(d.name)}" placeholder="e.g. PharmaFlash">
+          </label>
+          <label class="field"><span class="label">One-line description</span>
+            <input name="desc" maxlength="140" value="${esc(d.desc)}" placeholder="What does it do, in one line?">
+          </label>
+          <label class="field"><span class="label">Problem it solves</span>
+            <textarea name="problem" rows="3" placeholder="Kis problem ko solve karta hai?">${esc(d.problem)}</textarea>
+          </label>
+          <label class="field"><span class="label">Target users</span>
+            <textarea name="target" rows="2" placeholder="Kaun use karega?">${esc(d.target)}</textarea>
+          </label>
+          <label class="field" style="margin-bottom:0"><span class="label">Detailed notes</span>
+            <textarea name="notes" rows="4" placeholder="Anything else: inspiration, competitors, tech ideas…">${esc(d.notes)}</textarea>
+          </label>
+        </section>
+
+        <section class="card form-section">
+          <h2>Status & priority</h2>
+          <div class="field"><span class="label">Status</span>
+            <div class="chip-group">${STATUSES.map(s => `
+              <label class="chip"><input type="radio" name="status" value="${s.key}" ${d.status === s.key ? 'checked' : ''}>${s.emoji} ${s.label}</label>`).join('')}
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:0"><span class="label">Priority</span>
+            <div class="chip-group">${chips('priority', PRIORITIES, [d.priority], 'radio')}</div>
+          </div>
+        </section>
+
+        <section class="card form-section">
+          <h2>Platform & money</h2>
+          <div class="field"><span class="label">Platforms</span>
+            <div class="chip-group">${chips('platforms', PLATFORMS, d.platforms)}</div>
+          </div>
+          <div class="field"><span class="label">Monetization</span>
+            <div class="chip-group">${chips('monetization', MONETIZATION, d.monetization)}</div>
+          </div>
+          <label class="field" id="price-field" style="margin-bottom:0;${showPrice ? '' : 'display:none'}">
+            <span class="label">Price</span>
+            <input name="price" value="${esc(d.price)}" placeholder="e.g. ₹99 one-time or ₹49/month">
+          </label>
+        </section>
+
+        <section class="card form-section">
+          <h2>Tags & links</h2>
+          <label class="field"><span class="label">Tags</span>
+            <input name="tags" value="${esc(d.tags.join(', '))}" placeholder="pharma, productivity, education">
+            <span class="hint">Separate with commas</span>
+          </label>
+          <div class="field" style="margin-bottom:0"><span class="label">Links (GitHub, Play Store, designs…)</span>
+            <div id="link-rows" class="stack">${(d.links.length ? d.links : []).map(linkRow).join('')}</div>
+            <button type="button" class="btn ghost" data-action="add-link-row">+ Add link</button>
+          </div>
+        </section>
+
+        <section class="card form-section">
+          <h2>Progress</h2>
+          <label class="check"><input type="checkbox" name="manualOn" ${manualOn ? 'checked' : ''}> Set progress manually</label>
+          <div id="manual-wrap" style="${manualOn ? '' : 'display:none'}">
+            <div class="progress-label"><span>Manual progress</span><b id="manual-out">${manualVal}%</b></div>
+            <input type="range" name="manualVal" min="0" max="100" step="5" value="${manualVal}">
+          </div>
+          <p class="hint" style="margin:6px 0 0">Off = automatic (Done features ÷ total features).</p>
+        </section>
+
+        <div class="btn-row">
+          <a class="btn" href="${isNew ? '#/' : `#/idea/${d.id}`}">Cancel</a>
+          <button type="submit" class="btn primary">${isNew ? 'Create idea' : 'Save changes'}</button>
+        </div>
+      </form>
+    </main>`;
+}
+
+function linkRow(link = { label: '', url: '' }) {
+  return `
+    <div class="link-row row" style="align-items:stretch">
+      <input name="linkLabel" placeholder="Label (e.g. GitHub)" value="${esc(link.label)}" style="flex:1 1 35%">
+      <input name="linkUrl" placeholder="https://…" value="${esc(link.url)}" inputmode="url" style="flex:1 1 55%">
+      <button type="button" class="icon-btn" data-action="remove-link-row" aria-label="Remove link">✕</button>
+    </div>`;
+}
+
+function saveIdeaForm(form) {
+  const fd = new FormData(form);
+  const name = String(fd.get('name') || '').trim();
+  if (!name) {
+    toast('Please enter an app name');
+    form.elements.name.focus();
+    return;
+  }
+
+  let idea = form.dataset.id ? findIdea(form.dataset.id) : null;
+  const isNew = !idea;
+  if (isNew) {
+    idea = normalizeIdea({});
+    state.ideas.unshift(idea);
+  }
+
+  // Links come in as two parallel lists: labels and urls.
+  const labels = fd.getAll('linkLabel');
+  const urls = fd.getAll('linkUrl');
+  const links = urls
+    .map((url, i) => ({ id: uid(), label: String(labels[i] || '').trim(), url: String(url).trim() }))
+    .filter(l => l.url);
+
+  Object.assign(idea, {
+    name,
+    desc: String(fd.get('desc') || '').trim(),
+    problem: String(fd.get('problem') || '').trim(),
+    target: String(fd.get('target') || '').trim(),
+    notes: String(fd.get('notes') || '').trim(),
+    status: fd.get('status') || 'idea',
+    priority: fd.get('priority') || 'Medium',
+    platforms: fd.getAll('platforms'),
+    monetization: fd.getAll('monetization'),
+    price: String(fd.get('price') || '').trim(),
+    tags: parseTags(fd.get('tags')),
+    links,
+    manualProgress: fd.get('manualOn') ? Number(fd.get('manualVal')) : null,
+  });
+
+  touch(idea);
+  saveState();
+  toast(isNew ? '✨ Idea created' : '✅ Saved');
+  location.hash = `#/idea/${idea.id}`;
+}
+
+
+/* =====================================================================
+   SECTION 9: SCREEN — IDEA DETAIL (features, journal, info)
+   ===================================================================== */
+
+function renderDetail(idea) {
+  const pct = progressOf(idea);
+  const mvp = mvpProgressOf(idea);
+  const s = statusOf(idea.status);
+  const total = idea.features.length;
+  const done = idea.features.filter(f => f.status === 'done').length;
+  const mvpFeatures = idea.features.filter(f => f.mvp);
+
+  const actions = `
+    <button class="icon-btn" data-action="copy-idea" aria-label="Copy as text" title="Copy as text">📋</button>
+    <a class="icon-btn" href="#/edit/${idea.id}" aria-label="Edit idea" title="Edit">✏️</a>`;
+
+  const tabs = [
+    ['features', `Features (${total})`],
+    ['journal', `Journal (${idea.log.length})`],
+    ['info', 'Details'],
+  ];
+
+  let tabContent = '';
+  if (ui.tab === 'journal') tabContent = renderJournalTab(idea);
+  else if (ui.tab === 'info') tabContent = renderInfoTab(idea);
+  else tabContent = renderFeaturesTab(idea);
+
+  return `
+    ${topBar(esc(idea.name), { back: '#/', actions })}
+    <main class="page">
+      <section class="card hero">
+        <div class="badges">${statusBadge(idea.status)} ${priorityBadge(idea.priority)}</div>
+        <h1>${esc(idea.name)}</h1>
+        ${idea.desc ? `<p>${esc(idea.desc)}</p>` : ''}
+
+        <label class="field" style="margin:0">
+          <span class="label small muted">Quick status change</span>
+          <select data-change="status" aria-label="Status">
+            ${STATUSES.map(st => `<option value="${st.key}" ${st.key === idea.status ? 'selected' : ''}>${st.emoji} ${st.label}</option>`).join('')}
+          </select>
+        </label>
+
+        <div class="progress-grid">
+          <div>
+            <div class="progress-label">
+              <span>Overall progress ${idea.manualProgress !== null ? '<span class="tag">manual</span>' : `<span class="muted">· ${done}/${total} done</span>`}</span>
+              <b>${pct}%</b>
+            </div>
+            ${progressBar('overall-' + idea.id, pct, s.color, true)}
+          </div>
+          <div>
+            <div class="progress-label">
+              <span>MVP progress <span class="muted">· ${mvpFeatures.filter(f => f.status === 'done').length}/${mvpFeatures.length} must-haves</span></span>
+              <b>${mvp === null ? '—' : mvp + '%'}</b>
+            </div>
+            ${progressBar('mvp-' + idea.id, mvp || 0, 'var(--danger)', true)}
+          </div>
+        </div>
+      </section>
+
+      <div class="tabs" role="tablist">
+        ${tabs.map(([key, label]) => `<button class="tab ${ui.tab === key ? 'active' : ''}" role="tab" aria-selected="${ui.tab === key}" data-action="tab" data-value="${key}">${label}</button>`).join('')}
+      </div>
+
+      ${tabContent}
+
+      <div class="btn-row" style="margin-top:28px">
+        <button class="btn" data-action="copy-idea">📋 Copy as text</button>
+        <button class="btn danger" data-action="delete-idea">🗑️ Delete idea</button>
+      </div>
+    </main>`;
+}
+
+/* ----- Features tab ----- */
+function renderFeaturesTab(idea) {
+  const later = idea.features.filter(f => !f.mvp);
+  const items = idea.features.map(f => `
+    <li class="feature" data-id="${f.id}" data-status="${f.status}">
+      <button class="drag-handle" aria-label="Drag to reorder" title="Drag to reorder">⋮⋮</button>
+      <button class="f-status" data-action="cycle-feature" data-id="${f.id}"
+        aria-label="Status: ${FEATURE_LABEL[f.status]}. Tap to change" title="Tap to change status">${FEATURE_ICON[f.status]}</button>
+      <div class="f-body">
+        <div class="f-title">${esc(f.title)}</div>
+        ${f.desc ? `<div class="f-desc">${esc(f.desc)}</div>` : ''}
+        <div class="f-tags">
+          <button class="mini ${f.mvp ? 'mvp' : ''}" data-action="toggle-mvp" data-id="${f.id}" title="Tap to switch MVP / Later">${f.mvp ? '⭐ MVP' : '🕒 Later'}</button>
+          <span class="mini state-${f.status}" style="cursor:default;display:inline-flex;align-items:center">${FEATURE_LABEL[f.status]}</span>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="edit-feature" data-id="${f.id}" aria-label="Edit feature" style="font-size:1rem">✎</button>
+    </li>`).join('');
+
+  return `
+    <form id="feature-form" class="card add-form" autocomplete="off">
+      <input name="title" placeholder="Add a feature… e.g. Login with Google" maxlength="120" required aria-label="Feature title">
+      <textarea name="desc" rows="2" placeholder="Description (optional)" aria-label="Feature description" style="min-height:60px"></textarea>
+      <div class="row-between">
+        <label class="check"><input type="checkbox" name="mvp" checked> ⭐ Must have (MVP)</label>
+        <button type="submit" class="btn primary">+ Add</button>
+      </div>
+    </form>
+
+    ${idea.features.length ? `
+      <p class="muted small" style="margin:0 0 10px">
+        Tap the circle to change status · drag ⋮⋮ to reorder ·
+        MVP ${idea.features.length - later.length} · Later ${later.length}
+      </p>
+      <ul class="feature-list" id="feature-list">${items}</ul>`
+    : `<div class="card empty"><div class="big">🧩</div><p class="muted">No features yet. Add the first one above!</p></div>`}`;
+}
+
+/* ----- Journal tab ----- */
+function renderJournalTab(idea) {
+  // Group entries by date, newest first.
+  const sorted = [...idea.log].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+  const groups = [];
+  sorted.forEach(entry => {
+    const last = groups[groups.length - 1];
+    if (last && last.date === entry.date) last.items.push(entry);
+    else groups.push({ date: entry.date, items: [entry] });
+  });
+
+  return `
+    <form id="log-form" class="card add-form" autocomplete="off">
+      <div class="row-between">
+        <b>📓 Aaj kya kiya?</b>
+        <input type="date" name="date" value="${todayStr()}" style="width:auto" aria-label="Date">
+      </div>
+      <textarea name="text" rows="3" required placeholder="e.g. Built the login screen, fixed dark mode bug…" aria-label="Journal entry"></textarea>
+      <button type="submit" class="btn primary">Add entry</button>
+    </form>
+
+    ${groups.length ? `<ol class="timeline">${groups.map(g => `
+      <li class="log-day">
+        <h4>${g.date === todayStr() ? 'Today · ' : ''}${fmtDate(g.date)}</h4>
+        ${g.items.map(e => `
+          <div class="log-item">
+            <div class="row-between">
+              <div class="text">${esc(e.text)}</div>
+              <button class="icon-btn" data-action="delete-log" data-id="${e.id}" aria-label="Delete entry" style="font-size:.9rem;color:var(--muted);margin-top:-8px">✕</button>
+            </div>
+          </div>`).join('')}
+      </li>`).join('')}</ol>`
+    : `<div class="card empty"><div class="big">📓</div><p class="muted">No journal entries yet. Roz thoda likho — progress dikhega!</p></div>`}`;
+}
+
+/* ----- Details tab ----- */
+function renderInfoTab(idea) {
+  const block = (title, body) => body ? `<div class="detail-block"><h3>${title}</h3>${body}</div>` : '';
+  const text = t => (t ? `<p>${esc(t)}</p>` : '');
+  const money = idea.monetization.length
+    ? esc(idea.monetization.join(', ')) + (idea.price ? ` · ${esc(idea.price)}` : '')
+    : '';
+
+  const content = [
+    block('Problem it solves', text(idea.problem)),
+    block('Target users', text(idea.target)),
+    block('Notes', text(idea.notes)),
+    block('Platforms', idea.platforms.length ? `<div class="chip-group">${idea.platforms.map(p => `<span class="tag">${esc(p)}</span>`).join('')}</div>` : ''),
+    block('Monetization', money ? `<p>${money}</p>` : ''),
+    block('Tags', idea.tags.length ? `<div class="chip-group">${idea.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''),
+    block('Links', idea.links.length ? idea.links.map(l => `
+      <a class="link-item" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">
+        <span>🔗</span>
+        <span style="min-width:0"><b>${esc(l.label || 'Link')}</b><br><span class="url">${esc(l.url)}</span></span>
+      </a>`).join('') : ''),
+  ].join('');
+
+  return `
+    <section class="card">
+      ${content || `<p class="muted" style="margin:0">No details yet. Tap ✏️ Edit to add the problem, target users, links and more.</p>`}
+      <p class="muted small" style="margin:12px 0 0">Created ${fmtDate(idea.createdAt)} · Updated ${timeAgo(idea.updatedAt)}</p>
+    </section>`;
+}
+
+/* ----- Feature edit bottom sheet ----- */
+function openFeatureSheet(idea, feature) {
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <form id="feature-edit-form" class="sheet-inner" data-idea="${idea.id}" data-id="${feature.id}" autocomplete="off">
+      <h2>Edit feature</h2>
+      <label class="field"><span class="label">Title</span>
+        <input name="title" required maxlength="120" value="${esc(feature.title)}">
+      </label>
+      <label class="field"><span class="label">Description</span>
+        <textarea name="desc" rows="3">${esc(feature.desc)}</textarea>
+      </label>
+      <div class="field"><span class="label">Status</span>
+        <div class="chip-group">${FEATURE_STATUSES.map(st => `
+          <label class="chip"><input type="radio" name="status" value="${st}" ${feature.status === st ? 'checked' : ''}>${FEATURE_LABEL[st]}</label>`).join('')}
+        </div>
+      </div>
+      <div class="field"><span class="label">Type</span>
+        <div class="chip-group">
+          <label class="chip"><input type="radio" name="mvp" value="1" ${feature.mvp ? 'checked' : ''}>⭐ Must have (MVP)</label>
+          <label class="chip"><input type="radio" name="mvp" value="0" ${!feature.mvp ? 'checked' : ''}>🕒 Later</label>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn danger" data-action="delete-feature">Delete</button>
+        <button type="button" class="btn" data-action="close-sheet">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>`;
+  sheet.showModal();
+}
+
+function closeSheet() {
+  const sheet = document.getElementById('sheet');
+  if (sheet.open) sheet.close();
+}
+
+
+/* =====================================================================
+   SECTION 10: SCREEN — DASHBOARD
+   ===================================================================== */
+
+function renderDashboard() {
+  const ideas = state.ideas;
+  const total = ideas.length;
+  const avg = total ? Math.round(ideas.reduce((sum, i) => sum + progressOf(i), 0) / total) : 0;
+  const allFeatures = ideas.flatMap(i => i.features);
+  const featuresDone = allFeatures.filter(f => f.status === 'done').length;
+  const weekAgoStr = todayStr(Date.now() - 6 * DAY);
+  const entriesThisWeek = ideas.flatMap(i => i.log).filter(l => l.date >= weekAgoStr).length;
+
+  // Most active idea = most changes in the last 7 days.
+  let mostActive = null, best = 0;
+  ideas.forEach(i => {
+    const score = weeklyActivity(i);
+    if (score > best) { best = score; mostActive = i; }
+  });
+
+  const statusRows = STATUSES.map(s => {
+    const n = ideas.filter(i => i.status === s.key).length;
+    const pct = total ? Math.round((n / total) * 100) : 0;
+    return `
+      <div class="status-row">
+        <span>${s.emoji} ${s.label}</span>
+        ${progressBar('dash-' + s.key, pct, s.color)}
+        <span class="n">${n}</span>
+      </div>`;
+  }).join('');
+
+  return `
+    ${topBar('📊 Dashboard')}
+    <main class="page">
+      <div class="stats">
+        <div class="card stat"><div class="num">${total}</div><div class="lbl">Total ideas</div></div>
+        <div class="card stat"><div class="num">${avg}%</div><div class="lbl">Overall progress (avg)</div></div>
+        <div class="card stat"><div class="num">${featuresDone}<span class="muted" style="font-size:1rem">/${allFeatures.length}</span></div><div class="lbl">Features done</div></div>
+        <div class="card stat"><div class="num">${entriesThisWeek}</div><div class="lbl">Journal entries (7 days)</div></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        ${progressBar('dash-overall', avg, null, true)}
+      </div>
+
+      <h2 class="section-title">🔥 Most active this week</h2>
+      ${mostActive ? `
+        <a class="card active-idea" href="#/idea/${mostActive.id}">
+          <div class="card-top"><h3>${esc(mostActive.name)}</h3>${statusBadge(mostActive.status)}</div>
+          <p class="muted small" style="margin:6px 0 10px">${best} update${best === 1 ? '' : 's'} in the last 7 days · ${progressOf(mostActive)}% done</p>
+          ${progressBar('dash-active', progressOf(mostActive), statusOf(mostActive.status).color)}
+        </a>`
+      : `<div class="card"><p class="muted" style="margin:0">No activity this week yet. Kisi idea pe thoda kaam karo! 💪</p></div>`}
+
+      <h2 class="section-title">Ideas by status</h2>
+      <div class="card">${statusRows}</div>
+
+      <h2 class="section-title">☁️ Sync (phone app + website)</h2>
+      ${renderSyncCard()}
+
+      <h2 class="section-title">💾 Backup</h2>
+      <div class="card">
+        <p class="muted small" style="margin-top:0">Your data is saved only in this browser. Export a JSON backup regularly, and import it on another device.</p>
+        <div class="btn-row">
+          <button class="btn primary" data-action="export">⬇️ Export JSON</button>
+          <button class="btn" data-action="import" data-value="merge">⬆️ Import (merge)</button>
+          <button class="btn danger" data-action="import" data-value="replace">Import (replace all)</button>
+        </div>
+      </div>
+    </main>
+    ${bottomNav('dashboard')}`;
+}
+
+
+/* =====================================================================
+   SECTION 11: EXPORT / IMPORT / COPY AS TEXT / SAMPLE DATA
+   ===================================================================== */
+
+function exportJSON() {
+  const data = { app: 'app-ideas-tracker', version: 1, exportedAt: new Date().toISOString(), ideas: state.ideas };
+  const json = JSON.stringify(data, null, 2);
+  const fileName = `app-ideas-backup-${todayStr()}.json`;
+
+  // Inside the Android app: ask the app to save the file into Downloads.
+  if (window.AndroidBridge) {
+    toast(AndroidBridge.saveFile(fileName, json) ? `⬇️ Saved to Downloads: ${fileName}` : '❌ Could not save file');
+    return;
+  }
+
+  // In a normal browser: trigger a file download.
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast(`⬇️ Exported ${state.ideas.length} ideas`);
+}
+
+function importJSON(text, mode) {
+  let data;
+  try { data = JSON.parse(text); }
+  catch { toast('❌ That file is not valid JSON'); return; }
+
+  // Accept either { ideas: [...] } or a plain array.
+  const list = Array.isArray(data) ? data : data && Array.isArray(data.ideas) ? data.ideas : null;
+  if (!list) { toast('❌ No ideas found in that file'); return; }
+  const incoming = list.map(normalizeIdea);
+
+  if (mode === 'replace') {
+    if (!confirm(`Replace ALL ${state.ideas.length} current ideas with ${incoming.length} imported ideas? This cannot be undone.`)) return;
+    const keep = new Set(incoming.map(i => i.id));
+    state.ideas.forEach(i => { if (!keep.has(i.id)) state.deleted[i.id] = Date.now(); });
+    incoming.forEach(i => delete state.deleted[i.id]);
+    state.ideas = incoming;
+  } else {
+    // Merge: same id -> keep the newer version; new id -> add it.
+    let added = 0, updated = 0;
+    incoming.forEach(inc => {
+      const idx = state.ideas.findIndex(i => i.id === inc.id);
+      if (idx === -1) { state.ideas.push(inc); added++; }
+      else if (inc.updatedAt > state.ideas[idx].updatedAt) { state.ideas[idx] = inc; updated++; }
+    });
+    toast(`⬆️ Imported: ${added} new, ${updated} updated`);
+  }
+  saveState();
+  if (mode === 'replace') toast(`⬆️ Imported ${incoming.length} ideas`);
+  render();
+}
+
+// Plain-text summary, handy for sharing or pasting into an AI tool.
+function ideaToText(idea) {
+  const s = statusOf(idea.status);
+  const mvp = mvpProgressOf(idea);
+  const lines = [];
+  lines.push(`📱 ${idea.name}`);
+  if (idea.desc) lines.push(idea.desc);
+  lines.push('');
+  lines.push(`Status: ${s.emoji} ${s.label} | Priority: ${idea.priority} | Progress: ${progressOf(idea)}%${mvp !== null ? ` (MVP ${mvp}%)` : ''}`);
+  if (idea.platforms.length) lines.push(`Platforms: ${idea.platforms.join(', ')}`);
+  if (idea.monetization.length) lines.push(`Monetization: ${idea.monetization.join(', ')}${idea.price ? ` (${idea.price})` : ''}`);
+  if (idea.tags.length) lines.push(`Tags: ${idea.tags.map(t => '#' + t).join(' ')}`);
+  if (idea.problem) lines.push('', 'Problem it solves:', idea.problem);
+  if (idea.target) lines.push('', 'Target users:', idea.target);
+  if (idea.notes) lines.push('', 'Notes:', idea.notes);
+  if (idea.features.length) {
+    const mark = { todo: '[ ]', doing: '[~]', done: '[x]' };
+    lines.push('', 'Features ([x] done, [~] in progress, [ ] to do):');
+    idea.features.forEach(f => {
+      lines.push(`${mark[f.status]} ${f.title} — ${f.mvp ? 'MVP' : 'Later'}${f.desc ? `: ${f.desc}` : ''}`);
+    });
+  }
+  if (idea.links.length) {
+    lines.push('', 'Links:');
+    idea.links.forEach(l => lines.push(`- ${l.label ? l.label + ': ' : ''}${l.url}`));
+  }
+  if (idea.log.length) {
+    lines.push('', 'Recent progress log:');
+    [...idea.log].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10)
+      .forEach(l => lines.push(`- ${l.date}: ${l.text}`));
+  }
+  return lines.join('\n');
+}
+
+function loadSample() {
+  const now = Date.now();
+  const sample = normalizeIdea({
+    name: 'PharmaFlash',
+    desc: 'Flashcard app for B.Pharm students with spaced repetition.',
+    problem: 'Students struggle to revise hundreds of drugs, doses and mechanisms before exams.',
+    target: 'B.Pharm / D.Pharm students in India',
+    notes: 'Hinglish explanations. Offline-first. Later: AI-generated cards from notes.',
+    platforms: ['Android', 'Web'],
+    status: 'building',
+    priority: 'High',
+    monetization: ['Free', 'Subscription'],
+    price: '₹49/month for premium decks',
+    tags: ['pharma', 'education'],
+    links: [{ label: 'GitHub', url: 'https://github.com/' }],
+    features: [
+      { title: 'Flashcard viewer with flip animation', status: 'done', mvp: true },
+      { title: 'Spaced repetition scheduling', status: 'doing', mvp: true, desc: 'SM-2 algorithm' },
+      { title: 'Pharmacology starter deck', status: 'todo', mvp: true },
+      { title: 'Dark mode', status: 'done', mvp: false },
+      { title: 'AI card generator from PDF notes', status: 'todo', mvp: false },
+    ],
+    log: [
+      { date: todayStr(), text: 'Started spaced repetition logic.', createdAt: now },
+      { date: todayStr(now - 2 * DAY), text: 'Finished flip animation and dark mode.', createdAt: now - 2 * DAY },
+    ],
+    activity: [now - 2 * DAY, now - DAY, now],
+    createdAt: now - 10 * DAY,
+    updatedAt: now,
+  });
+  state.ideas.push(sample);
+  saveState();
+  toast('✨ Sample idea added');
+  render();
+}
+
+
+/* =====================================================================
+   SECTION 11B: CLOUD SYNC (same data on phone app + website)
+   ---------------------------------------------------------------------
+   Data is stored in a *secret GitHub Gist* in your GitHub account.
+   Each device needs the same GitHub token (with only the "gist" scope).
+   The token is kept in this device's localStorage only — it is NOT
+   included in JSON exports.
+
+   How syncing works:
+     1. Download the gist.
+     2. Merge: for each idea, the version with the newer "updatedAt" wins.
+        Deleted ideas are remembered in state.deleted so deletes sync too.
+     3. Upload the merged result (only if something changed).
+   ===================================================================== */
+const SYNC_STORAGE_KEY = 'appIdeasTracker.sync';
+const GIST_FILE = 'app-ideas-tracker.json';
+const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=App%20Ideas%20Sync';
+
+let sync = (() => {
+  try { return JSON.parse(localStorage.getItem(SYNC_STORAGE_KEY)) || {}; } catch { return {}; }
+})();
+const syncState = { status: sync.token ? 'idle' : 'off', message: '', running: false, again: false, timer: null };
+
+function saveSyncSettings() {
+  try { localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(sync)); } catch { /* ignore */ }
+}
+
+// Small wrapper around the GitHub API.
+async function github(path, options = {}) {
+  const res = await fetch('https://api.github.com' + path, {
+    ...options,
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: 'Bearer ' + sync.token,
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+  });
+  if (res.status === 401) throw new Error('Token is invalid or expired');
+  if (res.status === 404) throw new Error('not-found');
+  if (!res.ok) throw new Error('GitHub error ' + res.status);
+  return res.json();
+}
+
+// Find the gist that holds our data, or create a new secret one.
+async function findOrCreateGist() {
+  const gists = await github('/gists?per_page=100');
+  const existing = gists.find(g => g.files && g.files[GIST_FILE]);
+  if (existing) return existing.id;
+  const created = await github('/gists', {
+    method: 'POST',
+    body: JSON.stringify({
+      description: 'App Ideas Tracker — synced data (do not edit by hand)',
+      public: false,
+      files: { [GIST_FILE]: { content: JSON.stringify({ ideas: [], deleted: {} }) } },
+    }),
+  });
+  return created.id;
+}
+
+async function readGist() {
+  const gist = await github('/gists/' + sync.gistId);
+  const file = gist.files[GIST_FILE];
+  if (!file) return { ideas: [], deleted: {} };
+  // Big files are cut short in the API response; then download the full file.
+  const text = file.truncated ? await (await fetch(file.raw_url, { cache: 'no-store' })).text() : file.content;
+  const data = JSON.parse(text || '{}');
+  return { ideas: (data.ideas || []).map(normalizeIdea), deleted: data.deleted || {} };
+}
+
+async function writeGist(data) {
+  await github('/gists/' + sync.gistId, {
+    method: 'PATCH',
+    body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify({ updatedAt: Date.now(), ...data }) } } }),
+  });
+}
+
+// Combine two copies of the data. Newer idea wins; a delete wins if it is newer than the idea.
+function mergeData(a, b) {
+  const deleted = { ...a.deleted };
+  Object.entries(b.deleted || {}).forEach(([id, t]) => { deleted[id] = Math.max(deleted[id] || 0, t); });
+  // forget deletes older than 90 days so the list doesn't grow forever
+  Object.keys(deleted).forEach(id => { if (Date.now() - deleted[id] > 90 * DAY) delete deleted[id]; });
+
+  const byId = new Map();
+  [...a.ideas, ...b.ideas].forEach(idea => {
+    const current = byId.get(idea.id);
+    if (!current || idea.updatedAt > current.updatedAt) byId.set(idea.id, idea);
+  });
+  const ideas = [...byId.values()].filter(i => !(deleted[i.id] && deleted[i.id] >= i.updatedAt));
+  return { ideas, deleted };
+}
+
+// A stable text version of the data, used to check "did anything change?"
+function fingerprint(data) {
+  const ideas = [...data.ideas].sort((x, y) => (x.id < y.id ? -1 : 1));
+  const deleted = Object.keys(data.deleted).sort().map(k => [k, data.deleted[k]]);
+  return JSON.stringify([ideas, deleted]);
+}
+
+// Sync a couple of seconds after the last change (so fast tapping = one upload).
+function scheduleSync() {
+  if (!sync.token) return;
+  clearTimeout(syncState.timer);
+  syncState.timer = setTimeout(syncNow, 1500);
+}
+
+async function syncNow() {
+  if (!sync.token) return;
+  if (syncState.running) { syncState.again = true; return; }
+  if (!navigator.onLine) { setSyncStatus('error', 'Offline — will sync when back online'); return; }
+
+  syncState.running = true;
+  setSyncStatus('syncing');
+  try {
+    if (!sync.gistId) { sync.gistId = await findOrCreateGist(); saveSyncSettings(); }
+
+    let remote;
+    try { remote = await readGist(); }
+    catch (err) {
+      if (err.message !== 'not-found') throw err;
+      sync.gistId = await findOrCreateGist(); // gist was deleted -> make a new one
+      saveSyncSettings();
+      remote = await readGist();
+    }
+
+    const local = { ideas: state.ideas, deleted: state.deleted };
+    const merged = mergeData(local, remote);
+    if (fingerprint(merged) !== fingerprint(remote)) await writeGist(merged);
+
+    // Apply to this device. Merge again with the *current* data in case
+    // something was edited while we were waiting for the network.
+    const latest = mergeData({ ideas: state.ideas, deleted: state.deleted }, merged);
+    if (fingerprint(latest) !== fingerprint({ ideas: state.ideas, deleted: state.deleted })) {
+      state.ideas = latest.ideas;
+      state.deleted = latest.deleted;
+      saveState(true);
+      refreshAfterSync();
+    }
+
+    sync.lastSync = Date.now();
+    saveSyncSettings();
+    setSyncStatus('ok');
+  } catch (err) {
+    console.error('Sync failed', err);
+    setSyncStatus('error', err.message === 'Failed to fetch' ? 'No internet connection' : err.message);
+  } finally {
+    syncState.running = false;
+    if (syncState.again) { syncState.again = false; scheduleSync(); }
+  }
+}
+
+// Redraw with synced data — but never while you're typing or dragging.
+function refreshAfterSync() {
+  const { page } = parseRoute();
+  const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (page === 'edit' || page === 'new' || typing || drag || document.getElementById('sheet').open) return;
+  if (page === 'idea' && !findIdea(parseRoute().id)) { location.hash = '#/'; return; }
+  render();
+}
+
+function setSyncStatus(status, message = '') {
+  syncState.status = status;
+  syncState.message = message;
+  const btn = document.getElementById('sync-btn');
+  if (btn) btn.outerHTML = syncButton();
+  const card = document.getElementById('sync-card');
+  if (card) card.outerHTML = renderSyncCard();
+}
+
+// Little cloud icon in the top bar (tap = sync now).
+function syncButton() {
+  if (!sync.token) return '';
+  const icon = { syncing: '🔄', ok: '☁️', error: '⚠️', idle: '☁️' }[syncState.status] || '☁️';
+  const title = syncState.status === 'error' ? 'Sync problem: ' + syncState.message : 'Sync now';
+  return `<button id="sync-btn" class="icon-btn" data-action="sync-now" aria-label="${esc(title)}" title="${esc(title)}">${icon}</button>`;
+}
+
+function renderSyncCard() {
+  if (!sync.token) {
+    return `
+      <div class="card" id="sync-card">
+        <p class="small" style="margin-top:0">Phone app aur website ka data same rakhne ke liye GitHub se connect karo (free). Har device pe ek baar karna hai:</p>
+        <ol class="small" style="padding-left:20px;margin:0 0 12px">
+          <li><a href="${TOKEN_URL}" target="_blank" rel="noopener noreferrer">GitHub token banao</a> → only <b>gist</b> tick rahe → Expiration: <b>No expiration</b> → Generate → token copy karo.</li>
+          <li>Neeche paste karke <b>Connect</b> dabao.</li>
+          <li>Dusre device pe bhi wahi token paste karo.</li>
+        </ol>
+        <div class="row">
+          <input id="sync-token" type="password" placeholder="ghp_…" autocomplete="off" aria-label="GitHub token">
+          <button class="btn primary" data-action="sync-connect">Connect</button>
+        </div>
+      </div>`;
+  }
+  const statusText = {
+    syncing: '🔄 Syncing…',
+    ok: '✅ Synced',
+    idle: '☁️ Connected',
+    error: '⚠️ ' + esc(syncState.message),
+  }[syncState.status];
+  return `
+    <div class="card" id="sync-card">
+      <div class="row-between">
+        <b>${statusText}</b>
+        <span class="muted small">${sync.lastSync ? 'Last sync ' + timeAgo(sync.lastSync) : ''}</span>
+      </div>
+      <p class="muted small">Changes upload automatically. Other devices pick them up when opened.</p>
+      <div class="btn-row">
+        <button class="btn primary" data-action="sync-now">🔄 Sync now</button>
+        <button class="btn" data-action="sync-copy-key">🔑 Copy token</button>
+        <button class="btn danger" data-action="sync-disconnect">Disconnect</button>
+      </div>
+    </div>`;
+}
+
+// Sync when the app comes back to the screen, when internet returns, and every minute.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNow(); });
+window.addEventListener('online', syncNow);
+setInterval(() => { if (!document.hidden) syncNow(); }, 60 * 1000);
+
+
+/* =====================================================================
+   SECTION 12: DRAG TO REORDER FEATURES
+   Uses Pointer Events, so it works with mouse AND touch.
+   Grab the ⋮⋮ handle and move up/down.
+   ===================================================================== */
+let drag = null;
+
+document.addEventListener('pointerdown', e => {
+  const handle = e.target.closest('.drag-handle');
+  if (!handle) return;
+  e.preventDefault();
+  const item = handle.closest('.feature');
+  drag = { item, list: item.parentElement, pointerId: e.pointerId };
+  item.classList.add('dragging');
+  handle.setPointerCapture(e.pointerId); // keep receiving moves even outside the handle
+});
+
+document.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.pointerId) return;
+  e.preventDefault();
+
+  // Find the first item whose middle is below the finger, and drop before it.
+  const others = [...drag.list.querySelectorAll('.feature:not(.dragging)')];
+  const before = others.find(el => {
+    const r = el.getBoundingClientRect();
+    return e.clientY < r.top + r.height / 2;
+  });
+  if (before) { if (before !== drag.item.nextElementSibling) drag.list.insertBefore(drag.item, before); }
+  else if (drag.list.lastElementChild !== drag.item) drag.list.appendChild(drag.item);
+
+  // Auto-scroll when dragging near the top/bottom of the screen.
+  if (e.clientY < 90) window.scrollBy(0, -12);
+  else if (e.clientY > window.innerHeight - 90) window.scrollBy(0, 12);
+});
+
+function endDrag() {
+  if (!drag) return;
+  drag.item.classList.remove('dragging');
+  const idea = findIdea(currentIdeaId());
+  if (idea) {
+    const order = [...drag.list.children].map(li => li.dataset.id);
+    const before = idea.features.map(f => f.id).join();
+    idea.features.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    if (before !== order.join()) { touch(idea); saveState(); }
+  }
+  drag = null;
+}
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
+
+
+/* =====================================================================
+   SECTION 13: ROUTER
+   The URL hash decides which screen is shown:
+     #/              -> home
+     #/dashboard     -> dashboard
+     #/new           -> add idea
+     #/idea/<id>     -> idea detail
+     #/edit/<id>     -> edit idea
+   ===================================================================== */
+
+function parseRoute() {
+  const parts = (location.hash.replace(/^#\/?/, '') || '').split('/').filter(Boolean);
+  return { page: parts[0] || 'home', id: parts[1] };
+}
+const currentIdeaId = () => parseRoute().id;
+
+function render() {
+  const app = document.getElementById('app');
+  const { page, id } = parseRoute();
+
+  if (page === 'dashboard') {
+    app.innerHTML = renderDashboard();
+  } else if (page === 'new') {
+    app.innerHTML = renderEdit(null);
+  } else if ((page === 'idea' || page === 'edit') && id) {
+    const idea = findIdea(id);
+    if (!idea) { location.hash = '#/'; return; }
+    app.innerHTML = page === 'edit' ? renderEdit(idea) : renderDetail(idea);
+  } else {
+    app.innerHTML = renderHome();
+    updateIdeaList();
+  }
+  document.title = page === 'idea' && findIdea(id) ? `${findIdea(id).name} · App Ideas` : 'App Ideas Tracker';
+  animateBars();
+}
+
+window.addEventListener('hashchange', () => {
+  closeSheet();
+  // New idea page opened -> start on the Features tab.
+  if (parseRoute().page === 'idea') ui.tab = ui.tabFor === parseRoute().id ? ui.tab : 'features';
+  ui.tabFor = parseRoute().id;
+  render();
+  window.scrollTo(0, 0);
+});
+
+
+/* =====================================================================
+   SECTION 14: EVENT HANDLING
+   One listener per event type for the whole page ("event delegation").
+   Buttons say what they do with data-action="...".
+   ===================================================================== */
+
+const actions = {
+  theme: cycleTheme,
+
+  filter(el) {
+    ui.filter = el.dataset.value;
+    document.querySelectorAll('[data-action="filter"]').forEach(c => c.classList.toggle('active', c === el));
+    updateIdeaList();
+  },
+
+  'load-sample': loadSample,
+
+  tab(el) {
+    ui.tab = el.dataset.value;
+    render();
+  },
+
+  'cycle-feature'(el) {
+    const idea = findIdea(currentIdeaId());
+    const f = idea.features.find(x => x.id === el.dataset.id);
+    f.status = FEATURE_STATUSES[(FEATURE_STATUSES.indexOf(f.status) + 1) % FEATURE_STATUSES.length];
+    touch(idea); saveState(); render();
+    if (f.status === 'done') toast('✅ Done: ' + f.title);
+  },
+
+  'toggle-mvp'(el) {
+    const idea = findIdea(currentIdeaId());
+    const f = idea.features.find(x => x.id === el.dataset.id);
+    f.mvp = !f.mvp;
+    touch(idea); saveState(); render();
+  },
+
+  'edit-feature'(el) {
+    const idea = findIdea(currentIdeaId());
+    openFeatureSheet(idea, idea.features.find(x => x.id === el.dataset.id));
+  },
+
+  'delete-feature'() {
+    const form = document.getElementById('feature-edit-form');
+    const idea = findIdea(form.dataset.idea);
+    if (!confirm('Delete this feature?')) return;
+    idea.features = idea.features.filter(f => f.id !== form.dataset.id);
+    touch(idea); saveState(); closeSheet(); render();
+    toast('🗑️ Feature deleted');
+  },
+
+  'close-sheet': closeSheet,
+
+  'delete-log'(el) {
+    const idea = findIdea(currentIdeaId());
+    if (!confirm('Delete this journal entry?')) return;
+    idea.log = idea.log.filter(l => l.id !== el.dataset.id);
+    touch(idea); saveState(); render();
+  },
+
+  'copy-idea'() {
+    copyText(ideaToText(findIdea(currentIdeaId())));
+  },
+
+  'delete-idea'() {
+    const idea = findIdea(currentIdeaId());
+    if (!confirm(`Delete "${idea.name}" and all its features and journal? This cannot be undone.`)) return;
+    state.ideas = state.ideas.filter(i => i.id !== idea.id);
+    state.deleted[idea.id] = Date.now(); // remember the delete so other devices delete it too
+    saveState();
+    toast('🗑️ Idea deleted');
+    location.hash = '#/';
+  },
+
+  'add-link-row'() {
+    const rows = document.getElementById('link-rows');
+    rows.insertAdjacentHTML('beforeend', linkRow());
+    rows.lastElementChild.querySelector('input').focus();
+  },
+
+  'remove-link-row'(el) {
+    el.closest('.link-row').remove();
+  },
+
+  export: exportJSON,
+
+  async 'sync-connect'() {
+    const token = document.getElementById('sync-token').value.trim();
+    if (!token) { toast('Paste your GitHub token first'); return; }
+    sync = { token };
+    saveSyncSettings();
+    await syncNow();
+    if (syncState.status === 'ok') toast('☁️ Connected! Data synced');
+    else { sync = {}; saveSyncSettings(); toast('❌ ' + syncState.message); setSyncStatus('off'); }
+    render();
+  },
+
+  'sync-now'() {
+    syncNow();
+  },
+
+  'sync-copy-key'() {
+    copyText(sync.token);
+  },
+
+  'sync-disconnect'() {
+    if (!confirm('Disconnect sync on this device? Your ideas stay on this device and in GitHub.')) return;
+    sync = {};
+    saveSyncSettings();
+    setSyncStatus('off');
+    render();
+  },
+
+  import(el) {
+    ui.importMode = el.dataset.value;
+    document.getElementById('import-file').click();
+  },
+};
+
+// Clicks
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  e.preventDefault();
+  actions[el.dataset.action]?.(el, e);
+});
+
+// Form submissions
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const form = e.target;
+
+  if (form.id === 'idea-form') saveIdeaForm(form);
+
+  if (form.id === 'feature-form') {
+    const idea = findIdea(currentIdeaId());
+    const title = form.elements.title.value.trim();
+    if (!title) return;
+    idea.features.push({ id: uid(), title, desc: form.elements.desc.value.trim(), status: 'todo', mvp: form.elements.mvp.checked });
+    touch(idea); saveState(); render();
+    document.querySelector('#feature-form [name="title"]')?.focus(); // ready for the next one
+    toast('➕ Feature added');
+  }
+
+  if (form.id === 'feature-edit-form') {
+    const idea = findIdea(form.dataset.idea);
+    const f = idea.features.find(x => x.id === form.dataset.id);
+    const title = form.elements.title.value.trim();
+    if (!title) { toast('Title cannot be empty'); return; }
+    f.title = title;
+    f.desc = form.elements.desc.value.trim();
+    f.status = form.elements.status.value;
+    f.mvp = form.elements.mvp.value === '1';
+    touch(idea); saveState(); closeSheet(); render();
+  }
+
+  if (form.id === 'log-form') {
+    const idea = findIdea(currentIdeaId());
+    const text = form.elements.text.value.trim();
+    if (!text) return;
+    idea.log.push({ id: uid(), date: form.elements.date.value || todayStr(), text, createdAt: Date.now() });
+    touch(idea); saveState(); render();
+    toast('📓 Entry added');
+  }
+});
+
+// Typing (search box, manual progress slider)
+document.addEventListener('input', e => {
+  if (e.target.id === 'search') {
+    ui.search = e.target.value;
+    updateIdeaList();
+  }
+  if (e.target.name === 'manualVal') {
+    document.getElementById('manual-out').textContent = e.target.value + '%';
+  }
+});
+
+// Dropdowns, checkboxes, file picker
+document.addEventListener('change', e => {
+  const t = e.target;
+
+  if (t.id === 'sort') {
+    state.sort = t.value;
+    saveState();
+    updateIdeaList();
+  }
+
+  if (t.dataset.change === 'status') {
+    const idea = findIdea(currentIdeaId());
+    idea.status = t.value;
+    touch(idea); saveState(); render();
+    toast(`Status → ${statusOf(t.value).emoji} ${statusOf(t.value).label}`);
+  }
+
+  if (t.name === 'manualOn') {
+    document.getElementById('manual-wrap').style.display = t.checked ? '' : 'none';
+  }
+
+  if (t.name === 'monetization') {
+    const form = t.form;
+    const needsPrice = [...form.querySelectorAll('[name="monetization"]:checked')].some(c => c.value === 'Paid' || c.value === 'Subscription');
+    document.getElementById('price-field').style.display = needsPrice ? '' : 'none';
+  }
+
+  if (t.id === 'import-file' && t.files[0]) {
+    const reader = new FileReader();
+    reader.onload = () => importJSON(reader.result, ui.importMode);
+    reader.readAsText(t.files[0]);
+    t.value = ''; // allow importing the same file again
+  }
+});
+
+// Close the bottom sheet when tapping the dark backdrop.
+document.getElementById('sheet').addEventListener('click', e => {
+  if (e.target.id === 'sheet') closeSheet();
+});
+
+
+/* =====================================================================
+   SECTION 15: START THE APP
+   ===================================================================== */
+applyTheme();
+ui.tabFor = parseRoute().id;
+render();
+syncNow(); // pull the latest data from GitHub (if sync is connected)
+</script>
+</body>
+</html>
