@@ -1,3 +1,7 @@
 android/
 README.md
 .nojekyll
+.env*
+node_modules/
+backup-before-pwa.json
+android/

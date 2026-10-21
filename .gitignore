@@ -6,3 +6,6 @@ android/build/
 .vercel
 
 .vercel
+.env*
+node_modules/
+backup-before-pwa.json
