@@ -320,6 +320,11 @@
   .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .stat .num { font-size: 1.9rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .stat .lbl { color: var(--muted); font-size: .82rem; }
+  .avatar {
+    --h: 240; flex: none; width: 22px; height: 22px; border-radius: 50%;
+    display: inline-grid; place-items: center; font-size: .7rem; font-weight: 800; color: #fff;
+    background: hsl(var(--h) 65% 48%);
+  }
   .status-row { display: grid; grid-template-columns: 120px 1fr 28px; align-items: center; gap: 10px; padding: 6px 0; font-size: .9rem; }
   .status-row .n { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
   .section-title { font-size: 1rem; margin: 22px 0 10px; }
@@ -518,20 +523,29 @@ function normalizeIdea(raw = {}) {
       desc: String(f.desc || ''),
       status: FEATURE_STATUSES.includes(f.status) ? f.status : 'todo',
       mvp: f.mvp !== false, // default: Must have
+      by: normPerson(f.by),  // who added it
     })),
     log: arr(raw.log).map(l => ({
       id: l.id || uid(),
       date: /^\d{4}-\d{2}-\d{2}$/.test(l.date) ? l.date : todayStr(),
       text: String(l.text || ''),
       createdAt: Number(l.createdAt) || now,
+      by: normPerson(l.by),
     })),
     // null = automatic progress; a number 0-100 = manual override
     manualProgress: typeof raw.manualProgress === 'number' ? clamp(Math.round(raw.manualProgress), 0, 100) : null,
     // timestamps of every change, used for "most active idea this week"
     activity: arr(raw.activity).filter(n => typeof n === 'number'),
+    owner: normPerson(raw.owner),       // who created the idea: { id, name }
+    editedBy: normPerson(raw.editedBy), // who changed it last
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
   };
+}
+
+// A person is { id, name } (or null if unknown).
+function normPerson(p) {
+  return p && p.name ? { id: String(p.id || ''), name: String(p.name).slice(0, 30) } : null;
 }
 
 function loadState() {
@@ -568,6 +582,7 @@ function saveState(fromSync = false) {
 function touch(idea) {
   const now = Date.now();
   idea.updatedAt = now;
+  if (me.name) idea.editedBy = myRef();
   idea.activity.push(now);
   // keep only the last 30 days (and at most 300 entries) so storage stays small
   idea.activity = idea.activity.filter(t => now - t < 30 * DAY).slice(-300);
@@ -580,6 +595,7 @@ let state = loadState();
 const ui = {
   search: '',
   filter: 'all',
+  person: 'all', // show ideas of: 'all' or one person's id
   tab: 'features',
   importMode: 'merge',
   lastWidths: {}, // remembers progress-bar widths so they animate from old -> new
@@ -710,6 +726,16 @@ function renderHome() {
       <div class="search">
         <input id="search" type="search" placeholder="Search ideas, tags, features…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
       </div>
+      ${!me.name ? `
+        <div class="card" style="margin-bottom:12px">
+          <b>👋 Aapka naam kya hai?</b>
+          <p class="muted small" style="margin:4px 0 10px">Har idea pe dikhega ki kisne likha.</p>
+          <div class="row"><input id="my-name" maxlength="30" placeholder="e.g. Kunal"><button class="btn primary" data-action="save-name">Save</button></div>
+        </div>` : ''}
+      ${people().length > 1 ? `<div class="chips-row" aria-label="Filter by person">${[
+        `<button class="chip ${ui.person === 'all' ? 'active' : ''}" data-action="person" data-value="all">👥 Sab ke ideas</button>`,
+        ...people().map(p => `<button class="chip ${ui.person === p.id ? 'active' : ''}" data-action="person" data-value="${esc(p.id)}">${avatar(p)} ${isMe(p) ? 'Mere' : esc(p.name) + ' ke'}</button>`),
+      ].join('')}</div>` : ''}
       <div class="chips-row" aria-label="Filter by status">${filterChips}</div>
       <div class="row-between" style="margin:8px 0 12px">
         <span class="muted small" id="result-count"></span>
@@ -734,8 +760,9 @@ function updateIdeaList() {
   const q = ui.search.trim().toLowerCase();
   let ideas = state.ideas.filter(i => {
     if (ui.filter !== 'all' && i.status !== ui.filter) return false;
+    if (ui.person !== 'all' && (!i.owner || i.owner.id !== ui.person)) return false;
     if (!q) return true;
-    const haystack = [i.name, i.desc, i.notes, i.problem, i.target, i.tags.join(' '), i.features.map(f => f.title).join(' ')]
+    const haystack = [i.owner ? i.owner.name : '', i.name, i.desc, i.notes, i.problem, i.target, i.tags.join(' '), i.features.map(f => f.title).join(' ')]
       .join(' ').toLowerCase();
     return haystack.includes(q);
   });
@@ -787,7 +814,8 @@ function ideaCard(idea) {
         <span><b style="color:var(--text)">${pct}%</b> · ${doneCount}/${idea.features.length} features</span>
         <span class="row" style="gap:10px">
           <span title="Priority"><span class="dot" style="--c:${PRIORITY_COLORS[idea.priority]}"></span> ${idea.priority}</span>
-          <span>Updated ${timeAgo(idea.updatedAt)}</span>
+          ${idea.owner ? `<span class="row" style="gap:4px">${avatar(idea.owner)} ${esc(idea.owner.name)}</span>` : ''}
+          <span>${timeAgo(idea.updatedAt)}</span>
         </span>
       </div>
       ${idea.tags.length ? `<div class="tag-list">${idea.tags.slice(0, 4).map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}
@@ -911,7 +939,7 @@ function saveIdeaForm(form) {
   let idea = form.dataset.id ? findIdea(form.dataset.id) : null;
   const isNew = !idea;
   if (isNew) {
-    idea = normalizeIdea({});
+    idea = normalizeIdea({ owner: myRef() });
     state.ideas.unshift(idea);
   }
 
@@ -977,6 +1005,7 @@ function renderDetail(idea) {
     <main class="page">
       <section class="card hero">
         <div class="badges">${statusBadge(idea.status)} ${priorityBadge(idea.priority)}</div>
+        ${idea.owner ? `<p class="row small muted" style="margin:10px 0 0;flex-wrap:wrap">${avatar(idea.owner)} Added by <b style="color:var(--text)">${personName(idea.owner)}</b>${idea.editedBy && idea.editedBy.id !== idea.owner.id ? ` · last edit by ${personName(idea.editedBy)}` : ''} · ${timeAgo(idea.updatedAt)}</p>` : ''}
         <h1>${esc(idea.name)}</h1>
         ${idea.desc ? `<p>${esc(idea.desc)}</p>` : ''}
 
@@ -1031,6 +1060,7 @@ function renderFeaturesTab(idea) {
         ${f.desc ? `<div class="f-desc">${esc(f.desc)}</div>` : ''}
         <div class="f-tags">
           <button class="mini ${f.mvp ? 'mvp' : ''}" data-action="toggle-mvp" data-id="${f.id}" title="Tap to switch MVP / Later">${f.mvp ? '⭐ MVP' : '🕒 Later'}</button>
+          ${f.by ? avatar(f.by) : ''}
           <span class="mini state-${f.status}" style="cursor:default;display:inline-flex;align-items:center">${FEATURE_LABEL[f.status]}</span>
         </div>
       </div>
@@ -1083,7 +1113,7 @@ function renderJournalTab(idea) {
         ${g.items.map(e => `
           <div class="log-item">
             <div class="row-between">
-              <div class="text">${esc(e.text)}</div>
+              <div><div class="text">${esc(e.text)}</div>${e.by ? `<div class="row small muted" style="gap:6px;margin-top:4px">${avatar(e.by)} ${personName(e.by)}</div>` : ''}</div>
               <button class="icon-btn" data-action="delete-log" data-id="${e.id}" aria-label="Delete entry" style="font-size:.9rem;color:var(--muted);margin-top:-8px">✕</button>
             </div>
           </div>`).join('')}
@@ -1215,7 +1245,7 @@ function renderDashboard() {
       <h2 class="section-title">Ideas by status</h2>
       <div class="card">${statusRows}</div>
 
-      <h2 class="section-title">☁️ Sync (phone app + website)</h2>
+      <h2 class="section-title">👥 Shared space (aap + bhai)</h2>
       ${renderSyncCard()}
 
       <h2 class="section-title">💾 Backup</h2>
@@ -1297,6 +1327,7 @@ function ideaToText(idea) {
   const lines = [];
   lines.push(`📱 ${idea.name}`);
   if (idea.desc) lines.push(idea.desc);
+  if (idea.owner) lines.push(`Added by: ${idea.owner.name}`);
   lines.push('');
   lines.push(`Status: ${s.emoji} ${s.label} | Priority: ${idea.priority} | Progress: ${progressOf(idea)}%${mvp !== null ? ` (MVP ${mvp}%)` : ''}`);
   if (idea.platforms.length) lines.push(`Platforms: ${idea.platforms.join(', ')}`);
@@ -1362,87 +1393,74 @@ function loadSample() {
 
 
 /* =====================================================================
-   SECTION 11B: CLOUD SYNC (same data on phone app + website)
+   SECTION 11B: SHARED SPACE (you + your brother, on every device)
    ---------------------------------------------------------------------
-   Data is stored in a *secret GitHub Gist* in your GitHub account.
-   Each device needs the same GitHub token (with only the "gist" scope).
-   The token is kept in this device's localStorage only — it is NOT
-   included in JSON exports.
+   Everyone who joins with the same invite code sees and edits the same
+   ideas. Each idea / feature / journal entry remembers WHO wrote it.
+
+   - Your name is saved on each device (Dashboard → Shared space).
+   - The data lives on our small server (api/data.js on Vercel), which
+     stores it in a secret GitHub Gist. No GitHub token on any phone.
 
    How syncing works:
-     1. Download the gist.
-     2. Merge: for each idea, the version with the newer "updatedAt" wins.
-        Deleted ideas are remembered in state.deleted so deletes sync too.
-     3. Upload the merged result (only if something changed).
+     1. Send this device's ideas to the server.
+     2. Server merges them with everyone else's (newer edit wins,
+        deletes are remembered) and sends back the merged result.
+     3. This device merges that in and redraws.
    ===================================================================== */
-const SYNC_STORAGE_KEY = 'appIdeasTracker.sync';
-const GIST_FILE = 'app-ideas-tracker.json';
-const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=App%20Ideas%20Sync';
+const SITE_URL = 'https://app-ideas-beta.vercel.app/';
+const SPACE_API = SITE_URL + 'api/data';
+const APK_URL = 'https://github.com/ky37194-gif/app-ideas/releases/latest/download/AppIdeas.apk';
+const PROFILE_KEY = 'appIdeasTracker.profile';
+const SPACE_KEY_STORAGE = 'appIdeasTracker.space';
 
-let sync = (() => {
-  try { return JSON.parse(localStorage.getItem(SYNC_STORAGE_KEY)) || {}; } catch { return {}; }
-})();
-const syncState = { status: sync.token ? 'idle' : 'off', message: '', running: false, again: false, timer: null };
+const readJSON = key => { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch { return {}; } };
+const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ } };
 
-function saveSyncSettings() {
-  try { localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(sync)); } catch { /* ignore */ }
-}
+// Who is using this device: { id, name }
+let me = readJSON(PROFILE_KEY);
+// Which shared space this device is in: { key, lastSync }
+let space = readJSON(SPACE_KEY_STORAGE);
+const syncState = { status: space.key ? 'idle' : 'off', message: '', running: false, again: false, timer: null };
 
-// Small wrapper around the GitHub API.
-async function github(path, options = {}) {
-  const res = await fetch('https://api.github.com' + path, {
-    ...options,
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: 'Bearer ' + sync.token,
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    },
+const myRef = () => (me.name ? { id: me.id, name: me.name } : null);
+const isMe = person => !!person && person.id === me.id;
+
+// Save my name. Ideas that have no owner yet (made before names existed) become mine.
+function setMyName(name) {
+  name = String(name || '').trim().slice(0, 30);
+  if (!name) return false;
+  me = { id: me.id || uid(), name };
+  writeJSON(PROFILE_KEY, me);
+  state.ideas.forEach(idea => {
+    if (!idea.owner) { idea.owner = myRef(); touch(idea); }
+    else if (isMe(idea.owner)) idea.owner = myRef(); // keep my name up to date
   });
-  if (res.status === 401) throw new Error('Token is invalid or expired');
-  if (res.status === 404) throw new Error('not-found');
-  if (!res.ok) throw new Error('GitHub error ' + res.status);
-  return res.json();
+  saveState();
+  return true;
 }
 
-// Find the gist that holds our data, or create a new secret one.
-async function findOrCreateGist() {
-  const gists = await github('/gists?per_page=100');
-  const existing = gists.find(g => g.files && g.files[GIST_FILE]);
-  if (existing) return existing.id;
-  const created = await github('/gists', {
-    method: 'POST',
-    body: JSON.stringify({
-      description: 'App Ideas Tracker — synced data (do not edit by hand)',
-      public: false,
-      files: { [GIST_FILE]: { content: JSON.stringify({ ideas: [], deleted: {} }) } },
-    }),
-  });
-  return created.id;
+// Coloured circle with the person's first letter.
+function avatar(person) {
+  if (!person || !person.name) return '';
+  let hash = 0;
+  for (const ch of person.name) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+  return `<span class="avatar" style="--h:${hash % 360}" title="${esc(person.name)}">${esc([...person.name][0].toUpperCase())}</span>`;
 }
+const personName = p => (p ? esc(p.name) + (isMe(p) ? ' <span class="muted">(you)</span>' : '') : '');
 
-async function readGist() {
-  const gist = await github('/gists/' + sync.gistId);
-  const file = gist.files[GIST_FILE];
-  if (!file) return { ideas: [], deleted: {} };
-  // Big files are cut short in the API response; then download the full file.
-  const text = file.truncated ? await (await fetch(file.raw_url, { cache: 'no-store' })).text() : file.content;
-  const data = JSON.parse(text || '{}');
-  return { ideas: (data.ideas || []).map(normalizeIdea), deleted: data.deleted || {} };
-}
-
-async function writeGist(data) {
-  await github('/gists/' + sync.gistId, {
-    method: 'PATCH',
-    body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify({ updatedAt: Date.now(), ...data }) } } }),
-  });
+// Everyone who owns at least one idea.
+function people() {
+  const map = new Map();
+  state.ideas.forEach(i => { if (i.owner && !map.has(i.owner.id)) map.set(i.owner.id, i.owner); });
+  if (me.name && !map.has(me.id)) map.set(me.id, myRef());
+  return [...map.values()].sort((a, b) => (isMe(b) - isMe(a)) || a.name.localeCompare(b.name));
 }
 
 // Combine two copies of the data. Newer idea wins; a delete wins if it is newer than the idea.
 function mergeData(a, b) {
   const deleted = { ...a.deleted };
   Object.entries(b.deleted || {}).forEach(([id, t]) => { deleted[id] = Math.max(deleted[id] || 0, t); });
-  // forget deletes older than 90 days so the list doesn't grow forever
   Object.keys(deleted).forEach(id => { if (Date.now() - deleted[id] > 90 * DAY) delete deleted[id]; });
 
   const byId = new Map();
@@ -1461,48 +1479,42 @@ function fingerprint(data) {
   return JSON.stringify([ideas, deleted]);
 }
 
-// Sync a couple of seconds after the last change (so fast tapping = one upload).
+// Sync shortly after the last change (so fast tapping = one upload).
 function scheduleSync() {
-  if (!sync.token) return;
+  if (!space.key) return;
   clearTimeout(syncState.timer);
-  syncState.timer = setTimeout(syncNow, 1500);
+  syncState.timer = setTimeout(syncNow, 1200);
 }
 
 async function syncNow() {
-  if (!sync.token) return;
+  if (!space.key) return;
   if (syncState.running) { syncState.again = true; return; }
   if (!navigator.onLine) { setSyncStatus('error', 'Offline — will sync when back online'); return; }
 
   syncState.running = true;
   setSyncStatus('syncing');
   try {
-    if (!sync.gistId) { sync.gistId = await findOrCreateGist(); saveSyncSettings(); }
+    const res = await fetch(SPACE_API, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', 'X-Space-Key': space.key },
+      body: JSON.stringify({ ideas: state.ideas, deleted: state.deleted }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Server error ' + res.status);
 
-    let remote;
-    try { remote = await readGist(); }
-    catch (err) {
-      if (err.message !== 'not-found') throw err;
-      sync.gistId = await findOrCreateGist(); // gist was deleted -> make a new one
-      saveSyncSettings();
-      remote = await readGist();
-    }
-
-    const local = { ideas: state.ideas, deleted: state.deleted };
-    const merged = mergeData(local, remote);
-    if (fingerprint(merged) !== fingerprint(remote)) await writeGist(merged);
-
-    // Apply to this device. Merge again with the *current* data in case
-    // something was edited while we were waiting for the network.
-    const latest = mergeData({ ideas: state.ideas, deleted: state.deleted }, merged);
-    if (fingerprint(latest) !== fingerprint({ ideas: state.ideas, deleted: state.deleted })) {
+    const remote = { ideas: (data.ideas || []).map(normalizeIdea), deleted: data.deleted || {} };
+    // Merge with the *current* data in case something changed while we waited.
+    const current = { ideas: state.ideas, deleted: state.deleted };
+    const latest = mergeData(current, remote);
+    if (fingerprint(latest) !== fingerprint(current)) {
       state.ideas = latest.ideas;
       state.deleted = latest.deleted;
       saveState(true);
       refreshAfterSync();
     }
-
-    sync.lastSync = Date.now();
-    saveSyncSettings();
+    space.lastSync = Date.now();
+    writeJSON(SPACE_KEY_STORAGE, space);
     setSyncStatus('ok');
   } catch (err) {
     console.error('Sync failed', err);
@@ -1513,12 +1525,42 @@ async function syncNow() {
   }
 }
 
+// Join with an invite code (or a full invite link).
+async function joinSpace(codeOrLink, name) {
+  const code = String(codeOrLink || '').trim().replace(/^.*join\//, '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (!setMyName(name)) { toast('Pehle apna naam likho'); return false; }
+  if (!code) { toast('Invite code daalo'); return false; }
+  space = { key: code };
+  writeJSON(SPACE_KEY_STORAGE, space);
+  await syncNow();
+  if (syncState.status === 'ok') { toast('🎉 Joined! Ab sab ideas yahan dikhenge'); return true; }
+  toast('❌ ' + syncState.message);
+  space = {};
+  writeJSON(SPACE_KEY_STORAGE, space);
+  setSyncStatus('off');
+  return false;
+}
+
+function inviteText() {
+  return `💡 App Ideas mein mere saath apne app ideas likho!\n\n` +
+    `🌐 Website: ${SITE_URL}#/join/${space.key}\n\n` +
+    `📱 Android app: ${APK_URL}\n` +
+    `(Install karke Dashboard → Shared space mein ye code daalo: ${space.key})`;
+}
+
+// Share via WhatsApp etc. (Android app / phone browser) or copy as a fallback.
+function shareText(text) {
+  if (window.AndroidBridge && AndroidBridge.share) { AndroidBridge.share(text); return; }
+  if (navigator.share) { navigator.share({ text }).catch(() => {}); return; }
+  copyText(text);
+}
+
 // Redraw with synced data — but never while you're typing or dragging.
 function refreshAfterSync() {
-  const { page } = parseRoute();
+  const { page, id } = parseRoute();
   const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-  if (page === 'edit' || page === 'new' || typing || drag || document.getElementById('sheet').open) return;
-  if (page === 'idea' && !findIdea(parseRoute().id)) { location.hash = '#/'; return; }
+  if (page === 'edit' || page === 'new' || page === 'join' || typing || drag || document.getElementById('sheet').open) return;
+  if (page === 'idea' && !findIdea(id)) { location.hash = '#/'; return; }
   render();
 }
 
@@ -1533,26 +1575,24 @@ function setSyncStatus(status, message = '') {
 
 // Little cloud icon in the top bar (tap = sync now).
 function syncButton() {
-  if (!sync.token) return '';
-  const icon = { syncing: '🔄', ok: '☁️', error: '⚠️', idle: '☁️' }[syncState.status] || '☁️';
+  if (!space.key) return '';
+  const icon = { syncing: '🔄', error: '⚠️' }[syncState.status] || '☁️';
   const title = syncState.status === 'error' ? 'Sync problem: ' + syncState.message : 'Sync now';
   return `<button id="sync-btn" class="icon-btn" data-action="sync-now" aria-label="${esc(title)}" title="${esc(title)}">${icon}</button>`;
 }
 
 function renderSyncCard() {
-  if (!sync.token) {
+  if (!space.key) {
     return `
       <div class="card" id="sync-card">
-        <p class="small" style="margin-top:0">Phone app aur website ka data same rakhne ke liye GitHub se connect karo (free). Har device pe ek baar karna hai:</p>
-        <ol class="small" style="padding-left:20px;margin:0 0 12px">
-          <li><a href="${TOKEN_URL}" target="_blank" rel="noopener noreferrer">GitHub token banao</a> → only <b>gist</b> tick rahe → Expiration: <b>No expiration</b> → Generate → token copy karo.</li>
-          <li>Neeche paste karke <b>Connect</b> dabao.</li>
-          <li>Dusre device pe bhi wahi token paste karo.</li>
-        </ol>
-        <div class="row">
-          <input id="sync-token" type="password" placeholder="ghp_…" autocomplete="off" aria-label="GitHub token">
-          <button class="btn primary" data-action="sync-connect">Connect</button>
-        </div>
+        <p class="small" style="margin-top:0">Bhai ke saath ek hi jagah ideas likho. Dono ke ideas dono ko dikhenge, aur har idea pe likha hoga kisne likha. Invite code join karo:</p>
+        <label class="field"><span class="label">Aapka naam</span>
+          <input id="my-name" maxlength="30" value="${esc(me.name || '')}" placeholder="e.g. Kunal">
+        </label>
+        <label class="field"><span class="label">Invite code / link</span>
+          <input id="space-code" autocomplete="off" placeholder="Paste invite code">
+        </label>
+        <button class="btn primary block" data-action="space-join">Join shared space</button>
       </div>`;
   }
   const statusText = {
@@ -1560,26 +1600,52 @@ function renderSyncCard() {
     ok: '✅ Synced',
     idle: '☁️ Connected',
     error: '⚠️ ' + esc(syncState.message),
-  }[syncState.status];
+  }[syncState.status] || '☁️ Connected';
+  const members = people().map(p => {
+    const n = state.ideas.filter(i => i.owner && i.owner.id === p.id).length;
+    return `<div class="row" style="padding:4px 0">${avatar(p)} <span style="flex:1">${personName(p)}</span><span class="muted small">${n} idea${n === 1 ? '' : 's'}</span></div>`;
+  }).join('');
   return `
     <div class="card" id="sync-card">
       <div class="row-between">
         <b>${statusText}</b>
-        <span class="muted small">${sync.lastSync ? 'Last sync ' + timeAgo(sync.lastSync) : ''}</span>
+        <span class="muted small">${space.lastSync ? 'Last sync ' + timeAgo(space.lastSync) : ''}</span>
       </div>
-      <p class="muted small">Changes upload automatically. Other devices pick them up when opened.</p>
+      <div style="margin:12px 0">${members}</div>
       <div class="btn-row">
-        <button class="btn primary" data-action="sync-now">🔄 Sync now</button>
-        <button class="btn" data-action="sync-copy-key">🔑 Copy token</button>
-        <button class="btn danger" data-action="sync-disconnect">Disconnect</button>
+        <button class="btn primary" data-action="space-invite">📨 Invite bhai</button>
+        <button class="btn" data-action="sync-now">🔄 Sync now</button>
       </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn ghost" data-action="rename">✏️ Change my name</button>
+        <button class="btn danger" data-action="space-leave">Leave</button>
+      </div>
+      <p class="muted small" style="margin-bottom:0">Invite code: <code>${esc(space.key)}</code></p>
     </div>`;
 }
 
-// Sync when the app comes back to the screen, when internet returns, and every minute.
+// Screen shown when someone opens an invite link (#/join/<code>).
+function renderJoin(code) {
+  return `
+    ${topBar('Join App Ideas', { back: '#/' })}
+    <main class="page">
+      <div class="card empty">
+        <div class="big">🤝</div>
+        <h2>Aapko invite kiya gaya hai!</h2>
+        <p class="muted">Is shared space mein sab ke ideas ek jagah dikhenge, aur har idea pe naam likha hoga.</p>
+        <label class="field" style="text-align:left"><span class="label">Aapka naam</span>
+          <input id="my-name" maxlength="30" value="${esc(me.name || '')}" placeholder="e.g. Rahul">
+        </label>
+        <input id="space-code" type="hidden" value="${esc(code)}">
+        <button class="btn primary block" data-action="space-join">Join</button>
+      </div>
+    </main>`;
+}
+
+// Sync when the app comes back to the screen, when internet returns, and every 30 seconds.
 document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNow(); });
 window.addEventListener('online', syncNow);
-setInterval(() => { if (!document.hidden) syncNow(); }, 60 * 1000);
+setInterval(() => { if (!document.hidden) syncNow(); }, 30 * 1000);
 
 
 /* =====================================================================
@@ -1655,6 +1721,8 @@ function render() {
 
   if (page === 'dashboard') {
     app.innerHTML = renderDashboard();
+  } else if (page === 'join' && id) {
+    app.innerHTML = renderJoin(id);
   } else if (page === 'new') {
     app.innerHTML = renderEdit(null);
   } else if ((page === 'idea' || page === 'edit') && id) {
@@ -1765,30 +1833,39 @@ const actions = {
 
   export: exportJSON,
 
-  async 'sync-connect'() {
-    const token = document.getElementById('sync-token').value.trim();
-    if (!token) { toast('Paste your GitHub token first'); return; }
-    sync = { token };
-    saveSyncSettings();
-    await syncNow();
-    if (syncState.status === 'ok') toast('☁️ Connected! Data synced');
-    else { sync = {}; saveSyncSettings(); toast('❌ ' + syncState.message); setSyncStatus('off'); }
-    render();
+  async 'space-join'() {
+    const ok = await joinSpace(document.getElementById('space-code').value, document.getElementById('my-name').value);
+    if (ok) location.hash = '#/'; else render();
   },
 
   'sync-now'() {
     syncNow();
   },
 
-  'sync-copy-key'() {
-    copyText(sync.token);
+  'space-invite'() {
+    shareText(inviteText());
   },
 
-  'sync-disconnect'() {
-    if (!confirm('Disconnect sync on this device? Your ideas stay on this device and in GitHub.')) return;
-    sync = {};
-    saveSyncSettings();
+  rename() {
+    const name = prompt('Aapka naam:', me.name || '');
+    if (name && setMyName(name)) { toast('✅ Name saved'); render(); }
+  },
+
+  'save-name'() {
+    if (setMyName(document.getElementById('my-name').value)) { toast('👋 Hi ' + me.name + '!'); render(); }
+    else toast('Pehle apna naam likho');
+  },
+
+  'space-leave'() {
+    if (!confirm('Leave the shared space on this device? Your ideas stay on this device.')) return;
+    space = {};
+    writeJSON(SPACE_KEY_STORAGE, space);
     setSyncStatus('off');
+    render();
+  },
+
+  person(el) {
+    ui.person = el.dataset.value;
     render();
   },
 
@@ -1817,7 +1894,7 @@ document.addEventListener('submit', e => {
     const idea = findIdea(currentIdeaId());
     const title = form.elements.title.value.trim();
     if (!title) return;
-    idea.features.push({ id: uid(), title, desc: form.elements.desc.value.trim(), status: 'todo', mvp: form.elements.mvp.checked });
+    idea.features.push({ id: uid(), title, desc: form.elements.desc.value.trim(), status: 'todo', mvp: form.elements.mvp.checked, by: myRef() });
     touch(idea); saveState(); render();
     document.querySelector('#feature-form [name="title"]')?.focus(); // ready for the next one
     toast('➕ Feature added');
@@ -1839,7 +1916,7 @@ document.addEventListener('submit', e => {
     const idea = findIdea(currentIdeaId());
     const text = form.elements.text.value.trim();
     if (!text) return;
-    idea.log.push({ id: uid(), date: form.elements.date.value || todayStr(), text, createdAt: Date.now() });
+    idea.log.push({ id: uid(), date: form.elements.date.value || todayStr(), text, createdAt: Date.now(), by: myRef() });
     touch(idea); saveState(); render();
     toast('📓 Entry added');
   }

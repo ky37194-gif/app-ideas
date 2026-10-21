@@ -147,6 +147,17 @@ public class MainActivity extends Activity {
             }
         }
 
+        // Open the Android share sheet (WhatsApp, Telegram...) with this text.
+        @JavascriptInterface
+        public void share(final String text) {
+            runOnUiThread(() -> {
+                Intent send = new Intent(Intent.ACTION_SEND);
+                send.setType("text/plain");
+                send.putExtra(Intent.EXTRA_TEXT, text);
+                startActivity(Intent.createChooser(send, "Invite via"));
+            });
+        }
+
         // Copy text to the phone's clipboard.
         @JavascriptInterface
         public void copy(final String text) {
