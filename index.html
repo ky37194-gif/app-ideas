@@ -1711,7 +1711,7 @@ document.addEventListener('pointercancel', endDrag);
 
 function parseRoute() {
   const parts = (location.hash.replace(/^#\/?/, '') || '').split('/').filter(Boolean);
-  return { page: parts[0] || 'home', id: parts[1] };
+  return { page: parts[0] || 'home', id: parts[1], extra: parts[2] ? decodeURIComponent(parts[2]) : '' };
 }
 const currentIdeaId = () => parseRoute().id;
 
@@ -1722,6 +1722,12 @@ function render() {
   if (page === 'dashboard') {
     app.innerHTML = renderDashboard();
   } else if (page === 'join' && id) {
+    // Magic link #/join/<code>/<name>: join instantly, no questions.
+    if (parseRoute().extra) {
+      app.innerHTML = renderJoin(id);
+      joinSpace(id, parseRoute().extra).then(ok => { if (ok) location.hash = '#/'; });
+      return;
+    }
     app.innerHTML = renderJoin(id);
   } else if (page === 'new') {
     app.innerHTML = renderEdit(null);
@@ -1979,8 +1985,19 @@ document.getElementById('sheet').addEventListener('click', e => {
    ===================================================================== */
 applyTheme();
 ui.tabFor = parseRoute().id;
+
+// The Android app can come with the invite code built in (see android/build.sh),
+// so it joins the shared space automatically — nothing to type.
+const preset = window.APP_CONFIG || {};
+if (!space.key && preset.spaceKey) {
+  if (preset.name && !me.name) setMyName(preset.name);
+  space = { key: preset.spaceKey };
+  writeJSON(SPACE_KEY_STORAGE, space);
+  syncState.status = 'idle';
+}
+
 render();
-syncNow(); // pull the latest data from GitHub (if sync is connected)
+syncNow(); // get the latest ideas from the shared space (if joined)
 </script>
 </body>
 </html>

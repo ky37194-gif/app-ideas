@@ -4,6 +4,10 @@
 #   bash build.sh              -> build only
 #   bash build.sh <serial>     -> build + install on that device (see `adb devices`)
 #
+# Optional (makes the app join the shared space by itself, nothing to type):
+#   APP_SPACE_KEY=<invite code> APP_NAME=<name> OUT=MyApp.apk bash build.sh <serial>
+# Never upload an APK built with APP_SPACE_KEY publicly — the code is inside it.
+#
 # No Gradle needed: uses the Android SDK tools directly.
 # IMPORTANT: keep appideas.keystore. Updates must be signed with the same key,
 # otherwise you'd have to uninstall first (which deletes your saved ideas).
@@ -18,6 +22,11 @@ VERSION_CODE="${VERSION_CODE:-$(date +%s | cut -c1-9)}"   # grows every build, s
 
 rm -rf build && mkdir -p build/assets build/classes
 cp ../index.html build/assets/index.html
+if [ -n "${APP_SPACE_KEY:-}" ]; then
+  CONFIG="<script>window.APP_CONFIG={spaceKey:'${APP_SPACE_KEY}',name:'${APP_NAME:-}'};</script>"
+  sed -i "0,/<head>/s|<head>|<head>${CONFIG}|" build/assets/index.html
+fi
+OUT="${OUT:-AppIdeas.apk}"
 
 echo "1/6 Compiling resources..."
 "$BT/aapt2.exe" compile --dir res -o build/res.zip
@@ -43,12 +52,12 @@ if [ ! -f appideas.keystore ]; then
 fi
 "$BT/zipalign.exe" -p -f 4 build/unsigned.apk build/aligned.apk
 java -jar "$BT/lib/apksigner.jar" sign --ks appideas.keystore --ks-pass pass:appideas \
-  --out AppIdeas.apk build/aligned.apk
-echo "Built: $(pwd)/AppIdeas.apk"
+  --out "$OUT" build/aligned.apk
+echo "Built: $(pwd)/$OUT"
 
 if [ -n "${1:-}" ]; then
   echo "6/6 Installing on $1..."
-  "$ADB" -s "$1" install -r AppIdeas.apk
+  "$ADB" -s "$1" install -r "$OUT"
   "$ADB" -s "$1" shell am start -n com.ky.appideas/.MainActivity >/dev/null
   echo "Installed and launched."
 fi
