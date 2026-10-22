@@ -483,16 +483,57 @@ const FEATURE_STATUSES = ['todo', 'doing', 'done'];
 const FEATURE_LABEL = { todo: 'To Do', doing: 'In Progress', done: 'Done' };
 const FEATURE_ICON  = { todo: '', doing: '◐', done: '✓' };
 
-// Ready-made steps (roadmap) you can add to any idea with one tap.
-const DEFAULT_STEPS = [
-  '💡 Idea final karo',
-  '🔍 Research (competitors, users)',
-  '🎨 Design / UI screens',
-  '🛠️ Build MVP',
-  '🧪 Testing',
-  '🚀 Launch / Publish',
-  '📣 Marketing & feedback',
+// Ready-made roadmap from idea -> live on the store. Every idea gets it automatically.
+// phase = the app status (Idea / Planning / Building / Testing) while you're on that step.
+const PLAYSTORE_STEPS = [
+  ['idea',     '💡 Idea clear likho (kya problem, kis ke liye)'],
+  ['idea',     '🔍 Play Store pe similar apps check karo'],
+  ['planning', '📝 Features list + MVP decide karo'],
+  ['planning', '🎨 Screens ka design / sketch banao'],
+  ['planning', '🧰 Tech choose karo + project setup'],
+  ['building', '🛠️ Main screens banao'],
+  ['building', '⚙️ Core (MVP) features banao'],
+  ['building', '💾 Data save / login / backend'],
+  ['building', '🖼️ App icon, naam, splash screen'],
+  ['testing',  '🧪 Khud test karo + bugs fix'],
+  ['testing',  '📱 Dosto ke phone pe test karwao'],
+  ['testing',  '💳 Google Play Developer account ($25)'],
+  ['testing',  '🔐 Privacy policy page banao'],
+  ['testing',  '📦 Signed release build (AAB) banao'],
+  ['testing',  '🖼️ Store listing: screenshots, description, graphic'],
+  ['testing',  '📋 Content rating + Data safety form bharo'],
+  ['testing',  '👥 Closed testing (12 testers, 14 din)'],
+  ['testing',  '🚀 Production release submit karo'],
+  ['testing',  '✅ Review pass — Play Store pe LIVE!'],
 ];
+const VR_STEPS = [
+  ['idea',     '💡 Idea clear likho (kya experience, kis ke liye)'],
+  ['idea',     '🔍 Meta Quest store pe similar apps check karo'],
+  ['planning', '📝 Features list + MVP decide karo'],
+  ['planning', '🎨 Scene / interaction design sketch'],
+  ['planning', '🧰 Unity/engine + Quest project setup'],
+  ['building', '🛠️ Main scene + controls banao'],
+  ['building', '⚙️ Core (MVP) gameplay / features banao'],
+  ['building', '🎧 Sound, UI menus, comfort settings'],
+  ['building', '🖼️ App icon, naam, logo'],
+  ['testing',  '🥽 Headset pe khud test + bugs fix'],
+  ['testing',  '⚡ Performance (72+ FPS) theek karo'],
+  ['testing',  '👥 Dosto se headset pe test karwao'],
+  ['testing',  '💳 Meta developer account + org banao'],
+  ['testing',  '🔐 Privacy policy page banao'],
+  ['testing',  '📦 Release build (APK) banao'],
+  ['testing',  '🖼️ Store listing: screenshots, trailer, description'],
+  ['testing',  '🚀 Meta Horizon Store pe submit karo'],
+  ['testing',  '✅ Review pass — Store pe LIVE!'],
+];
+const stepTemplate = folder => (folder === 'vr' ? VR_STEPS : PLAYSTORE_STEPS);
+// The old short list from the first version: if an idea still has exactly that (nothing ticked), upgrade it.
+const OLD_DEFAULT_TITLES = ['💡 Idea final karo', '🔍 Research (competitors, users)', '🎨 Design / UI screens', '🛠️ Build MVP', '🧪 Testing', '🚀 Launch / Publish', '📣 Marketing & feedback'].join('|');
+
+// Fixed ids (s1, s2…) so every device creates the very same list -> no duplicates when syncing.
+function templateSteps(folder) {
+  return stepTemplate(folder).map(([phase, title], i) => ({ id: 's' + (i + 1), title, phase, done: false, doneAt: null, doneBy: null, by: null }));
+}
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -623,15 +664,8 @@ function normalizeIdea(raw = {}) {
       mvp: f.mvp !== false, // default: Must have
       by: normPerson(f.by),  // who added it
     })),
-    // Steps = the roadmap. The first step that isn't done is "where you are now".
-    steps: arr(raw.steps).map(st => ({
-      id: st.id || uid(),
-      title: String(st.title || 'Untitled step'),
-      done: !!st.done,
-      doneAt: Number(st.doneAt) || null,
-      doneBy: normPerson(st.doneBy),
-      by: normPerson(st.by),
-    })),
+    // Steps = the roadmap to the store. The first step that isn't done is "where you are now".
+    steps: normalizeSteps(raw),
     log: arr(raw.log).map(l => ({
       id: l.id || uid(),
       date: /^\d{4}-\d{2}-\d{2}$/.test(l.date) ? l.date : todayStr(),
@@ -648,6 +682,21 @@ function normalizeIdea(raw = {}) {
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
   };
+}
+
+function normalizeSteps(raw) {
+  const list = Array.isArray(raw.steps) ? raw.steps : [];
+  const isOldDefault = list.length && list.every(st => !st.done) && list.map(st => st.title).join('|') === OLD_DEFAULT_TITLES;
+  if (!list.length || isOldDefault) return templateSteps(raw.folder);
+  return list.map(st => ({
+    id: st.id || uid(),
+    title: String(st.title || 'Untitled step'),
+    phase: STATUSES.some(x => x.key === st.phase) ? st.phase : '',
+    done: !!st.done,
+    doneAt: Number(st.doneAt) || null,
+    doneBy: normPerson(st.doneBy),
+    by: normPerson(st.by),
+  }));
 }
 
 // A person is { id, name } (or null if unknown).
@@ -725,10 +774,22 @@ const ui = {
    SECTION 4: PROGRESS CALCULATIONS
    ===================================================================== */
 
-// Overall progress: manual value if set, otherwise Done ÷ total features.
+// Overall progress: manual value if set, otherwise steps done ÷ total steps (idea -> store).
 function progressOf(idea) {
   if (idea.manualProgress !== null) return idea.manualProgress;
-  return autoProgress(idea.features);
+  return idea.steps.length ? stepInfo(idea).pct : autoProgress(idea.features);
+}
+
+// App status follows the roadmap: the phase of the current step, or Launched when all done.
+// (On Hold is never changed automatically.)
+function statusFromSteps(idea) {
+  if (idea.status === 'onhold' || !idea.steps.length) return;
+  const info = stepInfo(idea);
+  if (!info.current) { idea.status = 'launched'; return; }
+  for (let i = info.number - 1; i >= 0; i--) {
+    if (idea.steps[i].phase) { idea.status = idea.steps[i].phase; return; }
+  }
+  idea.status = 'idea';
 }
 
 function autoProgress(features) {
@@ -983,7 +1044,7 @@ function renderEdit(idea) {
   const d = idea || normalizeIdea({});
   if (isNew) d.name = '';
   const manualOn = d.manualProgress !== null;
-  const manualVal = manualOn ? d.manualProgress : autoProgress(d.features);
+  const manualVal = manualOn ? d.manualProgress : (d.steps.length ? stepInfo(d).pct : autoProgress(d.features));
   const showPrice = d.monetization.includes('Paid') || d.monetization.includes('Subscription');
 
   const chips = (name, options, selected, type = 'checkbox') => options.map(o => `
@@ -1063,7 +1124,7 @@ function renderEdit(idea) {
             <div class="progress-label"><span>Manual progress</span><b id="manual-out">${manualVal}%</b></div>
             <input type="range" name="manualVal" min="0" max="100" step="5" value="${manualVal}">
           </div>
-          <p class="hint" style="margin:6px 0 0">Off = automatic (Done features ÷ total features).</p>
+          <p class="hint" style="margin:6px 0 0">Off = automatic (Steps done ÷ total steps, idea se store tak).</p>
         </section>
 
         <div class="btn-row">
@@ -1122,6 +1183,8 @@ function saveIdeaForm(form) {
     links,
     manualProgress: fd.get('manualOn') ? Number(fd.get('manualVal')) : null,
   });
+  // Folder changed (App <-> VR) and the ready-made roadmap is still untouched -> use that folder's roadmap.
+  if (!idea.steps.some(st => st.done) && idea.steps.every(st => /^s\d+$/.test(st.id))) idea.steps = templateSteps(idea.folder);
 
   touch(idea);
   saveState();
@@ -1191,7 +1254,7 @@ function renderDetail(idea) {
         <div class="progress-grid">
           <div>
             <div class="progress-label">
-              <span>Overall progress ${idea.manualProgress !== null ? '<span class="tag">manual</span>' : `<span class="muted">· ${done}/${total} done</span>`}</span>
+              <span>${idea.folder === 'vr' ? 'Store' : 'Play Store'} tak progress ${idea.manualProgress !== null ? '<span class="tag">manual</span>' : `<span class="muted">· ${steps.done}/${steps.total} steps</span>`}</span>
               <b>${pct}%</b>
             </div>
             ${progressBar('overall-' + idea.id, pct, s.color, true)}
@@ -1304,7 +1367,7 @@ function renderStepsTab(idea) {
         <div class="big">🗺️</div>
         <p class="muted">Steps = is idea ka roadmap. Har step tick karo, app batayega abhi kis step pe ho.</p>
         <button class="btn primary" data-action="default-steps">✨ Ready-made steps lagao</button>
-        <p class="muted small" style="margin:10px 0 0">${DEFAULT_STEPS.join(' → ')}</p>
+        <p class="muted small" style="margin:10px 0 0">Idea → Design → Build → Testing → ${idea.folder === 'vr' ? 'Store' : 'Play Store'} pe LIVE</p>
       </div>`}`;
 }
 
@@ -2153,6 +2216,7 @@ const actions = {
     const idea = findIdea(currentIdeaId());
     const st = idea.steps.find(x => x.id === el.dataset.id);
     setStepDone(idea, st, !st.done);
+    statusFromSteps(idea);
     touch(idea); saveState(); render();
     if (st.done) {
       const next = stepInfo(idea).current;
@@ -2165,6 +2229,7 @@ const actions = {
     const index = idea.steps.findIndex(x => x.id === el.dataset.id);
     idea.steps.forEach((st, i) => { if (i < index) setStepDone(idea, st, true); });
     setStepDone(idea, idea.steps[index], false);
+    statusFromSteps(idea);
     touch(idea); saveState(); render();
     toast('📍 Abhi yahan ho: ' + idea.steps[index].title);
   },
@@ -2194,7 +2259,7 @@ const actions = {
 
   'default-steps'() {
     const idea = findIdea(currentIdeaId());
-    DEFAULT_STEPS.forEach(title => idea.steps.push({ id: uid(), title, done: false, doneAt: null, doneBy: null, by: myRef() }));
+    idea.steps = templateSteps(idea.folder);
     touch(idea); saveState(); render();
     toast('🗺️ Steps add ho gaye — jo ho chuke unhe tick karo');
   },
@@ -2302,7 +2367,7 @@ document.addEventListener('submit', e => {
     const idea = findIdea(currentIdeaId());
     const title = form.elements.title.value.trim();
     if (!title) return;
-    idea.steps.push({ id: uid(), title, done: false, doneAt: null, doneBy: null, by: myRef() });
+    idea.steps.push({ id: uid(), title, phase: '', done: false, doneAt: null, doneBy: null, by: myRef() });
     touch(idea); saveState(); render();
     document.querySelector('#step-form [name="title"]')?.focus();
     toast('➕ Step added');
@@ -2315,6 +2380,7 @@ document.addEventListener('submit', e => {
     if (!title) { toast('Step cannot be empty'); return; }
     st.title = title;
     setStepDone(idea, st, form.elements.done.checked);
+    statusFromSteps(idea);
     touch(idea); saveState(); closeSheet(); render();
   }
 
