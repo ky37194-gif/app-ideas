@@ -227,6 +227,15 @@
   .chip:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
   .chip .count { font-size: .75rem; opacity: .75; }
 
+  /* Folder tabs on Home (Apps / VR) */
+  .folder-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; margin: 0 0 12px;
+    border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+  .folder-tab { min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--text);
+    font: inherit; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .folder-tab.active { background: var(--primary); color: var(--primary-ink); }
+  .folder-tab .count { font-size: .75rem; opacity: .75; font-weight: 500; }
+  .drawer h3 { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 8px 6px; }
+
   /* ---------- 10. Home: search + sort ---------- */
   .search { position: relative; }
   .search input { padding-left: 42px; border-radius: 14px; }
@@ -565,6 +574,7 @@ function normalizeIdea(raw = {}) {
   return {
     id: raw.id || uid(),
     name: String(raw.name || 'Untitled idea'),
+    folder: raw.folder === 'vr' ? 'vr' : 'apps', // which Home folder: 'apps' or 'vr'
     desc: String(raw.desc || ''),
     problem: String(raw.problem || ''),
     target: String(raw.target || ''),
@@ -652,8 +662,18 @@ function touch(idea) {
 // The app's whole saved state lives here.
 let state = loadState();
 
+// Folders on Home. Every idea lives in exactly one.
+const FOLDERS = [
+  { key: 'apps', emoji: '💡', label: 'App ideas', title: '💡 App Ideas' },
+  { key: 'vr',   emoji: '🥽', label: 'VR ideas',  title: '🥽 VR Ideas' },
+];
+const folderOf = key => FOLDERS.find(f => f.key === key) || FOLDERS[0];
+const FOLDER_KEY = 'app-ideas-folder'; // remembers the last open folder on this device
+function savedFolder() { try { return folderOf(localStorage.getItem(FOLDER_KEY)).key; } catch { return 'apps'; } }
+
 // Temporary UI state (not saved): search text, filter, active tab, etc.
 const ui = {
+  folder: savedFolder(), // folder shown on Home
   search: '',
   filter: 'all',
   person: 'all', // show ideas of: 'all' or one person's id
@@ -772,10 +792,16 @@ function bottomNav(active) {
    ===================================================================== */
 
 function renderHome() {
+  const inFolder = state.ideas.filter(i => i.folder === ui.folder);
   const counts = {};
-  state.ideas.forEach(i => (counts[i.status] = (counts[i.status] || 0) + 1));
+  inFolder.forEach(i => (counts[i.status] = (counts[i.status] || 0) + 1));
 
-  const filterChips = [`<button class="chip ${ui.filter === 'all' ? 'active' : ''}" data-action="filter" data-value="all">All <span class="count">${state.ideas.length}</span></button>`]
+  const folderTabs = FOLDERS.map(f => `
+    <button class="folder-tab ${ui.folder === f.key ? 'active' : ''}" data-action="folder" data-value="${f.key}">
+      ${f.emoji} ${f.label} <span class="count">${state.ideas.filter(i => i.folder === f.key).length}</span>
+    </button>`).join('');
+
+  const filterChips = [`<button class="chip ${ui.filter === 'all' ? 'active' : ''}" data-action="filter" data-value="all">All <span class="count">${inFolder.length}</span></button>`]
     .concat(STATUSES.map(s => `
       <button class="chip ${ui.filter === s.key ? 'active' : ''}" data-action="filter" data-value="${s.key}">
         ${s.emoji} ${s.label} <span class="count">${counts[s.key] || 0}</span>
@@ -783,8 +809,9 @@ function renderHome() {
     .join('');
 
   return `
-    ${topBar('💡 App Ideas')}
+    ${topBar(folderOf(ui.folder).title)}
     <main class="page">
+      <div class="folder-tabs" aria-label="Folders">${folderTabs}</div>
       <div class="search">
         <input id="search" type="search" placeholder="Search ideas, tags, features…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
       </div>
@@ -815,7 +842,8 @@ function updateIdeaList() {
   if (!listEl) return;
 
   const q = ui.search.trim().toLowerCase();
-  let ideas = state.ideas.filter(i => {
+  const inFolder = state.ideas.filter(i => i.folder === ui.folder);
+  let ideas = inFolder.filter(i => {
     if (ui.filter !== 'all' && i.status !== ui.filter) return false;
     if (ui.person !== 'all' && (!i.owner || i.owner.id !== ui.person)) return false;
     if (!q) return true;
@@ -843,6 +871,17 @@ function updateIdeaList() {
           <a class="btn primary" href="#/new">+ Add your first idea</a>
           <button class="btn" data-action="load-sample">Load sample idea</button>
         </div>
+      </div>`;
+    return;
+  }
+  if (!inFolder.length) {
+    const f = folderOf(ui.folder);
+    listEl.innerHTML = `
+      <div class="card empty">
+        <div class="big">${f.emoji}</div>
+        <h2>${f.label} folder khaali hai</h2>
+        <p class="muted">Is folder ka pehla idea likho.</p>
+        <div class="btn-row" style="margin-top:16px"><a class="btn primary" href="#/new">+ New ${f.key === 'vr' ? 'VR ' : ''}idea</a></div>
       </div>`;
     return;
   }
@@ -895,12 +934,17 @@ function renderEdit(idea) {
       <label class="chip"><input type="${type}" name="${name}" value="${esc(o)}" ${selected.includes(o) ? 'checked' : ''}>${esc(o)}</label>`).join('');
 
   return `
-    ${topBar(isNew ? 'New idea' : 'Edit idea', { back: isNew ? '#/' : `#/idea/${d.id}` })}
+    ${topBar(isNew ? (ui.folder === 'vr' ? 'New VR idea' : 'New idea') : 'Edit idea', { back: isNew ? '#/' : `#/idea/${d.id}` })}
     <main class="page">
       <form id="idea-form" data-id="${isNew ? '' : d.id}" autocomplete="off" novalidate>
 
         <section class="card form-section">
           <h2>Basics</h2>
+          <div class="field"><span class="label">Folder</span>
+            <div class="chip-group">${FOLDERS.map(f => `
+              <label class="chip"><input type="radio" name="folder" value="${f.key}" ${(isNew ? ui.folder : d.folder) === f.key ? 'checked' : ''}>${f.emoji} ${f.label}</label>`).join('')}
+            </div>
+          </div>
           <label class="field"><span class="label">App name *</span>
             <input name="name" required maxlength="80" value="${esc(d.name)}" placeholder="e.g. PharmaFlash">
           </label>
@@ -1008,6 +1052,7 @@ function saveIdeaForm(form) {
 
   Object.assign(idea, {
     name,
+    folder: folderOf(fd.get('folder')).key,
     desc: String(fd.get('desc') || '').trim(),
     problem: String(fd.get('problem') || '').trim(),
     target: String(fd.get('target') || '').trim(),
@@ -1731,12 +1776,15 @@ function renderDrawer() {
   const current = parseRoute().id;
   return `
     <h2>💡 Saare ideas (${ideas.length})</h2>
-    ${ideas.length ? ideas.map(i => `
+    ${ideas.length ? FOLDERS.map(f => {
+      const list = ideas.filter(i => i.folder === f.key);
+      return `<h3>${f.emoji} ${f.label} (${list.length})</h3>` + (list.length ? list.map(i => `
       <a class="drawer-item ${i.id === current ? 'active' : ''}" href="#/idea/${i.id}">
         ${avatar(i.owner)}
         <span class="name">${esc(i.name)}</span>
         <span class="meta">${statusOf(i.status).emoji} ${progressOf(i)}%</span>
-      </a>`).join('') : '<p class="muted small" style="margin:8px">Abhi koi idea nahi hai.</p>'}
+      </a>`).join('') : '<p class="muted small" style="margin:4px 8px">Abhi khaali.</p>');
+    }).join('') : '<p class="muted small" style="margin:8px">Abhi koi idea nahi hai.</p>'}
     <div class="drawer-links">
       <a class="btn primary" href="#/new">+ New idea</a>
       <a class="btn" href="#/">🗂️ All ideas</a>
@@ -1896,6 +1944,13 @@ window.addEventListener('hashchange', () => {
 
 const actions = {
   theme: cycleTheme,
+
+  folder(el) {
+    ui.folder = folderOf(el.dataset.value).key;
+    ui.filter = 'all';
+    try { localStorage.setItem(FOLDER_KEY, ui.folder); } catch { /* ignore */ }
+    render();
+  },
 
   filter(el) {
     ui.filter = el.dataset.value;
