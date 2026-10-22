@@ -748,7 +748,8 @@ function animateBars() {
 function topBar(title, { back = '', actions = '' } = {}) {
   return `
     <header class="topbar${back ? ' has-back' : ''}">
-      ${back ? `<a class="icon-btn" href="${back}" aria-label="Back">←</a>` : `<button class="icon-btn" data-action="open-drawer" aria-label="All ideas list">☰</button>`}
+      ${back ? `<a class="icon-btn" href="${back}" aria-label="Back">←</a>` : ''}
+      <button class="icon-btn" data-action="open-drawer" aria-label="All ideas list">☰</button>
       <h1 class="topbar-title">${title}</h1>
       ${actions}
       ${syncButton()}
@@ -1760,13 +1761,16 @@ document.getElementById('drawer').addEventListener('click', e => { if (e.target.
 
 const isDrawerOpen = () => document.getElementById('drawer').classList.contains('open');
 
-// Edge swipe: start within 24px of the left edge and move right → open.
+// Swipe right starting in the left 40% of the screen → open.
+// (Not just the very edge: on Android the edge swipe is the phone's own Back gesture.)
 // When open: swipe left anywhere → close.
 let swipe = null;
 document.addEventListener('touchstart', e => {
   const t = e.touches[0];
   if (e.touches.length !== 1 || drag) { swipe = null; return; }
-  if (isDrawerOpen() || t.clientX < 24) swipe = { x: t.clientX, y: t.clientY, done: false };
+  // skip things that scroll sideways or take typing
+  if (!isDrawerOpen() && e.target.closest('.chips-row, input, textarea, select, dialog')) { swipe = null; return; }
+  if (isDrawerOpen() || t.clientX < window.innerWidth * 0.4) swipe = { x: t.clientX, y: t.clientY, done: false };
   else swipe = null;
 }, { passive: true });
 
@@ -1775,8 +1779,8 @@ document.addEventListener('touchmove', e => {
   const t = e.touches[0];
   const dx = t.clientX - swipe.x;
   const dy = Math.abs(t.clientY - swipe.y);
-  if (dy > Math.abs(dx)) return; // scrolling up/down, not a sideways swipe
-  if (!isDrawerOpen() && dx > 50) { swipe.done = true; openDrawer(); }
+  if (dy * 1.5 > Math.abs(dx)) return; // scrolling up/down, not a sideways swipe
+  if (!isDrawerOpen() && dx > 60) { swipe.done = true; openDrawer(); }
   else if (isDrawerOpen() && dx < -50) { swipe.done = true; closeDrawer(); }
 }, { passive: true });
 
