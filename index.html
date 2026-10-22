@@ -385,6 +385,9 @@
     font-size: .9rem; font-weight: 600; max-width: 90vw; transition: opacity .25s, transform .25s;
   }
   #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.has-undo { pointer-events: auto; display: flex; align-items: center; gap: 10px; }
+  .toast-undo { border: 0; border-radius: 8px; padding: 6px 12px; min-height: 34px; cursor: pointer;
+    background: var(--primary); color: var(--primary-ink); font: inherit; font-weight: 700; white-space: nowrap; }
 
   /* ---------- 16b. Side list (swipe from the left edge, or tap ☰) ---------- */
   .drawer {
@@ -598,12 +601,22 @@ function parseTags(text) {
 
 // Show a short message at the bottom of the screen.
 let toastTimer;
-function toast(msg) {
+// toast('text') shows a short message. toast('text', undoFn) also shows an Undo button for 6 seconds.
+function toast(msg, undoFn = null) {
   const el = document.getElementById('toast');
   el.textContent = msg;
+  el.classList.toggle('has-undo', !!undoFn);
+  if (undoFn) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-undo';
+    btn.textContent = '↩️ Undo';
+    btn.onclick = () => { el.classList.remove('show', 'has-undo'); undoFn(); };
+    el.append(' ', btn);
+  }
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => el.classList.remove('show', 'has-undo'), undoFn ? 6000 : 2200);
 }
 
 // Copy text to clipboard (with a fallback for older browsers / file:// pages).
@@ -1361,8 +1374,9 @@ function renderStepsTab(idea) {
         <div class="progress-label"><span>Roadmap · ${info.done}/${info.total} steps done</span><b>${info.pct}%</b></div>
         ${progressBar('steps-' + idea.id, info.pct, 'var(--success)', true)}
       </section>
-      <p class="muted small" style="margin:0 0 10px">Number pe tap = done ✓ · "📍 Yahan hu" = pichhle saare steps done · ↑↓ se order badlo</p>
-      <ul class="feature-list">${items}</ul>`
+      <p class="muted small" style="margin:0 0 10px">Number pe tap = done ✓ (dobara tap = undo) · "📍 Yahan hu" = pichhle saare steps done · galti hui to ↩️ Undo ya ↺ Reset</p>
+      <ul class="feature-list">${items}</ul>
+      <div class="btn-row" style="margin-top:12px"><button class="btn" data-action="reset-steps-menu">↺ Reset steps</button></div>`
     : `<div class="card empty">
         <div class="big">🗺️</div>
         <p class="muted">Steps = is idea ka roadmap. Har step tick karo, app batayega abhi kis step pe ho.</p>
@@ -1389,6 +1403,18 @@ function openStepSheet(idea, step) {
   sheet.showModal();
 }
 
+// Save the idea's steps/status/journal before a change, so a mistaken tap can be undone.
+function stepUndo(idea) {
+  const saved = JSON.stringify({ steps: idea.steps, status: idea.status, log: idea.log });
+  return () => {
+    const cur = findIdea(idea.id);
+    if (!cur) return;
+    Object.assign(cur, JSON.parse(saved));
+    touch(cur); saveState(); render();
+    toast('↩️ Wapas pehle jaisa');
+  };
+}
+
 // Mark a step done/undone, and note it in the journal so "kya kya hogya" stays visible.
 function setStepDone(idea, step, done) {
   if (step.done === done) return;
@@ -1396,6 +1422,13 @@ function setStepDone(idea, step, done) {
   step.doneAt = done ? Date.now() : null;
   step.doneBy = done ? myRef() : null;
   if (done) idea.log.push({ id: uid(), date: todayStr(), text: `✅ Step done: ${step.title}`, createdAt: Date.now(), by: myRef() });
+  else {
+    // un-ticked: remove its "Step done" line from the journal too
+    const text = `✅ Step done: ${step.title}`;
+    for (let i = idea.log.length - 1; i >= 0; i--) {
+      if (idea.log[i].text === text) { idea.log.splice(i, 1); break; }
+    }
+  }
 }
 
 /* ----- Journal tab ----- */
@@ -2215,23 +2248,24 @@ const actions = {
   'toggle-step'(el) {
     const idea = findIdea(currentIdeaId());
     const st = idea.steps.find(x => x.id === el.dataset.id);
+    const undo = stepUndo(idea);
     setStepDone(idea, st, !st.done);
     statusFromSteps(idea);
     touch(idea); saveState(); render();
-    if (st.done) {
-      const next = stepInfo(idea).current;
-      toast(next ? `✅ Done! Ab next: ${next.title}` : '🎉 Saare steps complete!');
-    }
+    const next = stepInfo(idea).current;
+    if (st.done) toast(next ? `✅ Done! Ab next: ${next.title}` : '🎉 Saare steps complete!', undo);
+    else toast('○ Step un-tick ho gaya', undo);
   },
 
   'set-current-step'(el) {
     const idea = findIdea(currentIdeaId());
     const index = idea.steps.findIndex(x => x.id === el.dataset.id);
+    const undo = stepUndo(idea);
     idea.steps.forEach((st, i) => { if (i < index) setStepDone(idea, st, true); });
     setStepDone(idea, idea.steps[index], false);
     statusFromSteps(idea);
     touch(idea); saveState(); render();
-    toast('📍 Abhi yahan ho: ' + idea.steps[index].title);
+    toast('📍 Abhi yahan ho: ' + idea.steps[index].title, undo);
   },
 
   'move-step'(el) {
@@ -2251,10 +2285,40 @@ const actions = {
   'delete-step'() {
     const form = document.getElementById('step-edit-form');
     const idea = findIdea(form.dataset.idea);
-    if (!confirm('Delete this step?')) return;
+    const undo = stepUndo(idea);
     idea.steps = idea.steps.filter(st => st.id !== form.dataset.id);
+    statusFromSteps(idea);
     touch(idea); saveState(); closeSheet(); render();
-    toast('🗑️ Step deleted');
+    toast('🗑️ Step deleted', undo);
+  },
+
+  'reset-steps-menu'() {
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `
+      <div class="sheet-inner">
+        <h2>↺ Reset steps</h2>
+        <p class="muted" style="margin-top:0">Galti se tick ho gaye? Yahan se sab theek karo. Baad mein bhi ↩️ Undo milega.</p>
+        <div style="display:grid;gap:10px">
+          <button type="button" class="btn" data-action="reset-steps" data-value="untick">○ Saare ticks hatao (list wahi rahegi)</button>
+          <button type="button" class="btn" data-action="reset-steps" data-value="template">🗺️ List wapas default pe (apne steps hat jayenge)</button>
+          <button type="button" class="btn" data-action="close-sheet">Cancel</button>
+        </div>
+      </div>`;
+    sheet.showModal();
+  },
+
+  'reset-steps'(el) {
+    const idea = findIdea(currentIdeaId());
+    const undo = stepUndo(idea);
+    if (el.dataset.value === 'template') {
+      idea.steps.forEach(st => setStepDone(idea, st, false));
+      idea.steps = templateSteps(idea.folder);
+    } else {
+      idea.steps.forEach(st => setStepDone(idea, st, false));
+    }
+    statusFromSteps(idea);
+    touch(idea); saveState(); closeSheet(); render();
+    toast('↺ Steps reset ho gaye', undo);
   },
 
   'default-steps'() {
@@ -2378,10 +2442,12 @@ document.addEventListener('submit', e => {
     const st = idea.steps.find(x => x.id === form.dataset.id);
     const title = form.elements.title.value.trim();
     if (!title) { toast('Step cannot be empty'); return; }
+    const undo = stepUndo(idea);
     st.title = title;
     setStepDone(idea, st, form.elements.done.checked);
     statusFromSteps(idea);
     touch(idea); saveState(); closeSheet(); render();
+    toast('✅ Saved', undo);
   }
 
   if (form.id === 'feature-edit-form') {
