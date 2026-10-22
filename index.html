@@ -486,56 +486,67 @@ const FEATURE_STATUSES = ['todo', 'doing', 'done'];
 const FEATURE_LABEL = { todo: 'To Do', doing: 'In Progress', done: 'Done' };
 const FEATURE_ICON  = { todo: '', doing: '◐', done: '✓' };
 
-// Ready-made roadmap from idea -> live on the store. Every idea gets it automatically.
-// phase = the app status (Idea / Planning / Building / Testing) while you're on that step.
+// Ready-made roadmap from idea -> live on the store (max 5 steps, since Claude does the building).
+// phase = the app status while you're on that step. Every idea gets it automatically.
 const PLAYSTORE_STEPS = [
-  ['idea',     '💡 Idea clear likho (kya problem, kis ke liye)'],
-  ['idea',     '🔍 Play Store pe similar apps check karo'],
-  ['planning', '📝 Features list + MVP decide karo'],
-  ['planning', '🎨 Screens ka design / sketch banao'],
-  ['planning', '🧰 Tech choose karo + project setup'],
-  ['building', '🛠️ Main screens banao'],
-  ['building', '⚙️ Core (MVP) features banao'],
-  ['building', '💾 Data save / login / backend'],
-  ['building', '🖼️ App icon, naam, splash screen'],
-  ['testing',  '🧪 Khud test karo + bugs fix'],
-  ['testing',  '📱 Dosto ke phone pe test karwao'],
-  ['testing',  '💳 Google Play Developer account ($25)'],
-  ['testing',  '🔐 Privacy policy page banao'],
-  ['testing',  '📦 Signed release build (AAB) banao'],
-  ['testing',  '🖼️ Store listing: screenshots, description, graphic'],
-  ['testing',  '📋 Content rating + Data safety form bharo'],
-  ['testing',  '👥 Closed testing (12 testers, 14 din)'],
-  ['testing',  '🚀 Production release submit karo'],
-  ['testing',  '✅ Review pass — Play Store pe LIVE!'],
+  ['idea',     '💡 Idea + features Claude ko batao'],
+  ['building', '🤖 Claude se app banwao'],
+  ['testing',  '🧪 Phone pe test karo, bugs Claude se fix karwao'],
+  ['testing',  '📦 Release build + store listing taiyaar (Claude se)'],
+  ['testing',  '🚀 Play Store pe upload — LIVE!'],
 ];
 const VR_STEPS = [
-  ['idea',     '💡 Idea clear likho (kya experience, kis ke liye)'],
-  ['idea',     '🔍 Meta Quest store pe similar apps check karo'],
-  ['planning', '📝 Features list + MVP decide karo'],
-  ['planning', '🎨 Scene / interaction design sketch'],
-  ['planning', '🧰 Unity/engine + Quest project setup'],
-  ['building', '🛠️ Main scene + controls banao'],
-  ['building', '⚙️ Core (MVP) gameplay / features banao'],
-  ['building', '🎧 Sound, UI menus, comfort settings'],
-  ['building', '🖼️ App icon, naam, logo'],
-  ['testing',  '🥽 Headset pe khud test + bugs fix'],
-  ['testing',  '⚡ Performance (72+ FPS) theek karo'],
-  ['testing',  '👥 Dosto se headset pe test karwao'],
-  ['testing',  '💳 Meta developer account + org banao'],
-  ['testing',  '🔐 Privacy policy page banao'],
-  ['testing',  '📦 Release build (APK) banao'],
-  ['testing',  '🖼️ Store listing: screenshots, trailer, description'],
-  ['testing',  '🚀 Meta Horizon Store pe submit karo'],
-  ['testing',  '✅ Review pass — Store pe LIVE!'],
+  ['idea',     '💡 Idea + features Claude ko batao'],
+  ['building', '🤖 Claude se VR app banwao'],
+  ['testing',  '🥽 Headset pe test karo, bugs Claude se fix karwao'],
+  ['testing',  '📦 Release build + store listing taiyaar (Claude se)'],
+  ['testing',  '🚀 Meta Quest store pe upload — LIVE!'],
 ];
 const stepTemplate = folder => (folder === 'vr' ? VR_STEPS : PLAYSTORE_STEPS);
-// The old short list from the first version: if an idea still has exactly that (nothing ticked), upgrade it.
-const OLD_DEFAULT_TITLES = ['💡 Idea final karo', '🔍 Research (competitors, users)', '🎨 Design / UI screens', '🛠️ Build MVP', '🧪 Testing', '🚀 Launch / Publish', '📣 Marketing & feedback'].join('|');
 
-// Fixed ids (s1, s2…) so every device creates the very same list -> no duplicates when syncing.
+// Older ready-made lists. Ideas that still have them get moved to the 5-step list;
+// each old step points to the new step (1-5) it belongs to (0 = dropped).
+const OLD_DEFAULT_TITLES = ['💡 Idea final karo', '🔍 Research (competitors, users)', '🎨 Design / UI screens', '🛠️ Build MVP', '🧪 Testing', '🚀 Launch / Publish', '📣 Marketing & feedback'].join('|');
+const OLD_LONG_STEPS = {
+  '💡 Idea clear likho (kya problem, kis ke liye)': 1, '🔍 Play Store pe similar apps check karo': 1,
+  '📝 Features list + MVP decide karo': 1, '🎨 Screens ka design / sketch banao': 1, '🧰 Tech choose karo + project setup': 1,
+  '🛠️ Main screens banao': 2, '⚙️ Core (MVP) features banao': 2, '💾 Data save / login / backend': 2, '🖼️ App icon, naam, splash screen': 2,
+  '🧪 Khud test karo + bugs fix': 3, '📱 Dosto ke phone pe test karwao': 3,
+  '💳 Google Play Developer account ($25)': 0, '🔐 Privacy policy page banao': 4, '📦 Signed release build (AAB) banao': 4,
+  '🖼️ Store listing: screenshots, description, graphic': 4, '📋 Content rating + Data safety form bharo': 4,
+  '👥 Closed testing (12 testers, 14 din)': 5, '🚀 Production release submit karo': 5, '✅ Review pass — Play Store pe LIVE!': 5,
+  '💡 Idea clear likho (kya experience, kis ke liye)': 1, '🔍 Meta Quest store pe similar apps check karo': 1,
+  '🎨 Scene / interaction design sketch': 1, '🧰 Unity/engine + Quest project setup': 1,
+  '🛠️ Main scene + controls banao': 2, '⚙️ Core (MVP) gameplay / features banao': 2, '🎧 Sound, UI menus, comfort settings': 2, '🖼️ App icon, naam, logo': 2,
+  '🥽 Headset pe khud test + bugs fix': 3, '⚡ Performance (72+ FPS) theek karo': 3, '👥 Dosto se headset pe test karwao': 3,
+  '💳 Meta developer account + org banao': 0, '📦 Release build (APK) banao': 4, '🖼️ Store listing: screenshots, trailer, description': 4,
+  '🚀 Meta Horizon Store pe submit karo': 5, '✅ Review pass — Store pe LIVE!': 5,
+};
+
+// Fixed ids (t1…t5) so every device creates the very same list -> no duplicates when syncing.
 function templateSteps(folder) {
-  return stepTemplate(folder).map(([phase, title], i) => ({ id: 's' + (i + 1), title, phase, done: false, doneAt: null, doneBy: null, by: null }));
+  return stepTemplate(folder).map(([phase, title], i) => ({ id: 't' + (i + 1), title, phase, done: false, doneAt: null, doneBy: null, by: null }));
+}
+
+// Move an old long list to the 5-step list. A new step counts as done when all its old steps were done.
+// Steps you added yourself are kept after the 5.
+function migrateLongSteps(list, folder) {
+  const fresh = templateSteps(folder);
+  const groups = fresh.map(() => []);
+  const custom = [];
+  list.forEach(st => {
+    const to = OLD_LONG_STEPS[st.title];
+    if (to === undefined) custom.push(st);
+    else if (to > 0) groups[to - 1].push(st);
+  });
+  fresh.forEach((st, i) => {
+    const g = groups[i];
+    if (g.length && g.every(x => x.done)) {
+      const last = g.reduce((a, b) => ((Number(b.doneAt) || 0) > (Number(a.doneAt) || 0) ? b : a));
+      Object.assign(st, { done: true, doneAt: Number(last.doneAt) || null, doneBy: last.doneBy || null });
+    }
+  });
+  return [...fresh, ...custom];
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -701,7 +712,8 @@ function normalizeSteps(raw) {
   const list = Array.isArray(raw.steps) ? raw.steps : [];
   const isOldDefault = list.length && list.every(st => !st.done) && list.map(st => st.title).join('|') === OLD_DEFAULT_TITLES;
   if (!list.length || isOldDefault) return templateSteps(raw.folder);
-  return list.map(st => ({
+  const source = list.some(st => OLD_LONG_STEPS[st.title] !== undefined && /^s\d+$/.test(st.id)) ? migrateLongSteps(list, raw.folder) : list;
+  return source.map(st => ({
     id: st.id || uid(),
     title: String(st.title || 'Untitled step'),
     phase: STATUSES.some(x => x.key === st.phase) ? st.phase : '',
@@ -1197,7 +1209,7 @@ function saveIdeaForm(form) {
     manualProgress: fd.get('manualOn') ? Number(fd.get('manualVal')) : null,
   });
   // Folder changed (App <-> VR) and the ready-made roadmap is still untouched -> use that folder's roadmap.
-  if (!idea.steps.some(st => st.done) && idea.steps.every(st => /^s\d+$/.test(st.id))) idea.steps = templateSteps(idea.folder);
+  if (!idea.steps.some(st => st.done) && idea.steps.every(st => /^t\d+$/.test(st.id))) idea.steps = templateSteps(idea.folder);
 
   touch(idea);
   saveState();
