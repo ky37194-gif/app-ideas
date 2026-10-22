@@ -322,6 +322,24 @@
   .mini.state-doing { color: var(--warning); }
   .mini.state-done { color: var(--success); }
 
+  /* ---------- 13b. Steps (roadmap) ---------- */
+  .step { padding-left: 8px; }
+  .step-tools { display: flex; flex: none; align-items: center; }
+  .step-tools .icon-btn { width: 34px; min-width: 34px; font-size: .95rem; }
+  .step-tools .icon-btn:disabled { opacity: .25; cursor: default; }
+  .feature.step[data-status="doing"] { border-color: var(--warning); }
+  .mini.now-tag { cursor: default; display: inline-flex; align-items: center; color: var(--warning);
+    background: color-mix(in srgb, var(--warning) 14%, transparent); border-color: transparent; }
+  .where-now { margin: 0 0 14px; padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--warning) 7%, transparent); }
+  .where-step { margin-top: 4px; font-size: 1.05rem; font-weight: 700; word-break: break-word; }
+  .step-dots { display: flex; gap: 4px; margin-top: 10px; }
+  .step-dots span { flex: 1; height: 6px; border-radius: 999px; background: var(--border); }
+  .step-dots span.done { background: var(--success); }
+  .step-dots span.now { background: var(--warning); }
+  .step-line { font-size: .85rem; font-weight: 600; margin: 0 0 8px; color: var(--text); word-break: break-word; }
+  .small-btn { min-height: 34px; padding: 0 12px; font-size: .85rem; }
+
   /* ---------- 14. Journal timeline ---------- */
   .timeline { list-style: none; margin: 0; padding: 0; }
   .log-day h4 { margin: 14px 0 6px; font-size: .85rem; color: var(--muted); }
@@ -465,6 +483,17 @@ const FEATURE_STATUSES = ['todo', 'doing', 'done'];
 const FEATURE_LABEL = { todo: 'To Do', doing: 'In Progress', done: 'Done' };
 const FEATURE_ICON  = { todo: '', doing: '◐', done: '✓' };
 
+// Ready-made steps (roadmap) you can add to any idea with one tap.
+const DEFAULT_STEPS = [
+  '💡 Idea final karo',
+  '🔍 Research (competitors, users)',
+  '🎨 Design / UI screens',
+  '🛠️ Build MVP',
+  '🧪 Testing',
+  '🚀 Launch / Publish',
+  '📣 Marketing & feedback',
+];
+
 const DAY = 24 * 60 * 60 * 1000;
 
 
@@ -594,6 +623,15 @@ function normalizeIdea(raw = {}) {
       mvp: f.mvp !== false, // default: Must have
       by: normPerson(f.by),  // who added it
     })),
+    // Steps = the roadmap. The first step that isn't done is "where you are now".
+    steps: arr(raw.steps).map(st => ({
+      id: st.id || uid(),
+      title: String(st.title || 'Untitled step'),
+      done: !!st.done,
+      doneAt: Number(st.doneAt) || null,
+      doneBy: normPerson(st.doneBy),
+      by: normPerson(st.by),
+    })),
     log: arr(raw.log).map(l => ({
       id: l.id || uid(),
       date: /^\d{4}-\d{2}-\d{2}$/.test(l.date) ? l.date : todayStr(),
@@ -677,7 +715,7 @@ const ui = {
   search: '',
   filter: 'all',
   person: 'all', // show ideas of: 'all' or one person's id
-  tab: 'features',
+  tab: 'steps',
   importMode: 'merge',
   lastWidths: {}, // remembers progress-bar widths so they animate from old -> new
 };
@@ -703,6 +741,23 @@ function autoProgress(features) {
 function mvpProgressOf(idea) {
   const mvp = idea.features.filter(f => f.mvp);
   return mvp.length ? autoProgress(mvp) : null;
+}
+
+// Where you are on the roadmap: current step = first step not done yet.
+function stepInfo(idea) {
+  const total = idea.steps.length;
+  const done = idea.steps.filter(st => st.done).length;
+  const current = idea.steps.find(st => !st.done) || null;
+  const number = current ? idea.steps.indexOf(current) + 1 : total;
+  return { total, done, current, number, pct: total ? Math.round((done / total) * 100) : 0 };
+}
+
+// Short line like "📍 Step 3/7 · Build MVP" (used on cards).
+function stepLine(idea) {
+  const info = stepInfo(idea);
+  if (!info.total) return '';
+  if (!info.current) return `✅ Saare ${info.total} steps done`;
+  return `📍 Step ${info.number}/${info.total} · ${esc(info.current.title)}`;
 }
 
 // How many changes happened to this idea in the last 7 days.
@@ -905,6 +960,7 @@ function ideaCard(idea) {
         ${statusBadge(idea.status)}
       </div>
       <p class="card-desc">${esc(idea.desc) || '<i>No description</i>'}</p>
+      ${idea.steps.length ? `<div class="step-line">${stepLine(idea)}</div>` : ''}
       ${progressBar('card-' + idea.id, pct, s.color)}
       <div class="card-meta">
         <span><b style="color:var(--text)">${pct}%</b> · ${doneCount}/${idea.features.length} features</span>
@@ -1090,7 +1146,9 @@ function renderDetail(idea) {
     <button class="icon-btn" data-action="copy-idea" aria-label="Copy as text" title="Copy as text">📋</button>
     <a class="icon-btn" href="#/edit/${idea.id}" aria-label="Edit idea" title="Edit">✏️</a>`;
 
+  const steps = stepInfo(idea);
   const tabs = [
+    ['steps', `Steps (${steps.done}/${steps.total})`],
     ['features', `Features (${total})`],
     ['journal', `Journal (${idea.log.length})`],
     ['info', 'Details'],
@@ -1099,7 +1157,8 @@ function renderDetail(idea) {
   let tabContent = '';
   if (ui.tab === 'journal') tabContent = renderJournalTab(idea);
   else if (ui.tab === 'info') tabContent = renderInfoTab(idea);
-  else tabContent = renderFeaturesTab(idea);
+  else if (ui.tab === 'features') tabContent = renderFeaturesTab(idea);
+  else tabContent = renderStepsTab(idea);
 
   return `
     ${topBar(esc(idea.name), { back: '#/', actions })}
@@ -1109,6 +1168,18 @@ function renderDetail(idea) {
         ${idea.owner ? `<p class="row small muted" style="margin:10px 0 0;flex-wrap:wrap">${avatar(idea.owner)} Added by <b style="color:var(--text)">${personName(idea.owner)}</b>${idea.editedBy && idea.editedBy.id !== idea.owner.id ? ` · last edit by ${personName(idea.editedBy)}` : ''} · ${timeAgo(idea.updatedAt)}</p>` : ''}
         <h1>${esc(idea.name)}</h1>
         ${idea.desc ? `<p>${esc(idea.desc)}</p>` : ''}
+
+        <div class="where-now">
+          ${steps.total ? `
+            <div class="row-between" style="gap:8px">
+              <b>${steps.current ? `📍 Abhi yahan ho: Step ${steps.number}/${steps.total}` : '🎉 Saare steps complete!'}</b>
+              <span class="muted small">${steps.done}/${steps.total} done</span>
+            </div>
+            ${steps.current ? `<div class="where-step">${esc(steps.current.title)}</div>` : ''}
+            <div class="step-dots" aria-hidden="true">${idea.steps.map(st => `<span class="${st.done ? 'done' : st === steps.current ? 'now' : ''}" title="${esc(st.title)}"></span>`).join('')}</div>`
+          : `<div class="row-between" style="gap:8px"><span class="muted">📍 Kis step pe ho? Abhi koi steps nahi.</span>
+              <button class="btn small-btn" data-action="tab" data-value="steps">+ Steps banao</button></div>`}
+        </div>
 
         <label class="field" style="margin:0">
           <span class="label small muted">Quick status change</span>
@@ -1185,6 +1256,83 @@ function renderFeaturesTab(idea) {
       </p>
       <ul class="feature-list" id="feature-list">${items}</ul>`
     : `<div class="card empty"><div class="big">🧩</div><p class="muted">No features yet. Add the first one above!</p></div>`}`;
+}
+
+/* ----- Steps tab (roadmap checklist) ----- */
+function renderStepsTab(idea) {
+  const info = stepInfo(idea);
+  const last = idea.steps.length - 1;
+  const items = idea.steps.map((st, i) => {
+    const isNow = st === info.current;
+    const state = st.done ? 'done' : isNow ? 'doing' : 'todo';
+    return `
+    <li class="feature step" data-id="${st.id}" data-status="${state}">
+      <button class="f-status" data-action="toggle-step" data-id="${st.id}"
+        aria-label="${st.done ? 'Done. Tap to undo' : 'Tap to mark done'}" title="${st.done ? 'Tap to undo' : 'Tap to mark done'}">${st.done ? '✓' : i + 1}</button>
+      <div class="f-body">
+        <div class="f-title">${esc(st.title)}</div>
+        <div class="f-tags">
+          ${isNow ? `<span class="mini now-tag">📍 Abhi yahan ho</span>` : ''}
+          ${st.done ? `<span class="mini state-done" style="cursor:default;display:inline-flex;align-items:center;gap:4px">✓ Done${st.doneAt ? ' · ' + fmtDate(st.doneAt) : ''}${st.doneBy ? ' · ' + esc(st.doneBy.name) : ''}</span>` : ''}
+          ${!st.done && !isNow ? `<button class="mini" data-action="set-current-step" data-id="${st.id}" title="Is se pehle ke saare steps done mark ho jayenge">📍 Yahan hu</button>` : ''}
+        </div>
+      </div>
+      <div class="step-tools">
+        <button class="icon-btn" data-action="move-step" data-id="${st.id}" data-value="-1" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="icon-btn" data-action="move-step" data-id="${st.id}" data-value="1" aria-label="Move down" ${i === last ? 'disabled' : ''}>↓</button>
+        <button class="icon-btn" data-action="edit-step" data-id="${st.id}" aria-label="Edit step">✎</button>
+      </div>
+    </li>`;
+  }).join('');
+
+  return `
+    <form id="step-form" class="card add-form" autocomplete="off">
+      <div class="row" style="gap:8px">
+        <input name="title" placeholder="Next step add karo… e.g. Play Store account banao" maxlength="120" required aria-label="Step title" style="flex:1;min-width:0">
+        <button type="submit" class="btn primary">+ Add</button>
+      </div>
+    </form>
+
+    ${idea.steps.length ? `
+      <section class="card" style="margin-bottom:12px">
+        <div class="progress-label"><span>Roadmap · ${info.done}/${info.total} steps done</span><b>${info.pct}%</b></div>
+        ${progressBar('steps-' + idea.id, info.pct, 'var(--success)', true)}
+      </section>
+      <p class="muted small" style="margin:0 0 10px">Number pe tap = done ✓ · "📍 Yahan hu" = pichhle saare steps done · ↑↓ se order badlo</p>
+      <ul class="feature-list">${items}</ul>`
+    : `<div class="card empty">
+        <div class="big">🗺️</div>
+        <p class="muted">Steps = is idea ka roadmap. Har step tick karo, app batayega abhi kis step pe ho.</p>
+        <button class="btn primary" data-action="default-steps">✨ Ready-made steps lagao</button>
+        <p class="muted small" style="margin:10px 0 0">${DEFAULT_STEPS.join(' → ')}</p>
+      </div>`}`;
+}
+
+function openStepSheet(idea, step) {
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <form id="step-edit-form" class="sheet-inner" data-idea="${idea.id}" data-id="${step.id}" autocomplete="off">
+      <h2>Edit step</h2>
+      <label class="field"><span class="label">Step</span>
+        <input name="title" required maxlength="120" value="${esc(step.title)}">
+      </label>
+      <label class="check" style="margin-bottom:14px"><input type="checkbox" name="done" ${step.done ? 'checked' : ''}> ✓ Done</label>
+      <div class="btn-row">
+        <button type="button" class="btn danger" data-action="delete-step">Delete</button>
+        <button type="button" class="btn" data-action="close-sheet">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>`;
+  sheet.showModal();
+}
+
+// Mark a step done/undone, and note it in the journal so "kya kya hogya" stays visible.
+function setStepDone(idea, step, done) {
+  if (step.done === done) return;
+  step.done = done;
+  step.doneAt = done ? Date.now() : null;
+  step.doneBy = done ? myRef() : null;
+  if (done) idea.log.push({ id: uid(), date: todayStr(), text: `✅ Step done: ${step.title}`, createdAt: Date.now(), by: myRef() });
 }
 
 /* ----- Journal tab ----- */
@@ -1437,6 +1585,11 @@ function ideaToText(idea) {
   if (idea.problem) lines.push('', 'Problem it solves:', idea.problem);
   if (idea.target) lines.push('', 'Target users:', idea.target);
   if (idea.notes) lines.push('', 'Notes:', idea.notes);
+  if (idea.steps.length) {
+    const info = stepInfo(idea);
+    lines.push('', `Steps (${info.done}/${info.total} done${info.current ? `, now on step ${info.number}` : ''}):`);
+    idea.steps.forEach((st, i) => lines.push(`${st.done ? '[x]' : st === info.current ? '[>]' : '[ ]'} ${i + 1}. ${st.title}`));
+  }
   if (idea.features.length) {
     const mark = { todo: '[ ]', doing: '[~]', done: '[x]' };
     lines.push('', 'Features ([x] done, [~] in progress, [ ] to do):');
@@ -1928,8 +2081,8 @@ function render() {
 window.addEventListener('hashchange', () => {
   closeSheet();
   closeDrawer();
-  // New idea page opened -> start on the Features tab.
-  if (parseRoute().page === 'idea') ui.tab = ui.tabFor === parseRoute().id ? ui.tab : 'features';
+  // New idea page opened -> start on the Steps tab.
+  if (parseRoute().page === 'idea') ui.tab = ui.tabFor === parseRoute().id ? ui.tab : 'steps';
   ui.tabFor = parseRoute().id;
   render();
   window.scrollTo(0, 0);
@@ -1995,6 +2148,56 @@ const actions = {
   },
 
   'close-sheet': closeSheet,
+
+  'toggle-step'(el) {
+    const idea = findIdea(currentIdeaId());
+    const st = idea.steps.find(x => x.id === el.dataset.id);
+    setStepDone(idea, st, !st.done);
+    touch(idea); saveState(); render();
+    if (st.done) {
+      const next = stepInfo(idea).current;
+      toast(next ? `✅ Done! Ab next: ${next.title}` : '🎉 Saare steps complete!');
+    }
+  },
+
+  'set-current-step'(el) {
+    const idea = findIdea(currentIdeaId());
+    const index = idea.steps.findIndex(x => x.id === el.dataset.id);
+    idea.steps.forEach((st, i) => { if (i < index) setStepDone(idea, st, true); });
+    setStepDone(idea, idea.steps[index], false);
+    touch(idea); saveState(); render();
+    toast('📍 Abhi yahan ho: ' + idea.steps[index].title);
+  },
+
+  'move-step'(el) {
+    const idea = findIdea(currentIdeaId());
+    const i = idea.steps.findIndex(x => x.id === el.dataset.id);
+    const j = i + Number(el.dataset.value);
+    if (j < 0 || j >= idea.steps.length) return;
+    [idea.steps[i], idea.steps[j]] = [idea.steps[j], idea.steps[i]];
+    touch(idea); saveState(); render();
+  },
+
+  'edit-step'(el) {
+    const idea = findIdea(currentIdeaId());
+    openStepSheet(idea, idea.steps.find(x => x.id === el.dataset.id));
+  },
+
+  'delete-step'() {
+    const form = document.getElementById('step-edit-form');
+    const idea = findIdea(form.dataset.idea);
+    if (!confirm('Delete this step?')) return;
+    idea.steps = idea.steps.filter(st => st.id !== form.dataset.id);
+    touch(idea); saveState(); closeSheet(); render();
+    toast('🗑️ Step deleted');
+  },
+
+  'default-steps'() {
+    const idea = findIdea(currentIdeaId());
+    DEFAULT_STEPS.forEach(title => idea.steps.push({ id: uid(), title, done: false, doneAt: null, doneBy: null, by: myRef() }));
+    touch(idea); saveState(); render();
+    toast('🗺️ Steps add ho gaye — jo ho chuke unhe tick karo');
+  },
 
   'delete-log'(el) {
     const idea = findIdea(currentIdeaId());
@@ -2093,6 +2296,26 @@ document.addEventListener('submit', e => {
     touch(idea); saveState(); render();
     document.querySelector('#feature-form [name="title"]')?.focus(); // ready for the next one
     toast('➕ Feature added');
+  }
+
+  if (form.id === 'step-form') {
+    const idea = findIdea(currentIdeaId());
+    const title = form.elements.title.value.trim();
+    if (!title) return;
+    idea.steps.push({ id: uid(), title, done: false, doneAt: null, doneBy: null, by: myRef() });
+    touch(idea); saveState(); render();
+    document.querySelector('#step-form [name="title"]')?.focus();
+    toast('➕ Step added');
+  }
+
+  if (form.id === 'step-edit-form') {
+    const idea = findIdea(form.dataset.idea);
+    const st = idea.steps.find(x => x.id === form.dataset.id);
+    const title = form.elements.title.value.trim();
+    if (!title) { toast('Step cannot be empty'); return; }
+    st.title = title;
+    setStepDone(idea, st, form.elements.done.checked);
+    touch(idea); saveState(); closeSheet(); render();
   }
 
   if (form.id === 'feature-edit-form') {
