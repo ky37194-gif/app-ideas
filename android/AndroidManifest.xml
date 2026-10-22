@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android wrapper for App Ideas Tracker: a full-screen WebView that shows ../index.html -->
+<!-- Android wrapper for App Ideas Tracker: a full-screen WebView that opens the live site -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.ky.appideas">
 
-    <!-- Needed for syncing with GitHub -->
+    <!-- Needed to load the site and sync -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application

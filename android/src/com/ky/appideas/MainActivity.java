@@ -24,15 +24,14 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * The whole Android app: one screen with a WebView that shows index.html
- * (bundled inside the APK). Data is kept in the WebView's localStorage,
- * which lives in this app's private storage on the phone.
+ * The whole Android app: one screen with a WebView that opens the live site
+ * (app-ideas-beta.vercel.app). Every push to GitHub shows up here by itself,
+ * and cloud sync works the same as on PC. Works offline via the site's service worker.
  */
 public class MainActivity extends Activity {
 
-    // Fake https address the page "lives" at, so localStorage works reliably.
-    private static final String BASE_URL = "https://appideas.local/";
-    private static final String HOST = "appideas.local";
+    private static final String BASE_URL = "https://app-ideas-beta.vercel.app/";
+    private static final String HOST = "app-ideas-beta.vercel.app";
     private static final int FILE_REQUEST = 1;
 
     private WebView web;
@@ -94,7 +93,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        web.loadDataWithBaseURL(BASE_URL, readAsset("index.html"), "text/html", "UTF-8", null);
+        web.loadUrl(BASE_URL);
     }
 
     @Override

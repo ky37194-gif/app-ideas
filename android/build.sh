@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds AppIdeas.apk from ../index.html and (optionally) installs it on a phone.
+# Builds AppIdeas.apk (a WebView that opens the live site) and (optionally) installs it on a phone.
 #
 #   bash build.sh              -> build only
 #   bash build.sh <serial>     -> build + install on that device (see `adb devices`)
