@@ -234,6 +234,11 @@
     font: inherit; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
   @media (max-width: 560px) { .folder-tabs { grid-template-columns: 1fr 1fr; } }
   .folder-tab.active { background: var(--primary); color: var(--primary-ink); }
+  .person-switch { display: flex; gap: 4px; padding: 4px; margin: 0 0 10px; border-radius: 14px;
+    background: var(--surface-2); border: 1px solid var(--border); }
+  .person-switch button { flex: 1; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--muted);
+    font: inherit; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .person-switch button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
   .folder-tab .count { font-size: .75rem; opacity: .75; font-weight: 500; }
   .drawer h3 { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 8px 6px; }
 
@@ -811,7 +816,7 @@ function normalizeTodo(raw = {}) {
 const IDEA_FOLDERS = () => FOLDERS; // folders that hold idea cards
 const newFolder = () => ui.folder;
 const openTodos = () => state.todos.filter(t => !t.done).length;
-const folderCount = key => state.ideas.filter(i => i.folder === key).length;
+const folderCount = key => state.ideas.filter(i => i.folder === key && (ui.person === 'all' || (i.owner && i.owner.id === ui.person))).length;
 
 function loadState() {
   try {
@@ -1047,10 +1052,10 @@ function renderHome() {
         <input id="search" type="search" placeholder="Search ideas, tags, features…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
       </div>
       ${renderSetupCard()}
-      ${people().length > 1 ? `<div class="chips-row" aria-label="Filter by person">${[
-        `<button class="chip ${ui.person === 'all' ? 'active' : ''}" data-action="person" data-value="all">👥 Sab ke ideas</button>`,
-        ...people().map(p => `<button class="chip ${ui.person === p.id ? 'active' : ''}" data-action="person" data-value="${esc(p.id)}">${avatar(p)} ${esc(p.name)}${isMe(p) ? ' (you)' : ''}</button>`),
-      ].join('')}</div>` : ''}
+      <div class="person-switch" aria-label="Kiske ideas dikhayein">${[
+        ...people().map(p => `<button class="${ui.person === p.id ? 'active' : ''}" data-action="person" data-value="${esc(p.id)}">${avatar(p)} ${esc(fullName(p.name))}</button>`),
+        `<button class="${ui.person === 'all' ? 'active' : ''}" data-action="person" data-value="all">👥 Dono</button>`,
+      ].join('')}</div>
       <div class="chips-row" aria-label="Filter by status">${filterChips}</div>
       <div class="row-between" style="margin:8px 0 12px">
         <span class="muted small" id="result-count"></span>
@@ -1066,6 +1071,20 @@ function renderHome() {
     </main>
     ${bottomNav('home')}`;
 }
+
+/* ----- Join page (opened from the invite link) ----- */
+function renderJoin() {
+  return `
+    <main class="page" style="max-width:480px;margin:0 auto;padding-top:48px">
+      <div class="card stack" style="text-align:center">
+        <div style="font-size:3rem">👋</div>
+        <h2 style="margin:0">Namaste ${esc(fullName(me.name || ''))}!</h2>
+        <p class="muted" style="margin:0">Kuldeep ne jo <b>code</b> bheja hai wo yahan daalo. Uske baad aapke apne ideas alag dikhenge, aur dono ka data sync rahega.</p>
+        <div style="text-align:left">${passwordForm()}</div>
+      </div>
+    </main>`;
+}
+const INVITE_URL = () => location.origin + location.pathname + '#/join/S';
 
 /* ----- Misc page: to-do list with tasks inside tasks ----- */
 function renderMisc() {
@@ -1528,7 +1547,7 @@ function renderStepsTab(idea) {
         <div class="f-title">${esc(st.title)}</div>
         <div class="f-tags">
           ${isNow ? `<span class="mini now-tag">📍 Abhi yahan ho</span>` : ''}
-          ${st.done ? `<span class="mini state-done" style="cursor:default;display:inline-flex;align-items:center;gap:4px">✓ Done${st.doneAt ? ' · ' + fmtDate(st.doneAt) : ''}${st.doneBy ? ' · ' + esc(st.doneBy.name) : ''}</span>` : ''}
+          ${st.done ? `<span class="mini state-done" style="cursor:default;display:inline-flex;align-items:center;gap:4px">✓ Done${st.doneAt ? ' · ' + fmtDate(st.doneAt) : ''}${st.doneBy ? ' · ' + esc(fullName(st.doneBy.name)) : ''}</span>` : ''}
           ${!st.done && !isNow ? `<button class="mini" data-action="set-current-step" data-id="${st.id}" title="Is se pehle ke saare steps done mark ho jayenge">📍 Yahan hu</button>` : ''}
         </div>
       </div>
@@ -1851,7 +1870,7 @@ function ideaToText(idea) {
   const lines = [];
   lines.push(`📱 ${idea.name}`);
   if (idea.desc) lines.push(idea.desc);
-  if (idea.owner) lines.push(`Added by: ${idea.owner.name}`);
+  if (idea.owner) lines.push(`Added by: ${fullName(idea.owner.name)}`);
   lines.push('');
   lines.push(`Status: ${s.emoji} ${s.label} | Priority: ${idea.priority} | Progress: ${progressOf(idea)}%${mvp !== null ? ` (MVP ${mvp}%)` : ''}`);
   if (idea.platforms.length) lines.push(`Platforms: ${idea.platforms.join(', ')}`);
@@ -1941,7 +1960,10 @@ function loadSample() {
 const SYNC_API = '/api/sync';
 const PROFILE_KEY = 'appIdeasTracker.profile';
 const CLOUD_KEY = 'appIdeasTracker.cloud';
-const PEOPLE = ['K', 'S']; // quick choices for "Aap kaun ho?"
+const PEOPLE = ['K', 'S']; // quick choices for "Aap kaun ho?" (saved as the letter)
+const FULL_NAMES = { K: 'Kuldeep', S: 'Sandeep' }; // shown on screen
+const fullName = name => FULL_NAMES[name] || name;
+const PERSON_KEY = 'app-ideas-person'; // whose ideas Home shows on this device
 
 const readJSON = key => { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch { return {}; } };
 const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ } };
@@ -1949,6 +1971,8 @@ const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringi
 // Who is using this device: { name }
 let me = readJSON(PROFILE_KEY);
 if (me.name === 'Me') me.name = 'K'; // older versions used "Me" for you
+// Home shows only your own ideas by default; the switch on top shows the other person's or both.
+ui.person = (() => { try { return localStorage.getItem(PERSON_KEY); } catch { return null; } })() || me.name || 'all';
 // Cloud sync settings for this device: { code, lastSync, off }
 let cloud = readJSON(CLOUD_KEY);
 const syncState = { status: cloud.code ? 'idle' : 'off', message: '', running: false, again: false, timer: null };
@@ -1973,20 +1997,20 @@ function avatar(person) {
   const fixed = { K: 230, S: 150 };
   let hue = fixed[person.name];
   if (hue === undefined) { hue = 0; for (const ch of person.name) hue = (hue * 31 + ch.codePointAt(0)) % 360; }
-  return `<span class="avatar" style="--h:${hue}" title="Added by ${esc(person.name)}">${esc([...person.name][0].toUpperCase())}</span>`;
+  return `<span class="avatar" style="--h:${hue}" title="Added by ${esc(fullName(person.name))}">${esc([...person.name][0].toUpperCase())}</span>`;
 }
-const personName = p => (p ? esc(p.name) + (isMe(p) ? ' <span class="muted">(you)</span>' : '') : '');
+const personName = p => (p ? esc(fullName(p.name)) + (isMe(p) ? ' <span class="muted">(you)</span>' : '') : '');
 
 // Everyone who owns at least one idea (plus me).
 function people() {
-  const names = new Set(state.ideas.map(i => i.owner && i.owner.name).filter(Boolean));
+  const names = new Set([...PEOPLE, ...state.ideas.map(i => i.owner && i.owner.name).filter(Boolean)]);
   if (me.name) names.add(me.name);
   return [...names].sort((a, b) => (isMe({ name: b }) - isMe({ name: a })) || a.localeCompare(b)).map(name => ({ id: name, name }));
 }
 
 // "Aap kaun ho?" buttons
 function whoAmIButtons() {
-  return PEOPLE.map(p => `<button class="btn ${me.name === p ? 'primary' : ''}" data-action="set-name" data-value="${p}">${avatar({ name: p })} ${p === 'S' ? 'S (bhaiya)' : p}</button>`).join('');
+  return PEOPLE.map(p => `<button class="btn ${me.name === p ? 'primary' : ''}" data-action="set-name" data-value="${p}">${avatar({ name: p })} ${fullName(p)}${p === 'S' ? ' (bhaiya)' : ''}</button>`).join('');
 }
 
 /* ----- Password → code ----- */
@@ -2179,6 +2203,7 @@ function renderSyncCard() {
       ${who}
       <div class="btn-row">
         <button class="btn" data-action="sync-now">🔄 Sync now</button>
+        <button class="btn primary" data-action="invite">📨 Bhaiya ko link bhejo</button>
         <button class="btn danger" data-action="cloud-off">Disconnect</button>
       </div>
     </div>`;
@@ -2346,7 +2371,12 @@ function render() {
   const app = document.getElementById('app');
   const { page, id } = parseRoute();
 
-  if (page === 'dashboard') {
+  if (page === 'join') {
+    // Invite link: picks the person, then only the code is left to type.
+    if (PEOPLE.includes(id) && me.name !== id) { setMyName(id); ui.person = id; try { localStorage.setItem(PERSON_KEY, id); } catch { /* ignore */ } }
+    if (cloud.code) { location.hash = '#/'; return; }
+    app.innerHTML = renderJoin();
+  } else if (page === 'dashboard') {
     app.innerHTML = renderDashboard();
   } else if (page === 'misc') {
     app.innerHTML = renderMisc();
@@ -2608,9 +2638,19 @@ const actions = {
   'open-drawer': openDrawer,
   'close-drawer': closeDrawer,
 
+  async invite() {
+    const url = INVITE_URL();
+    const text = `Bhaiya, apne app ideas yahan likho: ${url}\nLink kholo aur jo code main bhejunga wo daalo.`;
+    if (navigator.share) { try { await navigator.share({ title: 'App Ideas', text }); return; } catch { /* closed */ } }
+    try { await navigator.clipboard.writeText(text); toast('📋 Link copy ho gaya — WhatsApp pe bhej do'); }
+    catch { prompt('Ye link bhaiya ko bhejo:', url); }
+  },
+
   'set-name'(el) {
     setMyName(el.dataset.value);
-    toast(`👋 Hi ${me.name}! Aapke ideas pe "${me.name}" dikhega`);
+    ui.person = me.name;
+    try { localStorage.setItem(PERSON_KEY, ui.person); } catch { /* ignore */ }
+    toast(`👋 Hi ${fullName(me.name)}!`);
     render();
   },
 
@@ -2630,6 +2670,7 @@ const actions = {
 
   person(el) {
     ui.person = el.dataset.value;
+    try { localStorage.setItem(PERSON_KEY, ui.person); } catch { /* ignore */ }
     render();
   },
 
@@ -2658,7 +2699,9 @@ document.addEventListener('submit', e => {
     const button = form.querySelector('button[type="submit"]');
     button.disabled = true;
     button.textContent = '…';
-    connectWithPassword(form.elements.password.value).then(() => render());
+    connectWithPassword(form.elements.password.value).then(ok => {
+      if (ok && parseRoute().page === 'join') location.hash = '#/'; else render();
+    });
   }
 
   if (form.id === 'feature-form') {
