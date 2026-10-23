@@ -250,6 +250,16 @@
   .todo-text { flex: 1; min-width: 0; word-break: break-word; }
   .todo.done .todo-text { text-decoration: line-through; color: var(--muted); }
   .todo-del { font-size: .9rem; color: var(--muted); }
+  .todo-item { display: grid; gap: 6px; }
+  .todo-children { margin-left: 22px; padding-left: 10px; border-left: 2px solid var(--border); }
+  .todo-children .todo { min-height: 46px; }
+  .todo-arrow, .todo-arrow-space { flex: none; width: 22px; margin-right: -6px; }
+  .todo-arrow { height: 32px; border: 0; background: transparent; color: var(--muted); font-size: 1.3rem; cursor: pointer;
+    padding: 0; transition: transform .15s; }
+  .todo-arrow.open { transform: rotate(90deg); }
+  .todo-count { flex: none; font-size: .75rem; color: var(--muted); white-space: nowrap; }
+  .todo-sub { font-size: 1.1rem; color: var(--primary); }
+  @media (max-width: 420px) { .todo-children { margin-left: 10px; padding-left: 8px; } }
 
   /* ---------- 10. Home: search + sort ---------- */
   .search { position: relative; }
@@ -273,6 +283,8 @@
   }
   .nav-item .ico { font-size: 1.3rem; line-height: 1; }
   .nav-item.active { color: var(--primary); }
+  .nav-count:empty { display: none; }
+  .nav-count { font-size: .7rem; opacity: .8; }
   .fab {
     width: 60px; height: 60px; margin-top: -30px; border-radius: 50%;
     display: grid; place-items: center; text-decoration: none;
@@ -539,10 +551,18 @@ const MISC_STEPS = [
   ['testing',  '🧪 Use karke dekho, bugs fix karwao'],
   ['testing',  '✅ Ready — kaam ho gaya!'],
 ];
-const STEP_TEMPLATES = { apps: PLAYSTORE_STEPS, vr: VR_STEPS, feature: FEATURE_STEPS, misc: MISC_STEPS };
+// PC / laptop software (Windows app).
+const PC_STEPS = [
+  ['idea',     '💡 Idea + features Claude ko batao'],
+  ['building', '🤖 Claude se PC app banwao'],
+  ['testing',  '💻 Laptop pe test karo, bugs Claude se fix karwao'],
+  ['testing',  '📦 Installer (.exe) + listing taiyaar (Claude se)'],
+  ['testing',  '🚀 Microsoft Store / website pe upload — LIVE!'],
+];
+const STEP_TEMPLATES = { apps: PLAYSTORE_STEPS, vr: VR_STEPS, pc: PC_STEPS, feature: FEATURE_STEPS, misc: MISC_STEPS };
 const stepTemplate = folder => STEP_TEMPLATES[folder] || PLAYSTORE_STEPS;
 // Where the roadmap ends, for labels like "Play Store tak progress".
-const FINISH_LINE = { apps: 'Play Store', vr: 'Store', feature: 'Release', misc: 'Ready' };
+const FINISH_LINE = { apps: 'Play Store', vr: 'Store', pc: 'Release', feature: 'Release', misc: 'Ready' };
 const finishOf = folder => FINISH_LINE[folder] || 'Play Store';
 
 // Older ready-made lists. Ideas that still have them get moved to the 5-step list;
@@ -709,7 +729,8 @@ function normalizeIdea(raw = {}) {
   return {
     id: raw.id || uid(),
     name: String(raw.name || 'Untitled idea'),
-    folder: STEP_TEMPLATES[raw.folder] ? raw.folder : 'apps', // which Home folder: apps / vr / feature / misc
+    // which Home folder: apps / vr / pc. The old Features + Misc idea folders were removed, so those ideas go to apps.
+    folder: ['apps', 'vr', 'pc'].includes(raw.folder) ? raw.folder : 'apps',
     desc: String(raw.desc || ''),
     problem: String(raw.problem || ''),
     target: String(raw.target || ''),
@@ -778,6 +799,7 @@ function normalizeTodo(raw = {}) {
   return {
     id: raw.id || uid(),
     text: String(raw.text || ''),
+    parentId: raw.parentId || null, // set = this task lives inside another task
     done: !!raw.done,
     doneAt: Number(raw.doneAt) || null,
     doneBy: normPerson(raw.doneBy),
@@ -786,10 +808,10 @@ function normalizeTodo(raw = {}) {
     updatedAt: Number(raw.updatedAt) || now,
   };
 }
-const IDEA_FOLDERS = () => FOLDERS.filter(f => f.key !== 'misc'); // folders that hold idea cards
-const newFolder = () => (ui.folder === 'misc' ? 'apps' : ui.folder); // new ideas never go to the to-do folder
+const IDEA_FOLDERS = () => FOLDERS; // folders that hold idea cards
+const newFolder = () => ui.folder;
 const openTodos = () => state.todos.filter(t => !t.done).length;
-const folderCount = key => (key === 'misc' ? openTodos() : state.ideas.filter(i => i.folder === key).length);
+const folderCount = key => state.ideas.filter(i => i.folder === key).length;
 
 function loadState() {
   try {
@@ -839,8 +861,7 @@ let state = loadState();
 const FOLDERS = [
   { key: 'apps', emoji: '💡', label: 'App ideas', title: '💡 App Ideas' },
   { key: 'vr',   emoji: '🥽', label: 'VR ideas',  title: '🥽 VR Ideas' },
-  { key: 'feature', emoji: '✨', label: 'Features', title: '✨ Feature Ideas' },
-  { key: 'misc', emoji: '🧰', label: 'Misc', title: '🧰 Misc — banana / develop' },
+  { key: 'pc',   emoji: '🖥️', label: 'PC app ideas', title: '🖥️ PC App Ideas' },
 ];
 const folderOf = key => FOLDERS.find(f => f.key === key) || FOLDERS[0];
 const FOLDER_KEY = 'app-ideas-folder'; // remembers the last open folder on this device
@@ -992,6 +1013,7 @@ function bottomNav(active) {
       </div>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
+      <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
     </nav>`;
 }
 
@@ -1016,15 +1038,6 @@ function renderHome() {
         ${s.emoji} ${s.label} <span class="count">${counts[s.key] || 0}</span>
       </button>`))
     .join('');
-
-  if (ui.folder === 'misc') return `
-    ${topBar(folderOf('misc').title)}
-    <main class="page">
-      <div class="folder-tabs" aria-label="Folders">${folderTabs}</div>
-      ${renderSetupCard()}
-      ${renderTodos()}
-    </main>
-    ${bottomNav('home')}`;
 
   return `
     ${topBar(folderOf(ui.folder).title)}
@@ -1054,24 +1067,73 @@ function renderHome() {
     ${bottomNav('home')}`;
 }
 
-/* ----- Misc: one-line to-do list ----- */
-function todoRow(t) {
+/* ----- Misc page: to-do list with tasks inside tasks ----- */
+function renderMisc() {
   return `
-    <li class="todo ${t.done ? 'done' : ''}">
-      <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
-      <span class="todo-text">${esc(t.text)}</span>
-      ${t.by ? avatar(t.by) : ''}
-      <button class="icon-btn todo-del" data-action="delete-todo" data-id="${t.id}" aria-label="Delete">✕</button>
+    ${topBar('🧰 Misc — karne wale kaam')}
+    <main class="page">
+      ${renderSetupCard()}
+      ${renderTodos()}
+    </main>
+    ${bottomNav('misc')}`;
+}
+
+// Collapsed tasks are remembered per device (not synced).
+const COLLAPSE_KEY = 'app-ideas-todo-collapsed';
+const collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem(COLLAPSE_KEY)) || []; } catch { return []; } })());
+const saveCollapsed = () => { try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsed])); } catch { /* ignore */ } };
+
+// Sub-tasks of a task, oldest first (the order you wrote them).
+const childrenOf = id => state.todos.filter(t => t.parentId === id).sort((a, b) => a.createdAt - b.createdAt);
+// Every task inside a task, at any depth.
+function descendantsOf(id) {
+  const out = [];
+  const walk = pid => childrenOf(pid).forEach(c => { out.push(c); walk(c.id); });
+  walk(id);
+  return out;
+}
+// Top-level = no parent, or its parent was deleted on another device.
+const isTopTodo = (t, ids) => !t.parentId || !ids.has(t.parentId);
+
+function todoRow(t) {
+  const kids = childrenOf(t.id);
+  const all = descendantsOf(t.id);
+  const isOpen = !collapsed.has(t.id);
+  const adding = ui.addSubTo === t.id;
+  return `
+    <li class="todo-item">
+      <div class="todo ${t.done ? 'done' : ''}">
+        ${kids.length
+          ? `<button class="todo-arrow ${isOpen ? 'open' : ''}" data-action="collapse-todo" data-id="${t.id}" aria-label="${isOpen ? 'Band karo' : 'Kholo'}">›</button>`
+          : '<span class="todo-arrow-space"></span>'}
+        <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
+        <span class="todo-text">${esc(t.text)}</span>
+        ${all.length ? `<span class="todo-count" title="Andar ke kaam">☰ ${all.filter(x => x.done).length}/${all.length}</span>` : ''}
+        ${t.by ? avatar(t.by) : ''}
+        <button class="icon-btn todo-sub" data-action="add-subtodo" data-id="${t.id}" aria-label="Iske andar task add karo" title="Andar task add karo">＋</button>
+        <button class="icon-btn todo-del" data-action="delete-todo" data-id="${t.id}" aria-label="Delete">✕</button>
+      </div>
+      ${(kids.length && isOpen) || adding ? `<ul class="todo-list todo-children">
+        ${isOpen ? kids.map(todoRow).join('') : ''}
+        ${adding ? `<li><form id="subtodo-form" class="todo-add" data-parent="${t.id}" autocomplete="off">
+          <input name="text" required maxlength="200" placeholder="Andar ka task… Enter dabao" aria-label="New sub-task">
+          <button type="submit" class="btn primary">Add</button>
+          <button type="button" class="btn" data-action="cancel-subtodo">✕</button>
+        </form></li>` : ''}
+      </ul>` : ''}
     </li>`;
 }
 function renderTodos() {
-  const open = state.todos.filter(t => !t.done).sort((a, b) => b.createdAt - a.createdAt);
-  const done = state.todos.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  const ids = new Set(state.todos.map(t => t.id));
+  const top = state.todos.filter(t => isTopTodo(t, ids));
+  const open = top.filter(t => !t.done).sort((a, b) => b.createdAt - a.createdAt);
+  const done = top.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   return `
     <form id="todo-form" class="todo-add" autocomplete="off">
       <input name="text" required maxlength="200" placeholder="Kya karna hai? Likho aur Enter dabao…" aria-label="New to-do">
       <button type="submit" class="btn primary">+ Add</button>
     </form>
+    <p class="muted small" style="margin:-4px 2px 10px">Kisi task ke andar aur task chahiye? Uske <b>＋</b> pe tap karo.</p>
     ${open.length ? `<ul class="todo-list">${open.map(todoRow).join('')}</ul>`
       : `<div class="card empty"><div class="big">🧰</div><p class="muted">${done.length ? 'Sab ho gaya! 🎉 Naya kaam upar likho.' : 'Jo bhi karna hai, upar ek line me likho. Ho jaye to tick karo.'}</p></div>`}
     ${done.length ? `
@@ -2161,7 +2223,7 @@ function renderDrawer() {
       </a>`).join('') : '<p class="muted small" style="margin:4px 8px">Abhi khaali.</p>');
     }).join('') : '<p class="muted small" style="margin:8px">Abhi koi idea nahi hai.</p>'}
     <h3>🧰 Misc to-do (${openTodos()} baaki)</h3>
-    <a class="drawer-item" href="#/" data-action="folder" data-value="misc"><span class="name">🧰 To-do list kholo</span></a>
+    <a class="drawer-item" href="#/misc"><span class="name">🧰 To-do list kholo</span></a>
     <div class="drawer-links">
       <a class="btn primary" href="#/new">+ New idea</a>
       <a class="btn" href="#/">🗂️ All ideas</a>
@@ -2286,6 +2348,9 @@ function render() {
 
   if (page === 'dashboard') {
     app.innerHTML = renderDashboard();
+  } else if (page === 'misc') {
+    app.innerHTML = renderMisc();
+    if (ui.addSubTo) document.querySelector('#subtodo-form input')?.focus();
   } else if (page === 'new') {
     app.innerHTML = renderEdit(null);
   } else if ((page === 'idea' || page === 'edit') && id) {
@@ -2462,24 +2527,48 @@ const actions = {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
     t.done = !t.done;
-    t.doneAt = t.done ? Date.now() : null;
-    t.doneBy = t.done ? myRef() : null;
-    t.updatedAt = Date.now();
+    // Ticking a task also ticks everything inside it.
+    const list = t.done ? [t, ...descendantsOf(t.id).filter(x => !x.done)] : [t];
+    list.forEach(x => {
+      x.done = t.done;
+      x.doneAt = t.done ? Date.now() : null;
+      x.doneBy = t.done ? myRef() : null;
+      x.updatedAt = Date.now();
+    });
     saveState(); render();
   },
 
+  'collapse-todo'(el) {
+    const id = el.dataset.id;
+    if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+    saveCollapsed(); render();
+  },
+
+  'add-subtodo'(el) {
+    ui.addSubTo = ui.addSubTo === el.dataset.id ? null : el.dataset.id;
+    collapsed.delete(el.dataset.id); saveCollapsed();
+    render();
+  },
+
+  'cancel-subtodo'() { ui.addSubTo = null; render(); },
+
   'delete-todo'(el) {
-    state.todos = state.todos.filter(t => t.id !== el.dataset.id);
-    state.deleted[el.dataset.id] = Date.now();
+    const inside = descendantsOf(el.dataset.id);
+    if (inside.length && !confirm(`Iske andar ${inside.length} task bhi hain — sab delete karein?`)) return;
+    const gone = new Set([el.dataset.id, ...inside.map(t => t.id)]);
+    state.todos = state.todos.filter(t => !gone.has(t.id));
+    gone.forEach(id => (state.deleted[id] = Date.now()));
     saveState(); render();
     toast('🗑️ Deleted');
   },
 
   'clear-done-todos'() {
-    const done = state.todos.filter(t => t.done);
-    if (!done.length || !confirm(`${done.length} done items hata dein?`)) return;
-    done.forEach(t => (state.deleted[t.id] = Date.now()));
-    state.todos = state.todos.filter(t => !t.done);
+    // Done tasks go, along with everything inside them.
+    const gone = new Set();
+    state.todos.filter(t => t.done).forEach(t => { gone.add(t.id); descendantsOf(t.id).forEach(x => gone.add(x.id)); });
+    if (!gone.size || !confirm(`${gone.size} done items hata dein?`)) return;
+    gone.forEach(id => (state.deleted[id] = Date.now()));
+    state.todos = state.todos.filter(t => !gone.has(t.id));
     saveState(); render();
   },
 
@@ -2623,6 +2712,18 @@ document.addEventListener('submit', e => {
     state.todos.push(normalizeTodo({ text, by: myRef() }));
     saveState(); render();
     document.querySelector('#todo-form input')?.focus(); // keep typing the next one
+  }
+
+  if (form.id === 'subtodo-form') {
+    const text = form.elements.text.value.trim();
+    const parent = state.todos.find(t => t.id === form.dataset.parent);
+    if (!text || !parent) return;
+    state.todos.push(normalizeTodo({ text, parentId: parent.id, by: myRef() }));
+    // Adding open work inside a done task re-opens that task (and the ones above it).
+    for (let p = parent; p && p.done; p = state.todos.find(t => t.id === p.parentId)) {
+      p.done = false; p.doneAt = null; p.doneBy = null; p.updatedAt = Date.now();
+    }
+    saveState(); render(); // form stays open for the next one
   }
 
   if (form.id === 'log-form') {
