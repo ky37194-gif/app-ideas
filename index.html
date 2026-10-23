@@ -1092,8 +1092,9 @@ function renderJoin() {
     <main class="page" style="max-width:480px;margin:0 auto;padding-top:48px">
       <div class="card stack" style="text-align:center">
         <div style="font-size:3rem">👋</div>
-        <h2 style="margin:0">Namaste ${esc(fullName(me.name || ''))}!</h2>
-        <p class="muted" style="margin:0">Kuldeep ne jo <b>code</b> bheja hai wo yahan daalo. Uske baad aapke apne ideas alag dikhenge, aur dono ka data sync rahega.</p>
+        <h2 style="margin:0">Namaste${me.name ? ' ' + esc(fullName(me.name)) : ''}!</h2>
+        ${!me.name ? `<p class="small" style="margin:0">Aap kaun ho?</p><div class="btn-row" style="justify-content:center">${whoAmIButtons()}</div>` : ''}
+        <p class="muted" style="margin:0">🔒 Site kholne ke liye <b>code</b> daalo (Kuldeep se pucho).</p>
         <div style="text-align:left">${passwordForm()}</div>
       </div>
     </main>`;
@@ -2117,6 +2118,13 @@ async function syncNow() {
       const got = await cloudRequest('GET');
       if (!got.ok) throw new Error(got.data.error || 'Server error ' + got.status);
 
+      if (!cloud.verified) {
+        if (!isRealList(got.data.data)) {
+          cloud = {}; writeJSON(CLOUD_KEY, cloud);
+          toast('🔒 Code galat tha — sahi code daalo'); render(); return;
+        }
+        cloud.verified = true; writeJSON(CLOUD_KEY, cloud);
+      }
       const remote = got.data.data
         ? { ideas: (got.data.data.ideas || []).map(normalizeIdea), todos: (got.data.data.todos || []).map(normalizeTodo), deleted: got.data.data.deleted || {} }
         : { ideas: [], todos: [], deleted: {} };
@@ -2153,14 +2161,23 @@ async function syncNow() {
   }
 }
 
+// The real shared list always has Kuldeep's ideas. A wrong code opens an empty (or someone-else) list.
+const isRealList = data => !!data && (data.ideas || []).some(i => i.owner && i.owner.name === 'K');
+
 // Turn on sync with a password (same password on every device).
 async function connectWithPassword(password) {
   if (String(password || '').trim().length < 6) { toast('Password kam se kam 6 letters ka rakho'); return false; }
   setSyncStatus('syncing');
   cloud = { code: await passwordToCode(password) };
+  const check = await cloudRequest('GET').catch(() => null);
+  if (!check || !check.ok) { cloud = {}; toast('❌ Internet nahi hai, phir try karo'); return false; }
+  if (!isRealList(check.data.data)) { cloud = {}; toast('❌ Galat code — Kuldeep se sahi code pucho'); return false; }
+  cloud.verified = true;
   writeJSON(CLOUD_KEY, cloud);
+  ui.person = 'all'; // show everyone's ideas after joining
+  try { localStorage.setItem(PERSON_KEY, 'all'); } catch { /* ignore */ }
   await syncNow();
-  if (syncState.status === 'ok') { toast('☁️ Connected! Ab sab apne aap sync hoga'); return true; }
+  if (syncState.status === 'ok') { toast('✅ Code sahi! Sab ideas aa gaye'); return true; }
   toast('❌ ' + syncState.message);
   cloud = {};
   writeJSON(CLOUD_KEY, cloud);
@@ -2251,7 +2268,7 @@ function renderSetupCard() {
       <b>☁️ Phone aur PC pe same data</b>
       ${!me.name ? `<p class="small" style="margin:10px 0 6px">1. Aap kaun ho?</p><div class="btn-row">${whoAmIButtons()}</div>` : ''}
       ${!cloud.code ? `<p class="small" style="margin:12px 0 6px">${!me.name ? '2. ' : ''}Sync password daalo:</p>${passwordForm()}
-      <button class="btn ghost block" data-action="cloud-skip" style="margin-top:6px">Abhi nahi</button>` : ''}
+` : ''}
     </div>`;
 }
 
@@ -2404,11 +2421,15 @@ function render() {
   const app = document.getElementById('app');
   const { page, id } = parseRoute();
 
-  if (page === 'join') {
-    // Invite link: picks the person, then only the code is left to type.
-    if (PEOPLE.includes(id) && me.name !== id) { setMyName(id); ui.person = id; try { localStorage.setItem(PERSON_KEY, id); } catch { /* ignore */ } }
-    if (cloud.code) { location.hash = '#/'; return; }
+  if (page === 'join' && PEOPLE.includes(id) && me.name !== id) setMyName(id); // invite link picks the person
+  if (!cloud.code) {
+    // No code yet → the site stays locked until the right code is typed.
     app.innerHTML = renderJoin();
+    document.querySelector('#password-form input[name="password"]')?.focus();
+    return;
+  }
+  if (page === 'join') {
+    location.hash = '#/'; return;
   } else if (page === 'dashboard') {
     app.innerHTML = renderDashboard();
   } else if (page === 'misc') {
@@ -2690,8 +2711,8 @@ const actions = {
   },
 
   'cloud-off'() {
-    if (!confirm('Turn off sync on this device? Your ideas stay on this device and in the cloud.')) return;
-    cloud = { off: true };
+    if (!confirm('Is device se logout karna hai? Wapas aane ke liye code dobara daalna padega.')) return;
+    cloud = {};
     writeJSON(CLOUD_KEY, cloud);
     setSyncStatus('off');
     render();
