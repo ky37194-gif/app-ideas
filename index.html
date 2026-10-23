@@ -273,9 +273,11 @@
   .hero p { margin: 0 0 14px; color: var(--muted); }
   .badges { display: flex; gap: 6px; flex-wrap: wrap; }
   .progress-grid { display: grid; gap: 14px; margin-top: 14px; }
-  .tabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); margin: 18px 0 12px; }
+  .tabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); margin: 18px 0 12px;
+    overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
   .tab {
-    flex: 1; min-height: 42px; border: 0; border-radius: 10px; background: transparent;
+    flex: 1 0 auto; padding: 0 12px; white-space: nowrap; min-height: 42px; border: 0; border-radius: 10px; background: transparent;
     color: var(--muted); font: inherit; font-weight: 700; font-size: .9rem; cursor: pointer;
   }
   .tab.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
@@ -709,6 +711,14 @@ function normalizeIdea(raw = {}) {
     })),
     // Steps = the roadmap to the store. The first step that isn't done is "where you are now".
     steps: normalizeSteps(raw),
+    // Misc ideas: small random notes/ideas for this idea (a sub-folder inside it).
+    misc: arr(raw.misc).map(m => ({
+      id: m.id || uid(),
+      text: String(m.text || ''),
+      done: !!m.done,
+      createdAt: Number(m.createdAt) || now,
+      by: normPerson(m.by),
+    })),
     log: arr(raw.log).map(l => ({
       id: l.id || uid(),
       date: /^\d{4}-\d{2}-\d{2}$/.test(l.date) ? l.date : todayStr(),
@@ -1009,7 +1019,7 @@ function updateIdeaList() {
     if (ui.filter !== 'all' && i.status !== ui.filter) return false;
     if (ui.person !== 'all' && (!i.owner || i.owner.id !== ui.person)) return false;
     if (!q) return true;
-    const haystack = [i.owner ? i.owner.name : '', i.name, i.desc, i.notes, i.problem, i.target, i.tags.join(' '), i.features.map(f => f.title).join(' ')]
+    const haystack = [i.owner ? i.owner.name : '', i.name, i.desc, i.notes, i.problem, i.target, i.tags.join(' '), i.features.map(f => f.title).join(' '), i.misc.map(m => m.text).join(' ')]
       .join(' ').toLowerCase();
     return haystack.includes(q);
   });
@@ -1259,12 +1269,14 @@ function renderDetail(idea) {
   const tabs = [
     ['steps', `Steps (${steps.done}/${steps.total})`],
     ['features', `Features (${total})`],
+    ['misc', `🧰 Misc (${idea.misc.length})`],
     ['journal', `Journal (${idea.log.length})`],
     ['info', 'Details'],
   ];
 
   let tabContent = '';
   if (ui.tab === 'journal') tabContent = renderJournalTab(idea);
+  else if (ui.tab === 'misc') tabContent = renderMiscTab(idea);
   else if (ui.tab === 'info') tabContent = renderInfoTab(idea);
   else if (ui.tab === 'features') tabContent = renderFeaturesTab(idea);
   else tabContent = renderStepsTab(idea);
@@ -1465,6 +1477,28 @@ function setStepDone(idea, step, done) {
 }
 
 /* ----- Journal tab ----- */
+/* ----- Misc tab: a sub-folder of small ideas inside this idea ----- */
+function renderMiscTab(idea) {
+  const list = [...idea.misc].sort((a, b) => (a.done - b.done) || b.createdAt - a.createdAt);
+  const items = list.map(m => `
+    <li class="feature" data-status="${m.done ? 'done' : 'todo'}">
+      <button class="f-status" data-action="toggle-misc" data-id="${m.id}" aria-label="${m.done ? 'Done. Tap to undo' : 'Tap to mark done'}">${m.done ? '✓' : ''}</button>
+      <div class="f-body" style="flex:1;min-width:0">
+        <div class="f-title" style="white-space:pre-wrap;word-break:break-word">${esc(m.text)}</div>
+        ${m.by ? `<div class="row small muted" style="gap:6px;margin-top:4px">${avatar(m.by)} ${personName(m.by)}</div>` : ''}
+      </div>
+      <button class="icon-btn" data-action="delete-misc" data-id="${m.id}" aria-label="Delete" style="font-size:.9rem;color:var(--muted)">✕</button>
+    </li>`).join('');
+  return `
+    <form id="misc-form" class="card add-form" autocomplete="off">
+      <b>🧰 Misc ideas</b>
+      <textarea name="text" rows="2" required maxlength="500" placeholder="Koi bhi chhota idea… e.g. dark mode, logo me neela rang" aria-label="Misc idea"></textarea>
+      <button type="submit" class="btn primary">+ Add misc idea</button>
+    </form>
+    ${list.length ? `<ul class="feature-list">${items}</ul>`
+    : `<div class="card empty"><div class="big">🧰</div><p class="muted">Is idea ke chhote-mote random ideas yahan likho.</p></div>`}`;
+}
+
 function renderJournalTab(idea) {
   // Group entries by date, newest first.
   const sorted = [...idea.log].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
@@ -1725,6 +1759,10 @@ function ideaToText(idea) {
     idea.features.forEach(f => {
       lines.push(`${mark[f.status]} ${f.title} — ${f.mvp ? 'MVP' : 'Later'}${f.desc ? `: ${f.desc}` : ''}`);
     });
+  }
+  if (idea.misc.length) {
+    lines.push('', 'Misc ideas:');
+    idea.misc.forEach(m => lines.push(`${m.done ? '[x]' : '[ ]'} ${m.text}`));
   }
   if (idea.links.length) {
     lines.push('', 'Links:');
@@ -2361,6 +2399,21 @@ const actions = {
     toast('🗺️ Steps add ho gaye — jo ho chuke unhe tick karo');
   },
 
+  'toggle-misc'(el) {
+    const idea = findIdea(currentIdeaId());
+    const m = idea.misc.find(x => x.id === el.dataset.id);
+    if (!m) return;
+    m.done = !m.done;
+    touch(idea); saveState(); render();
+  },
+
+  'delete-misc'(el) {
+    const idea = findIdea(currentIdeaId());
+    if (!confirm('Delete this misc idea?')) return;
+    idea.misc = idea.misc.filter(m => m.id !== el.dataset.id);
+    touch(idea); saveState(); render();
+  },
+
   'delete-log'(el) {
     const idea = findIdea(currentIdeaId());
     if (!confirm('Delete this journal entry?')) return;
@@ -2493,6 +2546,15 @@ document.addEventListener('submit', e => {
     f.status = form.elements.status.value;
     f.mvp = form.elements.mvp.value === '1';
     touch(idea); saveState(); closeSheet(); render();
+  }
+
+  if (form.id === 'misc-form') {
+    const idea = findIdea(currentIdeaId());
+    const text = form.elements.text.value.trim();
+    if (!text) return;
+    idea.misc.push({ id: uid(), text, done: false, createdAt: Date.now(), by: myRef() });
+    touch(idea); saveState(); render();
+    toast('🧰 Misc idea added');
   }
 
   if (form.id === 'log-form') {
