@@ -234,11 +234,10 @@
     font: inherit; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
   @media (max-width: 560px) { .folder-tabs { grid-template-columns: 1fr 1fr; } }
   .folder-tab.active { background: var(--primary); color: var(--primary-ink); }
-  .folder-misc { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; margin: 0 0 10px;
-    border: 1px dashed var(--border); border-radius: 12px; color: var(--text); text-decoration: none; font-weight: 600; }
-  .folder-misc .name { flex: 1; }
-  .folder-misc .count { font-size: .8rem; color: var(--muted); }
-  .folder-misc:hover { background: var(--surface-2); }
+  .misc-folder { border-style: dashed; background: color-mix(in srgb, var(--primary) 6%, var(--surface)); }
+  .misc-folder-ico { font-size: 1.5rem; line-height: 1; }
+  .misc-peek { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .9rem; }
+  .misc-peek li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .person-switch { display: flex; gap: 4px; padding: 4px; margin: 10px 0; border-radius: 14px;
     background: var(--surface-2); border: 1px solid var(--border); }
   .person-switch button { flex: 1; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--muted);
@@ -1067,10 +1066,6 @@ function renderHome() {
     ${topBar(folderOf(ui.folder).title)}
     <main class="page">
       <div class="folder-tabs" aria-label="Folders">${folderTabs}</div>
-      <a class="folder-misc" href="#/misc/${ui.folder}">
-        <span>🧰</span><span class="name">${folderOf(ui.folder).label} ka Misc <span class="muted small">— kuch bhi likho</span></span>
-        <span class="count">${openTodos(ui.folder) ? openTodos(ui.folder) + ' baaki' : ''}</span><span class="muted">›</span>
-      </a>
       <div class="search">
         <input id="search" type="search" placeholder="Search ideas, tags, features…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
       </div>
@@ -1214,7 +1209,7 @@ function updateIdeaList() {
   document.getElementById('result-count').textContent = `${ideas.length} idea${ideas.length === 1 ? '' : 's'}`;
 
   if (!state.ideas.length) {
-    listEl.innerHTML = `
+    listEl.innerHTML = miscFolderCard() + `
       <div class="card empty">
         <div class="big">💡</div>
         <h2>No ideas yet</h2>
@@ -1228,7 +1223,7 @@ function updateIdeaList() {
   }
   if (!inFolder.length) {
     const f = folderOf(ui.folder);
-    listEl.innerHTML = `
+    listEl.innerHTML = miscFolderCard() + `
       <div class="card empty">
         <div class="big">${f.emoji}</div>
         <h2>${f.label} folder khaali hai</h2>
@@ -1238,12 +1233,29 @@ function updateIdeaList() {
     return;
   }
   if (!ideas.length) {
-    listEl.innerHTML = `<div class="card empty"><div class="big">🔎</div><p class="muted">No ideas match your search / filter.</p></div>`;
+    listEl.innerHTML = miscFolderCard() + `<div class="card empty"><div class="big">🔎</div><p class="muted">No ideas match your search / filter.</p></div>`;
     return;
   }
 
-  listEl.innerHTML = ideas.map(ideaCard).join('');
+  listEl.innerHTML = miscFolderCard() + ideas.map(ideaCard).join('');
   animateBars();
+}
+
+// The folder's own Misc list, shown as a folder card first in the grid.
+function miscFolderCard() {
+  const f = folderOf(ui.folder);
+  const open = state.todos.filter(t => t.folder === f.key && !t.done && !t.parentId).sort((a, b) => b.createdAt - a.createdAt);
+  const left = openTodos(f.key);
+  return `
+    <a class="card idea-card misc-folder" href="#/misc/${f.key}">
+      <div class="card-top">
+        <h3 class="row" style="gap:10px"><span class="misc-folder-ico">📁</span><span>🧰 Misc</span></h3>
+        <span class="muted small">${left ? left + ' baaki' : ''} ›</span>
+      </div>
+      <p class="card-desc">${f.label} ke liye kuch bhi likho</p>
+      ${open.length ? `<ul class="misc-peek">${open.slice(0, 3).map(t => `<li>○ ${esc(t.text)}</li>`).join('')}${open.length > 3 ? `<li class="muted">+${open.length - 3} aur…</li>` : ''}</ul>`
+        : '<p class="muted small" style="margin:0">Abhi khaali — tap karke likhna shuru karo</p>'}
+    </a>`;
 }
 
 function ideaCard(idea) {
