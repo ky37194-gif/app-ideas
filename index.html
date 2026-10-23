@@ -564,10 +564,18 @@ const PC_STEPS = [
   ['testing',  '📦 Installer (.exe) + listing taiyaar (Claude se)'],
   ['testing',  '🚀 Microsoft Store / website pe upload — LIVE!'],
 ];
-const STEP_TEMPLATES = { apps: PLAYSTORE_STEPS, vr: VR_STEPS, pc: PC_STEPS, feature: FEATURE_STEPS, misc: MISC_STEPS };
+// REA: understand an existing app with reverse engineering (REA), then make our own and ship it everywhere.
+const REA_STEPS = [
+  ['idea',     '💡 Kya reverse engineer karna hai + kya banana hai — Claude ko batao'],
+  ['planning', '🔍 REA se app / feature samjho (reverse engineering)'],
+  ['building', '🤖 Claude se apna version banwao'],
+  ['testing',  '🧪 Phone, PC aur Quest pe test karo, bugs fix karwao'],
+  ['testing',  '🚀 Upload — Play Store 📱 + PC 🖥️ + Meta Quest 🥽 — LIVE!'],
+];
+const STEP_TEMPLATES = { apps: PLAYSTORE_STEPS, vr: VR_STEPS, pc: PC_STEPS, rea: REA_STEPS, feature: FEATURE_STEPS, misc: MISC_STEPS };
 const stepTemplate = folder => STEP_TEMPLATES[folder] || PLAYSTORE_STEPS;
 // Where the roadmap ends, for labels like "Play Store tak progress".
-const FINISH_LINE = { apps: 'Play Store', vr: 'Store', pc: 'Release', feature: 'Release', misc: 'Ready' };
+const FINISH_LINE = { apps: 'Play Store', vr: 'Store', pc: 'Release', rea: 'Upload', feature: 'Release', misc: 'Ready' };
 const finishOf = folder => FINISH_LINE[folder] || 'Play Store';
 
 // Older ready-made lists. Ideas that still have them get moved to the 5-step list;
@@ -735,7 +743,7 @@ function normalizeIdea(raw = {}) {
     id: raw.id || uid(),
     name: String(raw.name || 'Untitled idea'),
     // which Home folder: apps / vr / pc. The old Features + Misc idea folders were removed, so those ideas go to apps.
-    folder: ['apps', 'vr', 'pc'].includes(raw.folder) ? raw.folder : 'apps',
+    folder: ['apps', 'vr', 'pc', 'rea'].includes(raw.folder) ? raw.folder : 'apps',
     desc: String(raw.desc || ''),
     problem: String(raw.problem || ''),
     target: String(raw.target || ''),
@@ -867,6 +875,7 @@ const FOLDERS = [
   { key: 'apps', emoji: '💡', label: 'App ideas', title: '💡 App Ideas' },
   { key: 'vr',   emoji: '🥽', label: 'VR ideas',  title: '🥽 VR Ideas' },
   { key: 'pc',   emoji: '🖥️', label: 'PC app ideas', title: '🖥️ PC App Ideas' },
+  { key: 'rea',  emoji: '🔍', label: 'REA', title: '🔍 REA — reverse engineering se banao' },
 ];
 const folderOf = key => FOLDERS.find(f => f.key === key) || FOLDERS[0];
 const FOLDER_KEY = 'app-ideas-folder'; // remembers the last open folder on this device
