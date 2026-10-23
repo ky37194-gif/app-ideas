@@ -467,7 +467,6 @@
     .nav-sub { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 10px;
       color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
     .nav-sub .name { flex: 1; }
-    .nav-subsub { min-height: 32px; margin-left: 22px; font-size: .8rem; font-weight: 500; }
     .nav-sub .count { font-size: .75rem; opacity: .8; }
     .nav-sub:hover { background: var(--surface-2); color: var(--text); }
     .nav-sub.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--text); }
@@ -1029,9 +1028,6 @@ function bottomNav(active) {
       <div class="nav-subs">${FOLDERS.map(f => `
         <a class="nav-sub ${active === 'home' && ui.folder === f.key ? 'active' : ''}" href="#/" data-action="folder" data-value="${f.key}">
           <span>${f.emoji}</span><span class="name">${f.label}</span><span class="count">${folderCount(f.key)}</span>
-        </a>
-        <a class="nav-sub nav-subsub ${active === 'misc:' + f.key ? 'active' : ''}" href="#/misc/${f.key}">
-          <span>🧰</span><span class="name">Misc</span><span class="count">${openTodos(f.key) || ''}</span>
         </a>`).join('')}
       </div>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
