@@ -234,7 +234,12 @@
     font: inherit; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
   @media (max-width: 560px) { .folder-tabs { grid-template-columns: 1fr 1fr; } }
   .folder-tab.active { background: var(--primary); color: var(--primary-ink); }
-  .person-switch { display: flex; gap: 4px; padding: 4px; margin: 0 0 10px; border-radius: 14px;
+  .folder-misc { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; margin: 0 0 10px;
+    border: 1px dashed var(--border); border-radius: 12px; color: var(--text); text-decoration: none; font-weight: 600; }
+  .folder-misc .name { flex: 1; }
+  .folder-misc .count { font-size: .8rem; color: var(--muted); }
+  .folder-misc:hover { background: var(--surface-2); }
+  .person-switch { display: flex; gap: 4px; padding: 4px; margin: 10px 0; border-radius: 14px;
     background: var(--surface-2); border: 1px solid var(--border); }
   .person-switch button { flex: 1; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--muted);
     font: inherit; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -463,6 +468,7 @@
     .nav-sub { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 10px;
       color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
     .nav-sub .name { flex: 1; }
+    .nav-subsub { min-height: 32px; margin-left: 22px; font-size: .8rem; font-weight: 500; }
     .nav-sub .count { font-size: .75rem; opacity: .8; }
     .nav-sub:hover { background: var(--surface-2); color: var(--text); }
     .nav-sub.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--text); }
@@ -813,6 +819,7 @@ function normalizeTodo(raw = {}) {
     id: raw.id || uid(),
     text: String(raw.text || ''),
     parentId: raw.parentId || null, // set = this task lives inside another task
+    folder: raw.folder || null, // which Misc list: null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
     done: !!raw.done,
     doneAt: Number(raw.doneAt) || null,
     doneBy: normPerson(raw.doneBy),
@@ -823,7 +830,7 @@ function normalizeTodo(raw = {}) {
 }
 const IDEA_FOLDERS = () => FOLDERS; // folders that hold idea cards
 const newFolder = () => ui.folder;
-const openTodos = () => state.todos.filter(t => !t.done).length;
+const openTodos = (folder = null) => state.todos.filter(t => !t.done && t.folder === folder).length;
 const folderCount = key => state.ideas.filter(i => i.folder === key && (ui.person === 'all' || (i.owner && i.owner.id === ui.person))).length;
 
 function loadState() {
@@ -1023,6 +1030,9 @@ function bottomNav(active) {
       <div class="nav-subs">${FOLDERS.map(f => `
         <a class="nav-sub ${active === 'home' && ui.folder === f.key ? 'active' : ''}" href="#/" data-action="folder" data-value="${f.key}">
           <span>${f.emoji}</span><span class="name">${f.label}</span><span class="count">${folderCount(f.key)}</span>
+        </a>
+        <a class="nav-sub nav-subsub ${active === 'misc:' + f.key ? 'active' : ''}" href="#/misc/${f.key}">
+          <span>🧰</span><span class="name">Misc</span><span class="count">${openTodos(f.key) || ''}</span>
         </a>`).join('')}
       </div>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
@@ -1057,6 +1067,10 @@ function renderHome() {
     ${topBar(folderOf(ui.folder).title)}
     <main class="page">
       <div class="folder-tabs" aria-label="Folders">${folderTabs}</div>
+      <a class="folder-misc" href="#/misc/${ui.folder}">
+        <span>🧰</span><span class="name">${folderOf(ui.folder).label} ka Misc <span class="muted small">— kuch bhi likho</span></span>
+        <span class="count">${openTodos(ui.folder) ? openTodos(ui.folder) + ' baaki' : ''}</span><span class="muted">›</span>
+      </a>
       <div class="search">
         <input id="search" type="search" placeholder="Search ideas, tags, features…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
       </div>
@@ -1096,14 +1110,16 @@ function renderJoin() {
 const INVITE_URL = () => location.origin + location.pathname + '#/join/S';
 
 /* ----- Misc page: to-do list with tasks inside tasks ----- */
-function renderMisc() {
+function renderMisc(folder = null) {
+  const f = folder && FOLDERS.find(x => x.key === folder);
+  if (!f) folder = null;
   return `
-    ${topBar('🧰 Misc — karne wale kaam')}
+    ${f ? topBar(`${f.emoji} ${f.label} · 🧰 Misc`, { back: '#/' }) : topBar('🧰 Misc — karne wale kaam')}
     <main class="page">
       ${renderSetupCard()}
-      ${renderTodos()}
+      ${renderTodos(folder)}
     </main>
-    ${bottomNav('misc')}`;
+    ${bottomNav(f ? 'misc:' + folder : 'misc')}`;
 }
 
 // Collapsed tasks are remembered per device (not synced).
@@ -1151,13 +1167,13 @@ function todoRow(t) {
       </ul>` : ''}
     </li>`;
 }
-function renderTodos() {
+function renderTodos(folder = null) {
   const ids = new Set(state.todos.map(t => t.id));
-  const top = state.todos.filter(t => isTopTodo(t, ids));
+  const top = state.todos.filter(t => isTopTodo(t, ids) && t.folder === folder);
   const open = top.filter(t => !t.done).sort((a, b) => b.createdAt - a.createdAt);
   const done = top.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   return `
-    <form id="todo-form" class="todo-add" autocomplete="off">
+    <form id="todo-form" class="todo-add" data-folder="${folder || ''}" autocomplete="off">
       <input name="text" required maxlength="200" placeholder="Kya karna hai? Likho aur Enter dabao…" aria-label="New to-do">
       <button type="submit" class="btn primary">+ Add</button>
     </form>
@@ -1167,7 +1183,7 @@ function renderTodos() {
     ${done.length ? `
       <div class="row-between" style="margin:18px 2px 8px">
         <b class="muted small">✓ Ho gaye (${done.length})</b>
-        <button class="btn" data-action="clear-done-todos" style="min-height:34px;padding:0 12px;font-size:.85rem">Clear done</button>
+        <button class="btn" data-action="clear-done-todos" data-folder="${folder || ''}" style="min-height:34px;padding:0 12px;font-size:.85rem">Clear done</button>
       </div>
       <ul class="todo-list">${done.map(todoRow).join('')}</ul>` : ''}`;
 }
@@ -2388,7 +2404,8 @@ function render() {
   } else if (page === 'dashboard') {
     app.innerHTML = renderDashboard();
   } else if (page === 'misc') {
-    app.innerHTML = renderMisc();
+    if (id && FOLDERS.some(f => f.key === id)) { ui.folder = id; try { localStorage.setItem(FOLDER_KEY, id); } catch { /* ignore */ } }
+    app.innerHTML = renderMisc(id || null);
     if (ui.addSubTo) document.querySelector('#subtodo-form input')?.focus();
   } else if (page === 'new') {
     app.innerHTML = renderEdit(null);
@@ -2601,10 +2618,11 @@ const actions = {
     toast('🗑️ Deleted');
   },
 
-  'clear-done-todos'() {
-    // Done tasks go, along with everything inside them.
+  'clear-done-todos'(el) {
+    // Done tasks of this list go, along with everything inside them.
+    const folder = el.dataset.folder || null;
     const gone = new Set();
-    state.todos.filter(t => t.done).forEach(t => { gone.add(t.id); descendantsOf(t.id).forEach(x => gone.add(x.id)); });
+    state.todos.filter(t => t.done && t.folder === folder).forEach(t => { gone.add(t.id); descendantsOf(t.id).forEach(x => gone.add(x.id)); });
     if (!gone.size || !confirm(`${gone.size} done items hata dein?`)) return;
     gone.forEach(id => (state.deleted[id] = Date.now()));
     state.todos = state.todos.filter(t => !gone.has(t.id));
@@ -2761,7 +2779,7 @@ document.addEventListener('submit', e => {
   if (form.id === 'todo-form') {
     const text = form.elements.text.value.trim();
     if (!text) return;
-    state.todos.push(normalizeTodo({ text, by: myRef() }));
+    state.todos.push(normalizeTodo({ text, folder: form.dataset.folder || null, by: myRef() }));
     saveState(); render();
     document.querySelector('#todo-form input')?.focus(); // keep typing the next one
   }
@@ -2770,7 +2788,7 @@ document.addEventListener('submit', e => {
     const text = form.elements.text.value.trim();
     const parent = state.todos.find(t => t.id === form.dataset.parent);
     if (!text || !parent) return;
-    state.todos.push(normalizeTodo({ text, parentId: parent.id, by: myRef() }));
+    state.todos.push(normalizeTodo({ text, parentId: parent.id, folder: parent.folder, by: myRef() }));
     // Adding open work inside a done task re-opens that task (and the ones above it).
     for (let p = parent; p && p.done; p = state.todos.find(t => t.id === p.parentId)) {
       p.done = false; p.doneAt = null; p.doneBy = null; p.updatedAt = Date.now();
