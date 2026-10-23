@@ -228,10 +228,11 @@
   .chip .count { font-size: .75rem; opacity: .75; }
 
   /* Folder tabs on Home (Apps / VR) */
-  .folder-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; margin: 0 0 12px;
+  .folder-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 4px; margin: 0 0 12px;
     border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
   .folder-tab { min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--text);
     font: inherit; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  @media (max-width: 560px) { .folder-tabs { grid-template-columns: 1fr 1fr; } }
   .folder-tab.active { background: var(--primary); color: var(--primary-ink); }
   .folder-tab .count { font-size: .75rem; opacity: .75; font-weight: 500; }
   .drawer h3 { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 8px 6px; }
@@ -502,7 +503,25 @@ const VR_STEPS = [
   ['testing',  '📦 Release build + store listing taiyaar (Claude se)'],
   ['testing',  '🚀 Meta Quest store pe upload — LIVE!'],
 ];
-const stepTemplate = folder => (folder === 'vr' ? VR_STEPS : PLAYSTORE_STEPS);
+// A new feature for an app/site that already exists.
+const FEATURE_STEPS = [
+  ['idea',     '💡 Feature kya karega — Claude ko batao'],
+  ['building', '🤖 Claude se feature banwao'],
+  ['testing',  '🧪 Test karo, bugs Claude se fix karwao'],
+  ['testing',  '🚀 Update push / release — feature LIVE!'],
+];
+// Misc: any other thing to make or develop (tool, site, script, setup…).
+const MISC_STEPS = [
+  ['idea',     '💡 Kya banana hai — Claude ko batao'],
+  ['building', '🤖 Claude se banwao / develop karo'],
+  ['testing',  '🧪 Use karke dekho, bugs fix karwao'],
+  ['testing',  '✅ Ready — kaam ho gaya!'],
+];
+const STEP_TEMPLATES = { apps: PLAYSTORE_STEPS, vr: VR_STEPS, feature: FEATURE_STEPS, misc: MISC_STEPS };
+const stepTemplate = folder => STEP_TEMPLATES[folder] || PLAYSTORE_STEPS;
+// Where the roadmap ends, for labels like "Play Store tak progress".
+const FINISH_LINE = { apps: 'Play Store', vr: 'Store', feature: 'Release', misc: 'Ready' };
+const finishOf = folder => FINISH_LINE[folder] || 'Play Store';
 
 // Older ready-made lists. Ideas that still have them get moved to the 5-step list;
 // each old step points to the new step (1-5) it belongs to (0 = dropped).
@@ -668,7 +687,7 @@ function normalizeIdea(raw = {}) {
   return {
     id: raw.id || uid(),
     name: String(raw.name || 'Untitled idea'),
-    folder: raw.folder === 'vr' ? 'vr' : 'apps', // which Home folder: 'apps' or 'vr'
+    folder: STEP_TEMPLATES[raw.folder] ? raw.folder : 'apps', // which Home folder: apps / vr / feature / misc
     desc: String(raw.desc || ''),
     problem: String(raw.problem || ''),
     target: String(raw.target || ''),
@@ -778,6 +797,8 @@ let state = loadState();
 const FOLDERS = [
   { key: 'apps', emoji: '💡', label: 'App ideas', title: '💡 App Ideas' },
   { key: 'vr',   emoji: '🥽', label: 'VR ideas',  title: '🥽 VR Ideas' },
+  { key: 'feature', emoji: '✨', label: 'Features', title: '✨ Feature Ideas' },
+  { key: 'misc', emoji: '🧰', label: 'Misc', title: '🧰 Misc — banana / develop' },
 ];
 const folderOf = key => FOLDERS.find(f => f.key === key) || FOLDERS[0];
 const FOLDER_KEY = 'app-ideas-folder'; // remembers the last open folder on this device
@@ -1022,7 +1043,7 @@ function updateIdeaList() {
         <div class="big">${f.emoji}</div>
         <h2>${f.label} folder khaali hai</h2>
         <p class="muted">Is folder ka pehla idea likho.</p>
-        <div class="btn-row" style="margin-top:16px"><a class="btn primary" href="#/new">+ New ${f.key === 'vr' ? 'VR ' : ''}idea</a></div>
+        <div class="btn-row" style="margin-top:16px"><a class="btn primary" href="#/new">+ New idea in ${f.emoji} ${f.label}</a></div>
       </div>`;
     return;
   }
@@ -1076,7 +1097,7 @@ function renderEdit(idea) {
       <label class="chip"><input type="${type}" name="${name}" value="${esc(o)}" ${selected.includes(o) ? 'checked' : ''}>${esc(o)}</label>`).join('');
 
   return `
-    ${topBar(isNew ? (ui.folder === 'vr' ? 'New VR idea' : 'New idea') : 'Edit idea', { back: isNew ? '#/' : `#/idea/${d.id}` })}
+    ${topBar(isNew ? `New idea · ${folderOf(ui.folder).emoji} ${folderOf(ui.folder).label}` : 'Edit idea', { back: isNew ? '#/' : `#/idea/${d.id}` })}
     <main class="page">
       <form id="idea-form" data-id="${isNew ? '' : d.id}" autocomplete="off" novalidate>
 
@@ -1279,7 +1300,7 @@ function renderDetail(idea) {
         <div class="progress-grid">
           <div>
             <div class="progress-label">
-              <span>${idea.folder === 'vr' ? 'Store' : 'Play Store'} tak progress ${idea.manualProgress !== null ? '<span class="tag">manual</span>' : `<span class="muted">· ${steps.done}/${steps.total} steps</span>`}</span>
+              <span>${finishOf(idea.folder)} tak progress ${idea.manualProgress !== null ? '<span class="tag">manual</span>' : `<span class="muted">· ${steps.done}/${steps.total} steps</span>`}</span>
               <b>${pct}%</b>
             </div>
             ${progressBar('overall-' + idea.id, pct, s.color, true)}
@@ -1393,7 +1414,7 @@ function renderStepsTab(idea) {
         <div class="big">🗺️</div>
         <p class="muted">Steps = is idea ka roadmap. Har step tick karo, app batayega abhi kis step pe ho.</p>
         <button class="btn primary" data-action="default-steps">✨ Ready-made steps lagao</button>
-        <p class="muted small" style="margin:10px 0 0">Idea → Design → Build → Testing → ${idea.folder === 'vr' ? 'Store' : 'Play Store'} pe LIVE</p>
+        <p class="muted small" style="margin:10px 0 0">Idea → Design → Build → Testing → ${finishOf(idea.folder)}</p>
       </div>`}`;
 }
 
