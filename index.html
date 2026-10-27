@@ -1164,10 +1164,24 @@ function renderJoin() {
         <div style="font-size:3rem">👋</div>
         <h2 style="margin:0">Namaste${me.name ? ' ' + esc(fullName(me.name)) : ''}!</h2>
         ${!me.name ? `<p class="small" style="margin:0">Aap kaun ho?</p><div class="btn-row" style="justify-content:center">${whoAmIButtons()}</div>` : ''}
-        <p class="muted" style="margin:0">🔒 Site kholne ke liye <b>code</b> daalo (Kuldeep se pucho).</p>
-        <div style="text-align:left">${passwordForm()}</div>
+        ${ui.codeLogin ? `
+          <p class="muted" style="margin:0">🔒 Site kholne ke liye <b>code</b> daalo (Kuldeep se pucho).</p>
+          <div style="text-align:left">${passwordForm()}</div>
+          <button class="btn ghost" data-action="login-mode" data-value="id">🔑 ID + password se login karo</button>`
+        : `
+          <p class="muted" style="margin:0">🔑 Apna <b>ID</b> aur <b>password</b> daalo.</p>
+          ${loginForm()}
+          <button class="btn ghost" data-action="login-mode" data-value="code">ID nahi bana? Code se kholo</button>`}
       </div>
     </main>`;
+}
+function loginForm() {
+  return `
+    <form id="login-form" class="stack" style="text-align:left">
+      <input name="uid" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ID" aria-label="ID">
+      <input name="password" type="password" required autocomplete="current-password" placeholder="Password" aria-label="Password">
+      <button class="btn primary" type="submit">Login</button>
+    </form>`;
 }
 const INVITE_URL = () => location.origin + location.pathname + '#/join/S';
 
@@ -1894,6 +1908,7 @@ function renderDashboard() {
 
       <h2 class="section-title">☁️ Sync & aap kaun ho</h2>
       ${renderSyncCard()}
+      ${cloud.code ? `<div class="card" style="margin-top:12px">${accountSection()}</div>` : ''}
 
       <h2 class="section-title">💾 Backup</h2>
       <div class="card">
@@ -2576,6 +2591,7 @@ async function earnSyncNow() {
     for (let attempt = 0; attempt < 4; attempt++) {
       const got = await cloudRequest('GET', null, code);
       if (!got.ok) throw new Error(got.data.error || 'Server error ' + got.status);
+      if (got.data.data && got.data.data.moved) { if (earnCloud.code === code) earnMovedAway(); return; }
       const remote = earnFromCloud(got.data.data);
       const merged = mergeEarn(earn, remote);
       if (!got.data.data || earnPrint(merged) !== earnPrint(remote)) {
@@ -2606,10 +2622,12 @@ async function earnSyncNow() {
 }
 
 async function unlockEarning(form) {
+  const eid = cleanId(form.elements.eid.value);
   const pw = form.elements.password.value.trim();
   const again = form.elements.password2;
   const btn = form.querySelector('button[type="submit"]');
   const ready = label => { btn.disabled = false; btn.textContent = label; };
+  if (!/^[a-z0-9._-]{3,30}$/.test(eid)) { toast('ID 3-30 letters ka rakho (a-z, 0-9, . _ -)'); return; }
   if (pw.length < 6) { toast('Password kam se kam 6 letters ka rakho'); return; }
   btn.disabled = true; btn.textContent = '…';
   try {
@@ -2618,10 +2636,21 @@ async function unlockEarning(form) {
       toast('❌ Ye to shared code hai (bhaiya ko pata hai) — Earning ka alag password rakho');
       return ready('Unlock');
     }
-    const code = await passwordToCode(pw, EARN_SALT);
+    const code = await earnKeyFor(eid, pw);
     const got = await cloudRequest('GET', null, code).catch(() => null);
     if (!got || !got.ok) { toast('❌ Internet nahi hai, phir try karo'); return ready(again ? 'Banao' : 'Unlock'); }
-    const data = got.data.data;
+    let data = got.data.data && !got.data.data.moved ? got.data.data : null;
+    if (!data) {
+      // Made before IDs existed (password only)? Move it to this ID + password.
+      const legacyCode = await legacyEarnKey(pw);
+      const old = await cloudRequest('GET', null, legacyCode).catch(() => null);
+      const od = old && old.ok && old.data.data;
+      if (od && od.kind === 'earning' && !od.moved && (od.pages || []).length) {
+        await moveEarnData(legacyCode, code, earnFromCloud(od));
+        data = od;
+        toast('🔑 Purana Earning is ID pe shift ho gaya');
+      }
+    }
     if (data && data.kind !== 'earning') { toast('❌ Ye password nahi chalega — doosra rakho'); return ready('Unlock'); }
     if (!data) {
       // Nothing saved with this password yet → make sure it's not a typo before creating a new space.
@@ -2636,7 +2665,7 @@ async function unlockEarning(form) {
       }
       if (again.value.trim() !== pw) { toast('❌ Dono password alag hain'); return ready('Banao'); }
     }
-    earnCloud = { code };
+    earnCloud = { code, id: eid };
     writeJSON(EARN_CLOUD_KEY, earnCloud);
     earn = mergeEarn({ pages: [], deleted: {} }, earnFromCloud(data));
     saveEarn(true);
@@ -2679,13 +2708,11 @@ function renderEarnLock() {
         <h2 style="margin:0">Earning — sirf aapke liye</h2>
         <p class="muted" style="margin:0">Iska <b>alag password</b> hai. Shared code (jo bhaiya ke paas hai) yahan kaam nahi karta, isliye wo ise nahi dekh sakte.</p>
         <form id="earn-lock-form" class="stack" style="text-align:left">
-          <input type="text" name="username" value="Earning (private)" autocomplete="username" hidden>
-          <div class="row">
-            <input name="password" type="password" minlength="6" required placeholder="Earning password" autocomplete="current-password" aria-label="Earning password">
-            <button class="btn primary" type="submit">Unlock</button>
-          </div>
+          <input name="eid" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Earning ID" aria-label="Earning ID">
+          <input name="password" type="password" minlength="6" required placeholder="Earning password" autocomplete="current-password" aria-label="Earning password">
+          <button class="btn primary" type="submit">Unlock</button>
         </form>
-        <p class="hint" style="margin:0">Pehli baar? Ek naya password socho (shared code se alag) aur yaad rakhna.</p>
+        <p class="hint" style="margin:0">Pehli baar? Apna naya Earning ID + password socho (site wale se alag rakho) aur yaad rakhna. Pehle sirf password se banaya tha? Koi bhi ID + wahi password daalo — data us ID pe shift ho jayega.</p>
       </div>
     </main>
     ${bottomNav('earn')}`;
@@ -2714,8 +2741,9 @@ function earnCard(p) {
 function renderEarnHome() {
   const top = topEarnPages();
   return `
-    ${topBar('💰 Earning', { actions: '<button class="icon-btn" data-action="earn-lock" aria-label="Lock karo" title="Lock karo">🔒</button>' })}
+    ${topBar('💰 Earning', { actions: '<button class="icon-btn" data-action="earn-creds" aria-label="ID / password" title="ID / password badlo">🔑</button><button class="icon-btn" data-action="earn-lock" aria-label="Lock karo" title="Lock karo">🔒</button>' })}
     <main class="page">
+      ${earnCloud.id ? '' : '<button class="card inbox-banner" data-action="earn-creds" style="width:100%;font:inherit;text-align:left;cursor:pointer"><span class="big">🔑</span><span style="flex:1"><b>Earning ka ID + password set karo</b><br><span class="muted small">Abhi sirf password hai — ID add karke aur secure karo</span></span><span class="muted">›</span></button>'}
       <p class="muted small" style="margin:0 0 12px">🔒 Private — sirf aap dekh sakte ho. Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
       <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
       <div class="list" style="margin-top:12px">${top.length ? top.map(earnCard).join('')
@@ -3238,6 +3266,7 @@ const extraActions = {
           <button type="button" class="btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>
           <button type="button" class="btn" data-action="earn-copy">📋 Saara text copy karo</button>
           <button type="button" class="btn danger" data-action="earn-delete-page">🗑️ Ye page delete karo</button>
+          <button type="button" class="btn" data-action="earn-creds">🔑 Earning ID / password badlo</button>
           <button type="button" class="btn" data-action="earn-lock">🔒 Earning lock karo</button>
           <button type="button" class="btn" data-action="close-sheet">Close</button>
         </div>
@@ -3313,6 +3342,225 @@ const extraActions = {
     });
   },
 };
+
+
+/* =====================================================================
+   SECTION 11B2: 🔑 LOGIN WITH ID + PASSWORD
+   Each person has their own ID + password (instead of typing the shared code).
+   The password never leaves the device: we send PBKDF2(password, id) and the
+   server stores only a scrypt hash of that. A good login gives back the space code.
+   ===================================================================== */
+const ACCOUNT_API = '/api/account';
+const cleanId = id => String(id || '').trim().toLowerCase();
+const loginKey = (id, password) => passwordToCode(password, 'app-ideas-login-v1:' + cleanId(id));
+
+async function accountRequest(body) {
+  const res = await fetch(ACCOUNT_API, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+// Disable a form's submit button while waiting; returns a function that turns it back on.
+function busy(form, label = '…') {
+  const btn = form.querySelector('button[type="submit"]');
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = label;
+  return () => { btn.disabled = false; btn.textContent = old; };
+}
+
+async function loginWithId(form) {
+  const id = cleanId(form.elements.uid.value);
+  const pw = form.elements.password.value;
+  if (!id || !pw) return;
+  const done = busy(form);
+  try {
+    const r = await accountRequest({ action: 'login', id, key: await loginKey(id, pw) }).catch(() => null);
+    if (!r) { toast('❌ Internet nahi hai, phir try karo'); return done(); }
+    if (!r.ok) { toast('❌ ' + (r.data.error || 'Login nahi hua')); return done(); }
+    cloud = { code: r.data.space, verified: true, account: id };
+    writeJSON(CLOUD_KEY, cloud);
+    if (r.data.name && me.name !== r.data.name) setMyName(r.data.name);
+    ui.person = 'all';
+    try { localStorage.setItem(PERSON_KEY, 'all'); } catch { /* ignore */ }
+    ui.codeLogin = false;
+    await syncNow();
+    toast(`✅ Welcome ${fullName(me.name || '')}!`);
+    if (parseRoute().page === 'join') location.hash = '#/'; else render();
+  } catch (err) {
+    console.error(err); toast('❌ ' + err.message); done();
+  }
+}
+
+// Dashboard: your login ID + "make an ID" form.
+function accountSection() {
+  const mine = cloud.account ? `
+    <div class="row-between" style="margin-bottom:10px">
+      <span>🔑 Login ID: <b>${esc(cloud.account)}</b></span>
+      <button class="btn small-btn" data-action="change-login-pw">Password badlo</button>
+    </div>` : '';
+  return `
+    <div class="field" style="margin-top:4px">
+      ${mine}
+      <details${cloud.account ? '' : ' open'}>
+        <summary class="label" style="cursor:pointer">🔑 ${cloud.account ? 'Naya ID banao (jaise bhaiya ke liye)' : 'Apna ID + password banao — phir code ki zaroorat nahi'}</summary>
+        <form id="account-form" class="stack" style="margin-top:10px">
+          <input name="uid" required autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[A-Za-z0-9._\\-]{3,30}" placeholder="ID (jaise kuldeep)" aria-label="New ID">
+          <input name="password" type="password" minlength="8" required autocomplete="new-password" placeholder="Password (kam se kam 8)" aria-label="New password">
+          <input name="password2" type="password" minlength="8" required autocomplete="new-password" placeholder="Password dobara" aria-label="Password again">
+          <label class="row small">Kiska account:
+            <select name="name" style="width:auto">${PEOPLE.map(p => `<option value="${p}" ${p === (me.name || 'K') ? 'selected' : ''}>${fullName(p)}</option>`).join('')}</select>
+          </label>
+          <button class="btn primary" type="submit">ID banao</button>
+        </form>
+      </details>
+    </div>`;
+}
+
+async function createAccount(form) {
+  const id = cleanId(form.elements.uid.value);
+  const pw = form.elements.password.value;
+  const name = form.elements.name.value;
+  if (!/^[a-z0-9._-]{3,30}$/.test(id)) { toast('ID 3-30 letters ka rakho (a-z, 0-9, . _ -)'); return; }
+  if (pw.length < 8) { toast('Password kam se kam 8 letters ka rakho'); return; }
+  if (pw !== form.elements.password2.value) { toast('❌ Dono password alag hain'); return; }
+  const done = busy(form);
+  try {
+    const r = await accountRequest({ action: 'create', id, key: await loginKey(id, pw), space: cloud.code, name }).catch(() => null);
+    if (!r) { toast('❌ Internet nahi hai, phir try karo'); return done(); }
+    if (!r.ok) { toast('❌ ' + (r.data.error || 'ID nahi bana')); return done(); }
+    if (name === me.name) { cloud.account = id; writeJSON(CLOUD_KEY, cloud); }
+    toast(`✅ ID "${id}" ban gaya — ${fullName(name)} ab isse login kar sakte hain`);
+    render();
+  } catch (err) {
+    console.error(err); toast('❌ ' + err.message); done();
+  }
+}
+
+function openChangeLoginPw() {
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <div class="sheet-inner">
+      <h2>🔑 Password badlo</h2>
+      <form id="login-pw-form" class="stack">
+        <input type="text" name="username" value="${esc(cloud.account)}" autocomplete="username" hidden>
+        <input name="current" type="password" required autocomplete="current-password" placeholder="Abhi wala password" aria-label="Current password">
+        <input name="password" type="password" minlength="8" required autocomplete="new-password" placeholder="Naya password (kam se kam 8)" aria-label="New password">
+        <input name="password2" type="password" minlength="8" required autocomplete="new-password" placeholder="Naya password dobara" aria-label="New password again">
+        <div class="btn-row">
+          <button type="button" class="btn" data-action="close-sheet">Cancel</button>
+          <button type="submit" class="btn primary">Badlo</button>
+        </div>
+      </form>
+    </div>`;
+  sheet.showModal();
+}
+
+async function changeLoginPw(form) {
+  const id = cloud.account;
+  const pw = form.elements.password.value;
+  if (pw.length < 8) { toast('Password kam se kam 8 letters ka rakho'); return; }
+  if (pw !== form.elements.password2.value) { toast('❌ Naye password alag hain'); return; }
+  const done = busy(form);
+  try {
+    const r = await accountRequest({ action: 'change', id, key: await loginKey(id, form.elements.current.value), newKey: await loginKey(id, pw) }).catch(() => null);
+    if (!r) { toast('❌ Internet nahi hai, phir try karo'); return done(); }
+    if (!r.ok) { toast('❌ ' + (r.data.error || 'Nahi badla')); return done(); }
+    closeSheet();
+    toast('✅ Password badal gaya');
+  } catch (err) {
+    console.error(err); toast('❌ ' + err.message); done();
+  }
+}
+
+/* ----- 💰 Earning ID + password ----- */
+// Earning code = PBKDF2(password, earning salt + ID). (Before IDs existed it was password-only = "legacy".)
+const earnKeyFor = (id, pw) => passwordToCode(pw, EARN_SALT + ':' + cleanId(id));
+const legacyEarnKey = pw => passwordToCode(pw, EARN_SALT);
+const MOVED_EARN = () => ({ kind: 'earning', ideas: [], pages: [], deleted: {}, moved: true, savedAt: Date.now() });
+
+// Copy the Earning data to a new code, then empty the old file (marked "moved")
+// so devices still using the old login lock themselves.
+async function moveEarnData(fromCode, toCode, data) {
+  const target = await cloudRequest('GET', null, toCode);
+  if (!target.ok) throw new Error(target.data.error || 'Server error');
+  if (target.data.data && (target.data.data.pages || []).length) throw new Error('Ye ID + password pehle se kisi aur Earning ka hai');
+  const put = await cloudRequest('PUT', { data: { kind: 'earning', ideas: [], pages: data.pages, deleted: data.deleted || {}, savedAt: Date.now() }, etag: target.data.etag }, toCode);
+  if (!put.ok) throw new Error(put.data.error || 'Save nahi hua');
+  for (let i = 0; i < 4; i++) {
+    const old = await cloudRequest('GET', null, fromCode);
+    if (!old.ok || !old.data.data) return;
+    const wiped = await cloudRequest('PUT', { data: MOVED_EARN(), etag: old.data.etag }, fromCode);
+    if (wiped.status !== 409) return;
+  }
+}
+
+// When the Earning login was changed on another device.
+function earnMovedAway() {
+  earnCloud = {};
+  earn = { pages: [], deleted: {} };
+  try { localStorage.removeItem(EARN_KEY); localStorage.removeItem(EARN_CLOUD_KEY); } catch { /* ignore */ }
+  toast('🔒 Earning ka ID/password badla gaya — naye se login karo');
+  if (parseRoute().page === 'earn') location.hash = '#/earn';
+  render();
+}
+
+function openEarnCreds() {
+  closeSheet(); // may be opened from the page menu
+  const legacy = !earnCloud.id;
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <div class="sheet-inner">
+      <h2>🔑 Earning ka ID + password ${legacy ? 'set karo' : 'badlo'}</h2>
+      <form id="earn-cred-form" class="stack">
+        ${legacy ? '' : `<input name="curId" value="${esc(earnCloud.id)}" required autocomplete="off" autocapitalize="none" placeholder="Abhi wala ID" aria-label="Current ID">`}
+        <input name="curPw" type="password" required autocomplete="current-password" placeholder="Abhi wala Earning password" aria-label="Current password">
+        <h3 class="sheet-sub" style="margin:4px 0 0">Naya</h3>
+        <input name="newId" required autocomplete="username" autocapitalize="none" spellcheck="false" pattern="[A-Za-z0-9._\\-]{3,30}" placeholder="Naya Earning ID" aria-label="New ID" value="${esc(earnCloud.id || '')}">
+        <input name="newPw" type="password" minlength="8" required autocomplete="new-password" placeholder="Naya password (kam se kam 8)" aria-label="New password">
+        <input name="newPw2" type="password" minlength="8" required autocomplete="new-password" placeholder="Naya password dobara" aria-label="New password again">
+        <p class="hint" style="margin:0">Baaki devices pe Earning apne aap lock ho jayega — wahan naye ID + password se kholna.</p>
+        <div class="btn-row">
+          <button type="button" class="btn" data-action="close-sheet">Cancel</button>
+          <button type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </div>`;
+  sheet.showModal();
+}
+
+async function saveEarnCreds(form) {
+  const f = form.elements;
+  const newId = cleanId(f.newId.value);
+  if (!/^[a-z0-9._-]{3,30}$/.test(newId)) { toast('ID 3-30 letters ka rakho (a-z, 0-9, . _ -)'); return; }
+  if (f.newPw.value.length < 8) { toast('Password kam se kam 8 letters ka rakho'); return; }
+  if (f.newPw.value !== f.newPw2.value) { toast('❌ Naye password alag hain'); return; }
+  const done = busy(form);
+  try {
+    const oldCode = f.curId ? await earnKeyFor(f.curId.value, f.curPw.value) : await legacyEarnKey(f.curPw.value);
+    if (oldCode !== earnCloud.code) { toast('❌ Abhi wala ID / password galat hai'); return done(); }
+    if (cloud.code && await passwordToCode(f.newPw.value) === cloud.code) { toast('❌ Ye shared code hai — alag password rakho'); return done(); }
+    const newCode = await earnKeyFor(newId, f.newPw.value);
+    if (newCode === oldCode) { toast('Kuch nahi badla'); return done(); }
+    flushEarn();
+    await earnSyncNow();
+    if (!earnCloud.code) return; // got locked meanwhile
+    if (earnSync.error) { toast('❌ Pehle internet se sync hone do, phir try karo'); return done(); }
+    await moveEarnData(oldCode, newCode, earn);
+    earnCloud = { code: newCode, id: newId, lastSync: Date.now() };
+    writeJSON(EARN_CLOUD_KEY, earnCloud);
+    closeSheet();
+    toast('✅ Earning ka naya ID + password set ho gaya');
+    render();
+  } catch (err) {
+    console.error(err); toast('❌ ' + err.message); done();
+  }
+}
+
+Object.assign(extraActions, {
+  'login-mode'(el) { ui.codeLogin = el.dataset.value === 'code'; render(); },
+  'change-login-pw': openChangeLoginPw,
+  'earn-creds': openEarnCreds,
+});
 
 
 /* =====================================================================
@@ -3811,6 +4059,10 @@ document.addEventListener('submit', e => {
   if (form.id === 'idea-form') saveIdeaForm(form);
   if (form.id === 'quick-form') saveQuick(form, e.submitter);
   if (form.id === 'earn-lock-form') unlockEarning(form);
+  if (form.id === 'login-form') loginWithId(form);
+  if (form.id === 'account-form') createAccount(form);
+  if (form.id === 'login-pw-form') changeLoginPw(form);
+  if (form.id === 'earn-cred-form') saveEarnCreds(form);
 
   if (form.id === 'password-form') {
     const button = form.querySelector('button[type="submit"]');
