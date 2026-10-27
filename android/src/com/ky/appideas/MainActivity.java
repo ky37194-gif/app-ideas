@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -93,7 +94,26 @@ public class MainActivity extends Activity {
             }
         });
 
-        web.loadUrl(BASE_URL);
+        web.loadUrl(BASE_URL + hashFor(getIntent()));
+    }
+
+    // Widget / shortcut tapped while the app is already open → jump to that page.
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String hash = hashFor(intent);
+        if (!hash.isEmpty() && web != null) {
+            web.evaluateJavascript("location.hash='" + hash + "';setTimeout(function(){try{render()}catch(e){}},60);", null);
+        }
+    }
+
+    // appideas://open/quick → "#/quick", appideas://open/inbox → "#/inbox"
+    private static String hashFor(Intent intent) {
+        Uri d = intent == null ? null : intent.getData();
+        if (d == null || !"appideas".equals(d.getScheme())) return "";
+        String page = d.getLastPathSegment();
+        return "quick".equals(page) || "inbox".equals(page) ? "#/" + page : "";
     }
 
     @Override
@@ -154,6 +174,24 @@ public class MainActivity extends Activity {
                 send.setType("text/plain");
                 send.putExtra(Intent.EXTRA_TEXT, text);
                 startActivity(Intent.createChooser(send, "Invite via"));
+            });
+        }
+
+        // "Save & band karo" on the quick-note page: hide the app (back to the home screen).
+        @JavascriptInterface
+        public void done() {
+            runOnUiThread(() -> moveTaskToBack(true));
+        }
+
+        // Open the keyboard right away on the quick-note page.
+        @JavascriptInterface
+        public void showKeyboard() {
+            runOnUiThread(() -> {
+                web.requestFocus();
+                web.postDelayed(() -> {
+                    InputMethodManager imm = getSystemService(InputMethodManager.class);
+                    if (imm != null) imm.showSoftInput(web, InputMethodManager.SHOW_IMPLICIT);
+                }, 250);
             });
         }
 

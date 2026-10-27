@@ -270,6 +270,73 @@
   .todo-sub { font-size: 1.1rem; color: var(--primary); }
   @media (max-width: 420px) { .todo-children { margin-left: 10px; padding-left: 8px; } }
 
+  /* Quick note + Inbox */
+  .quick-page textarea { min-height: 180px; font-size: 1.05rem; }
+  .inbox-banner { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; text-decoration: none; color: inherit;
+    border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); background: color-mix(in srgb, var(--warning) 8%, var(--surface)); }
+  .inbox-banner .big { font-size: 1.6rem; }
+  .inbox-text { white-space: pre-wrap; word-break: break-word; }
+  .inbox-quote { margin: -6px 0 6px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); white-space: pre-wrap; }
+  .sheet-sub { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 8px; }
+  .move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .move-grid .btn { min-height: 44px; font-size: .9rem; padding: 0 10px; justify-content: flex-start; text-align: left; }
+  dialog.sheet { overflow-y: auto; }
+
+  /* 💰 Earning: Notion-style pages */
+  .notion { max-width: 780px; }
+  .crumbs { display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: .82rem; color: var(--muted); }
+  .crumbs a { color: var(--muted); text-decoration: none; }
+  .crumbs a:hover { color: var(--text); }
+  .pg-icon { font-size: 2.8rem; line-height: 1; border: 0; background: transparent; padding: 6px; margin: 10px 0 0 -6px;
+    border-radius: 12px; cursor: pointer; }
+  .pg-icon:hover { background: var(--surface-2); }
+  .pg-title { font-size: 2rem; font-weight: 800; line-height: 1.2; margin: 4px 0; outline: none; word-break: break-word; white-space: pre-wrap; }
+  [data-ph]:empty::before { content: attr(data-ph); color: var(--muted); opacity: .55; pointer-events: none; }
+  .blk-p .blk-text:empty:not(:focus)::before { content: none; }
+  .blocks { display: grid; gap: 1px; margin-top: 14px; }
+  .blk { display: flex; align-items: flex-start; gap: 4px; border-radius: 8px; }
+  .blk-handle { flex: none; width: 22px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent;
+    color: var(--muted); opacity: .3; font-size: .8rem; letter-spacing: -2px; cursor: pointer; }
+  .blk:hover .blk-handle, .blk:focus-within .blk-handle { opacity: .9; }
+  .blk-handle:hover { background: var(--surface-2); }
+  .blk-text { flex: 1; min-width: 0; min-height: 1.6em; padding: 4px 2px; outline: none; white-space: pre-wrap; word-break: break-word; }
+  .blk-h1 .blk-text { font-size: 1.6rem; font-weight: 800; line-height: 1.25; }
+  .blk-h2 .blk-text { font-size: 1.3rem; font-weight: 750; line-height: 1.3; }
+  .blk-h3 .blk-text { font-size: 1.1rem; font-weight: 700; }
+  .blk-h1 { margin-top: 16px; } .blk-h2 { margin-top: 12px; } .blk-h3 { margin-top: 8px; }
+  .blk-h1 .blk-handle, .blk-h2 .blk-handle { height: 40px; }
+  .blk-mark { flex: none; min-width: 20px; padding-top: 4px; text-align: center; color: var(--muted); font-weight: 700; }
+  .blk-bullet .blk-mark { font-size: 1.2rem; line-height: 1.2; }
+  .blk-check { flex: none; width: 20px; height: 20px; margin: 6px 4px 0 0; padding: 0; border: 2px solid var(--muted); border-radius: 5px;
+    background: transparent; color: #fff; font-size: .75rem; font-weight: 800; cursor: pointer; display: grid; place-items: center; }
+  .blk.checked .blk-check { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+  .blk.checked .blk-text { text-decoration: line-through; color: var(--muted); }
+  .blk-quote .blk-text { border-left: 3px solid var(--text); padding-left: 12px; }
+  .blk-callout { background: var(--surface-2); padding: 6px 8px 6px 0; margin: 4px 0; border-radius: 10px; }
+  .blk-code.blk-text { min-height: 0; width: auto; resize: none; overflow: hidden; border: 0; border-radius: 10px; padding: 10px 12px;
+    background: var(--surface-2); font: .88rem/1.5 ui-monospace, Consolas, monospace; }
+  .blk-divider hr { flex: 1; border: 0; border-top: 1px solid var(--border); margin: 15px 2px; }
+  .add-block { display: block; width: 100%; text-align: left; margin-top: 4px; min-height: 44px; padding: 0 26px; border: 0; border-radius: 10px;
+    background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+  .add-block:hover { background: var(--surface-2); }
+  .subpages { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .subpages h3 { margin: 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .subpage { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 10px; margin-top: 6px; border-radius: 12px;
+    border: 1px solid var(--border); background: var(--surface); color: inherit; text-decoration: none; }
+  .subpage .name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .subpage:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+  .earn-card-ico { font-size: 1.5rem; line-height: 1; }
+  .icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .icon-grid button { min-height: 50px; font-size: 1.6rem; border: 0; border-radius: 12px; background: var(--surface-2); cursor: pointer; }
+  .slash { position: absolute; z-index: 70; width: min(290px, calc(100vw - 24px)); max-height: 300px; overflow-y: auto; padding: 6px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 34px rgba(0, 0, 0, .25); }
+  .slash-head { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 4px 10px 6px; }
+  .slash button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 0 10px; border: 0; border-radius: 10px;
+    background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .slash button.sel, .slash button:hover { background: var(--surface-2); }
+  .slash .ico { width: 28px; text-align: center; font-weight: 800; color: var(--muted); }
+  @media (max-width: 899px) { .pc-only { display: none !important; } }
+
   /* ---------- 10. Home: search + sort ---------- */
   .search { position: relative; }
   .search input { padding-left: 42px; border-radius: 14px; }
@@ -1033,6 +1100,8 @@ function bottomNav(active) {
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
       <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
+      <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
+      ${canEarn() ? `<a class="nav-item ${active === 'earn' ? 'active' : ''}" href="#/earn"><span class="ico">💰</span>Earning</a>` : ''}
     </nav>`;
 }
 
@@ -1059,8 +1128,9 @@ function renderHome() {
     .join('');
 
   return `
-    ${topBar(folderOf(ui.folder).title)}
+    ${topBar(folderOf(ui.folder).title, { actions: '<a class="icon-btn" href="#/quick" aria-label="Jaldi likho" title="Jaldi likho">⚡</a>' })}
     <main class="page">
+      ${inboxBanner()}
       <div class="folder-tabs" aria-label="Folders">${folderTabs}</div>
       <div class="search">
         <input id="search" type="search" placeholder="Search ideas, tags, features…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
@@ -2048,19 +2118,19 @@ function whoAmIButtons() {
 }
 
 /* ----- Password → code ----- */
-async function passwordToCode(password) {
+async function passwordToCode(password, salt = 'app-ideas-tracker-sync-v1') {
   const enc = new TextEncoder();
   const base = await crypto.subtle.importKey('raw', enc.encode(password.trim()), 'PBKDF2', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: enc.encode('app-ideas-tracker-sync-v1'), iterations: 300000, hash: 'SHA-256' }, base, 256);
+    { name: 'PBKDF2', salt: enc.encode(salt), iterations: 300000, hash: 'SHA-256' }, base, 256);
   return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function cloudRequest(method, body) {
+async function cloudRequest(method, body, code = cloud.code) {
   const res = await fetch(SYNC_API, {
     method,
     cache: 'no-store',
-    headers: { 'x-sync-key': cloud.code, ...(body ? { 'content-type': 'application/json' } : {}) },
+    headers: { 'x-sync-key': code, ...(body ? { 'content-type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
@@ -2188,8 +2258,8 @@ async function connectWithPassword(password) {
 // Redraw with synced data — but never while you're typing or dragging.
 function refreshAfterSync() {
   const { page, id } = parseRoute();
-  const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-  if (page === 'edit' || page === 'new' || typing || drag || document.getElementById('sheet').open) return;
+  const typing = document.activeElement && (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable);
+  if (page === 'edit' || page === 'new' || typing || drag || slash || document.getElementById('sheet').open) return;
   if (page === 'idea' && !findIdea(id)) { location.hash = '#/'; return; }
   render();
 }
@@ -2273,9 +2343,976 @@ function renderSetupCard() {
 }
 
 // Sync when the app comes back to the screen, when internet returns, and every 30 seconds.
-document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNow(); });
-window.addEventListener('online', syncNow);
-setInterval(() => { if (!document.hidden) syncNow(); }, 30 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushEarn(); else { syncNow(); earnSyncNow(); } });
+window.addEventListener('pagehide', () => flushEarn());
+window.addEventListener('online', () => { syncNow(); earnSyncNow(); });
+setInterval(() => { if (!document.hidden) { syncNow(); earnSyncNow(); } }, 30 * 1000);
+
+
+/* =====================================================================
+   SECTION 11A: ⚡ QUICK NOTE + 📥 INBOX
+   Write anything fast (phone widget / ⚡ button). It lands in your Inbox;
+   later move it into a folder (new idea), a Misc list, or 💰 Earning.
+   Inbox notes are to-dos with folder 'inbox', shown only to the person who wrote them.
+   ===================================================================== */
+const INBOX = 'inbox';
+const canEarn = () => me.name !== 'S'; // Earning is Kuldeep's private space
+const myInbox = () => state.todos
+  .filter(t => t.folder === INBOX && (!t.by || !me.name || t.by.name === me.name))
+  .sort((a, b) => b.createdAt - a.createdAt);
+
+// First line = title, the rest = details.
+function splitNote(text) {
+  const s = String(text || '').trim();
+  const nl = s.indexOf('\n');
+  let title = (nl < 0 ? s : s.slice(0, nl)).trim();
+  let rest = nl < 0 ? '' : s.slice(nl + 1).trim();
+  if (title.length > 80) { rest = s; title = title.slice(0, 60).trim() + '…'; }
+  return { title: title || 'Untitled', rest };
+}
+
+function inboxBanner() {
+  const n = myInbox().length;
+  if (!n) return '';
+  return `<a class="card inbox-banner" href="#/inbox"><span class="big">📥</span>
+    <span style="flex:1"><b>Inbox me ${n} note${n === 1 ? '' : 's'}</b><br><span class="muted small">Tap karo aur folder me shift karo</span></span><span class="muted">›</span></a>`;
+}
+
+function renderQuick() {
+  const n = myInbox().length;
+  const canClose = !!(window.AndroidBridge && typeof AndroidBridge.done === 'function');
+  return `
+    ${topBar('⚡ Jaldi likho', { back: '#/' })}
+    <main class="page quick-page" style="max-width:640px">
+      <form id="quick-form" class="stack" autocomplete="off">
+        <textarea id="quick-text" name="text" maxlength="5000" required placeholder="Idea, kaam, earning — kuch bhi likho…&#10;(pehli line = naam, baaki = details)"></textarea>
+        ${canEarn() && earnCloud.code ? `<label class="check"><input type="checkbox" name="private"> 🔒 Seedha 💰 Earning me daalo (sirf aapke liye)</label>` : ''}
+        <div class="btn-row">
+          <button class="btn primary" type="submit">✓ Save</button>
+          ${canClose ? '<button class="btn" type="submit" name="close" value="1">✓ Save & band karo</button>' : ''}
+        </div>
+      </form>
+      <p class="muted small">Save hote hi <b>📥 Inbox</b> me jata hai — baad me jab chaho kisi bhi folder me shift kar do.</p>
+      <a class="btn block" href="#/inbox">📥 Inbox kholo${n ? ` (${n})` : ''}</a>
+    </main>`;
+}
+
+function renderInbox() {
+  const items = myInbox();
+  return `
+    ${topBar('📥 Inbox', { back: '#/', actions: '<a class="icon-btn" href="#/quick" aria-label="Jaldi likho" title="Jaldi likho">⚡</a>' })}
+    <main class="page" style="max-width:720px">
+      <form id="quick-form" class="todo-add" autocomplete="off">
+        <input name="text" required maxlength="5000" placeholder="Jaldi kuch likho… Enter dabao" aria-label="Quick note">
+        <button class="btn primary" type="submit">+ Add</button>
+      </form>
+      <p class="muted small" style="margin:-4px 2px 12px">Jaldi wale notes yahan aate hain (sirf aapko dikhte hain). <b>📂</b> dabao aur jis folder me chaho daal do.</p>
+      ${items.length ? `<div class="list">${items.map(inboxCard).join('')}</div>`
+        : `<div class="card empty"><div class="big">📥</div><p class="muted">Inbox khaali hai. Phone widget ya ⚡ button se jaldi likho.</p></div>`}
+    </main>
+    ${bottomNav('inbox')}`;
+}
+
+function inboxCard(t) {
+  return `
+    <div class="card">
+      <div class="inbox-text">${esc(t.text)}</div>
+      <div class="row-between" style="margin-top:10px">
+        <span class="muted small">${timeAgo(t.createdAt)}</span>
+        <span class="row" style="gap:4px">
+          <button class="btn primary small-btn" data-action="inbox-move" data-id="${t.id}">📂 Folder me daalo</button>
+          <button class="icon-btn todo-del" data-action="inbox-del" data-id="${t.id}" aria-label="Delete">✕</button>
+        </span>
+      </div>
+    </div>`;
+}
+
+function saveQuick(form, submitter) {
+  const text = form.elements.text.value.trim();
+  if (!text) return;
+  if (form.elements.private?.checked && earnCloud.code) {
+    const { title, rest } = splitNote(text);
+    earn.pages.push(normalizePage({ title, icon: '💰', blocks: notesToBlocks(rest), by: myRef() }));
+    saveEarn();
+    toast('🔒 Earning me save ho gaya');
+  } else {
+    state.todos.push(normalizeTodo({ text, folder: INBOX, by: myRef() }));
+    saveState();
+    toast('✅ Inbox me save ho gaya');
+  }
+  if (submitter && submitter.name === 'close' && window.AndroidBridge?.done) {
+    form.reset();
+    setTimeout(() => AndroidBridge.done(), 300);
+    return;
+  }
+  render();
+  document.querySelector('#quick-form [name="text"]')?.focus(); // ready for the next one
+}
+
+/* =====================================================================
+   SECTION 11B: 💰 EARNING — private, Notion-style pages
+   It has its OWN password → its own cloud file. The shared code (bhaiya)
+   can't open it, and nothing from here goes into the shared list.
+   Each page: icon, title, blocks (text / headings / lists / to-dos …) and pages inside it.
+   ===================================================================== */
+const EARN_KEY = 'appIdeasTracker.earn';
+const EARN_CLOUD_KEY = 'appIdeasTracker.earnCloud';
+const EARN_SALT = 'app-ideas-earning-private-v1';
+const BLOCK_TYPES = ['p', 'h1', 'h2', 'h3', 'bullet', 'num', 'todo', 'quote', 'callout', 'code', 'divider'];
+// [type, icon, label, search words] — shown in the "/" menu and the ⋮⋮ menu
+const BLOCK_MENU = [
+  ['p', '¶', 'Text', 'text paragraph likho'],
+  ['h1', 'H1', 'Bada heading', 'heading1 title'],
+  ['h2', 'H2', 'Heading', 'heading2'],
+  ['h3', 'H3', 'Chhota heading', 'heading3'],
+  ['bullet', '•', 'Bullet list', 'list bullet points'],
+  ['num', '1.', 'Numbered list', 'number list'],
+  ['todo', '☑', 'To-do checkbox', 'todo task check kaam'],
+  ['quote', '❝', 'Quote', 'quote'],
+  ['callout', '💡', 'Callout box', 'callout note important highlight'],
+  ['code', '</>', 'Code', 'code'],
+  ['divider', '—', 'Divider line', 'divider line hr'],
+  ['page', '📄', 'Andar naya page', 'page subpage folder'],
+];
+const PAGE_ICONS = '💰 💵 💸 🤑 🪙 💎 📈 📊 🏦 💳 🛒 📦 🎥 📱 💻 🧠 ✍️ 🎨 📸 🎮 🤝 🏠 🚀 🎯 ⭐ 🔥 ✅ 📄 📁 💡'.split(' ');
+const BLOCK_PH = { p: "Likho, ya '/' dabao…", h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', bullet: 'List', num: 'List', todo: 'To-do', quote: 'Quote', callout: 'Kuch important…' };
+const LIST_TYPES = ['bullet', 'num', 'todo'];
+// Plain-text editing (no pasted fonts/colours). Older browsers fall back to normal editing.
+const CE = (() => { try { const d = document.createElement('div'); d.contentEditable = 'plaintext-only'; return d.contentEditable === 'plaintext-only' ? 'plaintext-only' : 'true'; } catch { return 'true'; } })();
+
+function normalizePage(raw = {}) {
+  const now = Date.now();
+  return {
+    id: raw.id || uid(),
+    parentId: raw.parentId || null,
+    icon: String(raw.icon || '📄').slice(0, 8),
+    title: String(raw.title || ''),
+    blocks: (Array.isArray(raw.blocks) ? raw.blocks : []).map(b => ({
+      id: b.id || uid(),
+      type: BLOCK_TYPES.includes(b.type) ? b.type : 'p',
+      text: String(b.text || ''),
+      checked: !!b.checked,
+    })),
+    by: normPerson(raw.by),
+    createdAt: Number(raw.createdAt) || now,
+    updatedAt: Number(raw.updatedAt) || now,
+  };
+}
+const newBlock = (type = 'p', text = '') => ({ id: uid(), type, text, checked: false });
+
+function loadEarn() {
+  const d = readJSON(EARN_KEY);
+  return {
+    pages: (Array.isArray(d.pages) ? d.pages : []).map(normalizePage),
+    deleted: d.deleted && typeof d.deleted === 'object' ? d.deleted : {},
+  };
+}
+let earn = loadEarn();
+let earnCloud = readJSON(EARN_CLOUD_KEY); // { code, lastSync } — only on devices where you unlocked it
+const earnSync = { running: false, again: false, timer: null, error: '' };
+let earnSaveTimer = null;
+
+function saveEarn(fromSync = false) {
+  clearTimeout(earnSaveTimer);
+  earnSaveTimer = null;
+  if (!earnCloud.code) return; // locked → never keep private pages on this device
+  writeJSON(EARN_KEY, earn);
+  if (!fromSync) scheduleEarnSync();
+}
+// While typing: mark the page changed now, save a moment later.
+function touchPage(page) {
+  page.updatedAt = Date.now();
+  clearTimeout(earnSaveTimer);
+  earnSaveTimer = setTimeout(() => saveEarn(), 400);
+}
+function flushEarn() { if (earnSaveTimer) saveEarn(); }
+
+const findPage = id => earn.pages.find(p => p.id === id);
+const childPages = id => earn.pages.filter(p => p.parentId === id).sort((a, b) => a.createdAt - b.createdAt);
+const topEarnPages = () => earn.pages.filter(p => !p.parentId || !findPage(p.parentId)).sort((a, b) => b.updatedAt - a.updatedAt);
+function pageDescendants(id) {
+  const out = [];
+  const walk = pid => childPages(pid).forEach(c => { if (!out.includes(c)) { out.push(c); walk(c.id); } });
+  walk(id);
+  return out;
+}
+function pageAncestors(page) {
+  const out = [];
+  for (let p = findPage(page.parentId); p && out.length < 20; p = findPage(p.parentId)) out.unshift(p);
+  return out;
+}
+
+/* ----- Earning sync (same server, different password → different private file) ----- */
+function mergeEarn(a, b) {
+  const deleted = { ...a.deleted };
+  Object.entries(b.deleted || {}).forEach(([id, t]) => { deleted[id] = Math.max(deleted[id] || 0, t); });
+  Object.keys(deleted).forEach(id => { if (Date.now() - deleted[id] > 90 * DAY) delete deleted[id]; });
+  const byId = new Map();
+  [...a.pages, ...b.pages].forEach(p => {
+    const cur = byId.get(p.id);
+    if (!cur || p.updatedAt > cur.updatedAt) byId.set(p.id, p);
+  });
+  return { pages: [...byId.values()].filter(p => !(deleted[p.id] && deleted[p.id] >= p.updatedAt)), deleted };
+}
+const earnPrint = d => JSON.stringify([
+  [...d.pages].sort((x, y) => (x.id < y.id ? -1 : 1)),
+  Object.keys(d.deleted).sort().map(k => [k, d.deleted[k]]),
+]);
+const earnFromCloud = d => (d ? { pages: (d.pages || []).map(normalizePage), deleted: d.deleted || {} } : { pages: [], deleted: {} });
+
+function scheduleEarnSync() {
+  if (!earnCloud.code) return;
+  clearTimeout(earnSync.timer);
+  earnSync.timer = setTimeout(earnSyncNow, 1200);
+}
+
+async function earnSyncNow() {
+  if (!earnCloud.code) return;
+  if (earnSync.running) { earnSync.again = true; return; }
+  if (!navigator.onLine) { earnSync.error = 'offline'; return; }
+  earnSync.running = true;
+  const code = earnCloud.code;
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const got = await cloudRequest('GET', null, code);
+      if (!got.ok) throw new Error(got.data.error || 'Server error ' + got.status);
+      const remote = earnFromCloud(got.data.data);
+      const merged = mergeEarn(earn, remote);
+      if (!got.data.data || earnPrint(merged) !== earnPrint(remote)) {
+        const saved = await cloudRequest('PUT', { data: { kind: 'earning', ideas: [], ...merged, savedAt: Date.now() }, etag: got.data.etag }, code);
+        if (saved.status === 409) continue;
+        if (!saved.ok) throw new Error(saved.data.error || 'Server error ' + saved.status);
+      }
+      if (earnCloud.code !== code) return; // locked while syncing
+      const latest = mergeEarn(earn, merged);
+      if (earnPrint(latest) !== earnPrint(earn)) {
+        earn = latest;
+        saveEarn(true);
+        refreshAfterSync();
+      }
+      earnCloud.lastSync = Date.now();
+      writeJSON(EARN_CLOUD_KEY, earnCloud);
+      earnSync.error = '';
+      return;
+    }
+    throw new Error('Busy, will retry');
+  } catch (err) {
+    console.error('Earning sync failed', err);
+    earnSync.error = err.message || 'error';
+  } finally {
+    earnSync.running = false;
+    if (earnSync.again) { earnSync.again = false; scheduleEarnSync(); }
+  }
+}
+
+async function unlockEarning(form) {
+  const pw = form.elements.password.value.trim();
+  const again = form.elements.password2;
+  const btn = form.querySelector('button[type="submit"]');
+  const ready = label => { btn.disabled = false; btn.textContent = label; };
+  if (pw.length < 6) { toast('Password kam se kam 6 letters ka rakho'); return; }
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    // Never allow the shared code — bhaiya knows that one.
+    if (cloud.code && await passwordToCode(pw) === cloud.code) {
+      toast('❌ Ye to shared code hai (bhaiya ko pata hai) — Earning ka alag password rakho');
+      return ready('Unlock');
+    }
+    const code = await passwordToCode(pw, EARN_SALT);
+    const got = await cloudRequest('GET', null, code).catch(() => null);
+    if (!got || !got.ok) { toast('❌ Internet nahi hai, phir try karo'); return ready(again ? 'Banao' : 'Unlock'); }
+    const data = got.data.data;
+    if (data && data.kind !== 'earning') { toast('❌ Ye password nahi chalega — doosra rakho'); return ready('Unlock'); }
+    if (!data) {
+      // Nothing saved with this password yet → make sure it's not a typo before creating a new space.
+      if (!again) {
+        form.insertAdjacentHTML('beforeend', `
+          <div class="stack" style="gap:8px">
+            <p class="small" style="margin:0">🆕 Is password se koi Earning nahi mila. <b>Naya banana hai?</b> Password dobara daalo — aur yaad rakhna, bhoolne pe ye data nahi khulega.</p>
+            <input name="password2" type="password" required placeholder="Password dobara" autocomplete="new-password" aria-label="Password dobara">
+          </div>`);
+        form.elements.password2.focus();
+        return ready('Banao');
+      }
+      if (again.value.trim() !== pw) { toast('❌ Dono password alag hain'); return ready('Banao'); }
+    }
+    earnCloud = { code };
+    writeJSON(EARN_CLOUD_KEY, earnCloud);
+    earn = mergeEarn({ pages: [], deleted: {} }, earnFromCloud(data));
+    saveEarn(true);
+    toast(data ? '🔓 Earning khul gaya' : '✅ Aapka private Earning ban gaya');
+    await earnSyncNow();
+    render();
+  } catch (err) {
+    console.error(err);
+    toast('❌ ' + err.message);
+    ready('Unlock');
+  }
+}
+
+async function lockEarning() {
+  flushEarn();
+  for (let i = 0; i < 40 && earnSync.running; i++) await new Promise(r => setTimeout(r, 250));
+  await earnSyncNow();
+  if (earnSync.error && !confirm('Abhi cloud me save nahi hua (internet?). Lock karne pe is device ke naye changes chale jayenge. Phir bhi lock karein?')) return;
+  earnCloud = {};
+  earn = { pages: [], deleted: {} };
+  try { localStorage.removeItem(EARN_KEY); localStorage.removeItem(EARN_CLOUD_KEY); } catch { /* ignore */ }
+  closeSheet();
+  toast('🔒 Earning lock ho gaya');
+  if (location.hash !== '#/earn') location.hash = '#/earn'; else render();
+}
+
+/* ----- Earning screens ----- */
+function renderEarn(id) {
+  if (!earnCloud.code) return renderEarnLock();
+  const page = id && findPage(id);
+  return page ? renderEarnPage(page) : renderEarnHome();
+}
+
+function renderEarnLock() {
+  return `
+    ${topBar('💰 Earning', { back: '#/' })}
+    <main class="page" style="max-width:480px;margin:0 auto">
+      <div class="card stack" style="text-align:center;margin-top:24px">
+        <div style="font-size:3rem">🔒</div>
+        <h2 style="margin:0">Earning — sirf aapke liye</h2>
+        <p class="muted" style="margin:0">Iska <b>alag password</b> hai. Shared code (jo bhaiya ke paas hai) yahan kaam nahi karta, isliye wo ise nahi dekh sakte.</p>
+        <form id="earn-lock-form" class="stack" style="text-align:left">
+          <input type="text" name="username" value="Earning (private)" autocomplete="username" hidden>
+          <div class="row">
+            <input name="password" type="password" minlength="6" required placeholder="Earning password" autocomplete="current-password" aria-label="Earning password">
+            <button class="btn primary" type="submit">Unlock</button>
+          </div>
+        </form>
+        <p class="hint" style="margin:0">Pehli baar? Ek naya password socho (shared code se alag) aur yaad rakhna.</p>
+      </div>
+    </main>
+    ${bottomNav('earn')}`;
+}
+
+function pagePreview(p) {
+  const b = p.blocks.find(x => x.type !== 'divider' && x.text.trim());
+  return b ? b.text.trim().slice(0, 140) : '';
+}
+
+function earnCard(p) {
+  const inside = pageDescendants(p.id).length;
+  const todos = p.blocks.filter(b => b.type === 'todo');
+  const meta = [inside ? `📄 ${inside} page andar` : '', todos.length ? `☑ ${todos.filter(b => b.checked).length}/${todos.length}` : ''].filter(Boolean).join(' · ');
+  return `
+    <a class="card idea-card" href="#/earn/${p.id}">
+      <div class="card-top">
+        <h3 class="row" style="gap:10px"><span class="earn-card-ico">${esc(p.icon)}</span><span>${esc(p.title || 'Untitled')}</span></h3>
+        <span class="muted small">›</span>
+      </div>
+      ${pagePreview(p) ? `<p class="card-desc" style="margin-bottom:0">${esc(pagePreview(p))}</p>` : ''}
+      <div class="card-meta"><span>${meta}</span><span>${timeAgo(p.updatedAt)}</span></div>
+    </a>`;
+}
+
+function renderEarnHome() {
+  const top = topEarnPages();
+  return `
+    ${topBar('💰 Earning', { actions: '<button class="icon-btn" data-action="earn-lock" aria-label="Lock karo" title="Lock karo">🔒</button>' })}
+    <main class="page">
+      <p class="muted small" style="margin:0 0 12px">🔒 Private — sirf aap dekh sakte ho. Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
+      <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
+      <div class="list" style="margin-top:12px">${top.length ? top.map(earnCard).join('')
+        : '<div class="card empty"><div class="big">💰</div><p class="muted">Abhi kuch nahi. Upar ＋ dabao aur pehla earning method likho.</p></div>'}</div>
+    </main>
+    ${bottomNav('earn')}`;
+}
+
+function renderEarnPage(page) {
+  const parent = findPage(page.parentId);
+  const crumbs = pageAncestors(page).map(p => `<a href="#/earn/${p.id}">${esc(p.icon)} ${esc(p.title || 'Untitled')}</a><span>›</span>`).join('');
+  const kids = childPages(page.id);
+  return `
+    ${topBar(`<span id="earn-top-title">${esc(page.icon)} ${esc(page.title || 'Untitled')}</span>`, {
+      back: parent ? '#/earn/' + parent.id : '#/earn',
+      actions: '<button class="icon-btn" data-action="earn-page-menu" aria-label="Page options" title="Page options">⋯</button>',
+    })}
+    <main class="page notion">
+      <nav class="crumbs"><a href="#/earn">💰 Earning</a><span>›</span>${crumbs}</nav>
+      <button class="pg-icon" data-action="earn-icon" aria-label="Icon badlo" title="Icon badlo">${esc(page.icon)}</button>
+      <div id="pg-title" class="pg-title" contenteditable="${CE}" data-ph="Untitled" role="textbox" aria-label="Page title">${esc(page.title)}</div>
+      <div class="muted small">${page.by ? avatar(page.by) + ' ' : ''}Last edit ${timeAgo(page.updatedAt)}</div>
+      <div id="blocks" class="blocks">${blocksHTML(page)}</div>
+      <button class="add-block" data-action="earn-add-block">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
+      <section class="subpages">
+        <div class="row-between">
+          <h3>📁 Andar ke pages${kids.length ? ` (${kids.length})` : ''}</h3>
+          <button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Naya page</button>
+        </div>
+        ${kids.map(k => {
+          const n = pageDescendants(k.id).length;
+          return `<a class="subpage" href="#/earn/${k.id}"><span>${esc(k.icon)}</span><span class="name">${esc(k.title || 'Untitled')}</span><span class="muted small">${n ? '📄 ' + n + ' ' : ''}›</span></a>`;
+        }).join('')}
+      </section>
+      <p class="hint" style="margin-top:22px">Shortcut: <b>#</b> heading · <b>-</b> list · <b>1.</b> number · <b>[]</b> checkbox · <b>&gt;</b> quote · <b>---</b> line · <b>/</b> sab options · <b>⋮⋮</b> se block badlo / hatao</p>
+    </main>`;
+}
+
+function blocksHTML(page) {
+  let n = 0;
+  return page.blocks.map(b => { n = b.type === 'num' ? n + 1 : 0; return blockHTML(b, n); }).join('');
+}
+
+function blockHTML(b, n) {
+  const handle = `<button class="blk-handle" data-action="earn-block-menu" data-id="${b.id}" aria-label="Block options" tabindex="-1">⋮⋮</button>`;
+  if (b.type === 'divider') return `<div class="blk blk-divider" data-id="${b.id}">${handle}<hr></div>`;
+  const mark = b.type === 'todo'
+    ? `<button class="blk-check" data-action="earn-check" data-id="${b.id}" aria-label="${b.checked ? 'Done — tap to undo' : 'Mark done'}">${b.checked ? '✓' : ''}</button>`
+    : { bullet: '<span class="blk-mark">•</span>', num: `<span class="blk-mark">${n}.</span>`, callout: '<span class="blk-mark">💡</span>' }[b.type] || '';
+  const body = b.type === 'code'
+    ? `<textarea class="blk-text blk-code" data-id="${b.id}" rows="1" spellcheck="false" placeholder="Code…" aria-label="Code">${esc(b.text)}</textarea>`
+    : `<div class="blk-text" contenteditable="${CE}" data-id="${b.id}" data-ph="${esc(BLOCK_PH[b.type] || '')}" role="textbox">${esc(b.text)}</div>`;
+  return `<div class="blk blk-${b.type}${b.checked ? ' checked' : ''}" data-id="${b.id}">${handle}${mark}${body}</div>`;
+}
+
+/* ----- Editor helpers ----- */
+const curPage = () => { const r = parseRoute(); return r.page === 'earn' && r.id ? findPage(r.id) : null; };
+const textOf = el => (el.tagName === 'TEXTAREA' ? el.value : el.textContent.replace(/ /g, ' '));
+const selCollapsed = () => { const s = getSelection(); return !s.rangeCount || s.isCollapsed; };
+function autoSize(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }
+function sizeCodes(root = document) { root.querySelectorAll('.blk-code').forEach(autoSize); }
+
+function caretOffset(el) {
+  if (el.tagName === 'TEXTAREA') return el.selectionStart;
+  const sel = getSelection();
+  if (!sel.rangeCount) return 0;
+  const r = sel.getRangeAt(0);
+  if (!el.contains(r.startContainer)) return 0;
+  const pre = document.createRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(r.startContainer, r.startOffset);
+  return pre.toString().length;
+}
+
+// Put the cursor at a character position (-1 = end).
+function placeCaret(el, offset = -1) {
+  el.focus();
+  if (el.tagName === 'TEXTAREA') { const o = offset < 0 ? el.value.length : offset; el.setSelectionRange(o, o); return; }
+  const len = el.textContent.length;
+  let o = offset < 0 || offset > len ? len : offset;
+  const r = document.createRange();
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let node, placed = false;
+  while ((node = walker.nextNode())) {
+    if (o <= node.length) { r.setStart(node, o); placed = true; break; }
+    o -= node.length;
+  }
+  if (!placed) { r.selectNodeContents(el); r.collapse(false); } else r.collapse(true);
+  const s = getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+}
+
+function redrawBlocks(focusId = null, offset = -1) {
+  const page = curPage();
+  const box = document.getElementById('blocks');
+  if (!page || !box) return;
+  box.innerHTML = blocksHTML(page);
+  sizeCodes(box);
+  if (focusId) focusBlock(focusId, offset);
+}
+function focusBlock(id, offset = -1) {
+  const el = document.querySelector(`#blocks .blk-text[data-id="${id}"]`);
+  if (el) placeCaret(el, offset);
+}
+
+// Markdown-style shortcuts (used while typing and when pasting / moving notes in).
+const MD_RULES = [
+  [/^###\s+/, 'h3'], [/^##\s+/, 'h2'], [/^#\s+/, 'h1'],
+  [/^[-*•]\s+/, 'bullet'], [/^\d+[.)]\s+/, 'num'],
+  [/^\[[xX]\]\s+/, 'done'], [/^\[\s?\]\s+/, 'todo'], [/^>\s+/, 'quote'],
+];
+function mdLine(line) {
+  if (/^\s*(-{3,}|—)\s*$/.test(line)) return { type: 'divider', text: '' };
+  for (const [rx, type] of MD_RULES) {
+    if (rx.test(line)) return type === 'done' ? { type: 'todo', text: line.replace(rx, ''), checked: true } : { type, text: line.replace(rx, '') };
+  }
+  return { type: 'p', text: line };
+}
+const notesToBlocks = text => String(text || '').split(/\r?\n/).filter(l => l.trim()).map(l => ({ ...newBlock(), ...mdLine(l) }));
+
+function blockOf(el) {
+  const page = curPage();
+  if (!page) return {};
+  const i = page.blocks.findIndex(x => x.id === el.dataset.id);
+  return { page, i, b: page.blocks[i] };
+}
+
+function onTitleInput(el) {
+  const page = curPage();
+  if (!page) return;
+  page.title = textOf(el).replace(/\n/g, ' ');
+  touchPage(page);
+  const top = document.getElementById('earn-top-title');
+  if (top) top.textContent = `${page.icon} ${page.title || 'Untitled'}`;
+}
+
+function onBlockInput(el) {
+  const { page, b } = blockOf(el);
+  if (!b) return;
+  const text = textOf(el);
+  if (b.type === 'code') { b.text = text; autoSize(el); touchPage(page); return; }
+  if (b.type === 'p') {
+    if (text === '---') {
+      b.type = 'divider'; b.text = '';
+      const nb = newBlock();
+      page.blocks.splice(page.blocks.indexOf(b) + 1, 0, nb);
+      touchPage(page); redrawBlocks(nb.id, 0); return;
+    }
+    if (text === '```') { b.type = 'code'; b.text = ''; touchPage(page); redrawBlocks(b.id, 0); return; }
+    const off = caretOffset(el);
+    for (const [rx, type] of MD_RULES) {
+      const m = rx.exec(text);
+      if (m && type !== 'done' && off === m[0].length) {
+        b.type = type; b.text = text.slice(m[0].length);
+        touchPage(page); redrawBlocks(b.id, 0); return;
+      }
+    }
+  }
+  b.text = text;
+  touchPage(page);
+  const m = /^\/([^\s/]*)$/.exec(text);
+  if (m) showSlash(el, m[1]); else hideSlash();
+}
+
+// Enter: split the block at the cursor (lists continue; empty list item → plain text).
+function blockEnter(el) {
+  const { page, i, b } = blockOf(el);
+  if (!b) return;
+  hideSlash();
+  if (!selCollapsed()) getSelection().deleteFromDocument();
+  const text = textOf(el);
+  const off = caretOffset(el);
+  if (b.type !== 'p' && b.type !== 'code' && !text.trim()) {
+    b.type = 'p'; b.checked = false; b.text = '';
+    touchPage(page); redrawBlocks(b.id, 0); return;
+  }
+  const nextType = LIST_TYPES.includes(b.type) ? b.type : 'p';
+  if (off === 0 && text) { // Enter at the very start → empty line above
+    b.text = text;
+    page.blocks.splice(i, 0, newBlock(nextType));
+    touchPage(page); redrawBlocks(b.id, 0); return;
+  }
+  b.text = text.slice(0, off);
+  const nb = newBlock(nextType, text.slice(off));
+  page.blocks.splice(i + 1, 0, nb);
+  touchPage(page); redrawBlocks(nb.id, 0);
+}
+
+// Backspace at the very start: un-format, or join with the block above. Returns true if handled.
+function blockBackspace(el) {
+  const { page, i, b } = blockOf(el);
+  if (!b || !selCollapsed() || caretOffset(el) !== 0) return false;
+  if (el.tagName === 'TEXTAREA' && el.selectionEnd !== 0) return false;
+  const text = textOf(el);
+  if (b.type === 'code' && text) return false;
+  if (b.type !== 'p') { b.type = 'p'; b.checked = false; touchPage(page); redrawBlocks(b.id, 0); return true; }
+  if (i === 0) {
+    if (text || page.blocks.length < 2) return false;
+    page.blocks.splice(0, 1);
+    touchPage(page); redrawBlocks();
+    placeCaret(document.getElementById('pg-title'), -1);
+    return true;
+  }
+  const prev = page.blocks[i - 1];
+  if (prev.type === 'divider') { page.blocks.splice(i - 1, 1); touchPage(page); redrawBlocks(b.id, 0); return true; }
+  if (prev.type === 'code') {
+    if (!text) { page.blocks.splice(i, 1); touchPage(page); redrawBlocks(prev.id, -1); } else focusBlock(prev.id, -1);
+    return true;
+  }
+  const len = prev.text.length;
+  prev.text += text;
+  page.blocks.splice(i, 1);
+  touchPage(page); redrawBlocks(prev.id, len);
+  return true;
+}
+
+// Move to the block above / below (skips divider lines).
+function focusNeighbour(el, dir) {
+  const { page, i } = blockOf(el);
+  if (!page) return false;
+  for (let j = i + dir; j >= 0 && j < page.blocks.length; j += dir) {
+    if (page.blocks[j].type !== 'divider') { focusBlock(page.blocks[j].id, dir < 0 ? -1 : 0); return true; }
+  }
+  if (dir < 0) { placeCaret(document.getElementById('pg-title'), -1); return true; }
+  return false;
+}
+
+function titleEnter() {
+  const page = curPage();
+  if (!page) return;
+  const first = page.blocks[0];
+  if (first && first.type === 'p' && !first.text) { focusBlock(first.id, 0); return; }
+  const nb = newBlock();
+  page.blocks.unshift(nb);
+  touchPage(page); redrawBlocks(nb.id, 0);
+}
+
+function insertPlain(text) {
+  if (document.execCommand('insertText', false, text)) return;
+  const s = getSelection();
+  if (!s.rangeCount) return;
+  const r = s.getRangeAt(0);
+  r.deleteContents();
+  const node = document.createTextNode(text);
+  r.insertNode(node);
+  r.setStartAfter(node); r.collapse(true);
+  s.removeAllRanges(); s.addRange(r);
+  document.activeElement?.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// Pasting several lines → one block per line (with # - [] > shortcuts understood).
+function onBlockPaste(e, el) {
+  const text = e.clipboardData?.getData('text/plain');
+  if (text == null) return;
+  e.preventDefault();
+  if (el.id === 'pg-title') { insertPlain(text.replace(/\s*\r?\n+\s*/g, ' ')); return; }
+  const lines = text.replace(/\r/g, '').split('\n');
+  if (lines.filter(l => l.trim()).length < 2) { insertPlain(text.replace(/\n+/g, ' ')); return; }
+  const { page, i, b } = blockOf(el);
+  if (!b) return;
+  if (!selCollapsed()) getSelection().deleteFromDocument();
+  const cur = textOf(el), off = caretOffset(el);
+  const after = cur.slice(off);
+  const parsed = notesToBlocks(text);
+  let added = parsed.slice(1);
+  if (!cur.trim()) Object.assign(b, parsed[0], { id: b.id }); // empty block → it becomes the first pasted line
+  else if (parsed[0].type === 'p') b.text = cur.slice(0, off) + parsed[0].text; // plain first line joins this line
+  else { b.text = cur.slice(0, off); added = parsed; } // heading / list → its own block
+  page.blocks.splice(i + 1, 0, ...added);
+  const last = added.length ? added[added.length - 1] : b;
+  const caret = last.text.length;
+  last.text += after;
+  touchPage(page); redrawBlocks(last.id, caret);
+}
+
+/* ----- "/" menu ----- */
+let slash = null; // { blockId, items, sel }
+function showSlash(el, q) {
+  const query = q.toLowerCase();
+  const items = BLOCK_MENU.filter(([type, , label, words]) => !query || `${type} ${label} ${words}`.toLowerCase().includes(query));
+  if (!items.length) { hideSlash(); return; }
+  let box = document.getElementById('slash');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'slash';
+    box.className = 'slash';
+    box.addEventListener('mousedown', e => e.preventDefault()); // keep the cursor in the block
+    document.body.appendChild(box);
+  }
+  slash = { blockId: el.dataset.id, items, sel: 0 };
+  box.innerHTML = '<div class="slash-head">Block chuno</div>' + items.map(([type, ico, label], k) =>
+    `<button type="button" class="${k === 0 ? 'sel' : ''}" data-action="earn-slash" data-value="${type}"><span class="ico">${ico}</span>${label}</button>`).join('');
+  const r = el.getBoundingClientRect();
+  const viewH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const h = box.offsetHeight;
+  const top = r.bottom + 4 + h > viewH && r.top - 4 - h > 0 ? r.top - 4 - h : r.bottom + 4;
+  box.style.top = top + window.scrollY + 'px';
+  box.style.left = Math.max(8, Math.min(r.left, window.innerWidth - box.offsetWidth - 8)) + window.scrollX + 'px';
+}
+function hideSlash() { slash = null; document.getElementById('slash')?.remove(); }
+function moveSlash(d) {
+  const btns = document.querySelectorAll('#slash button');
+  slash.sel = (slash.sel + d + btns.length) % btns.length;
+  btns.forEach((b, k) => b.classList.toggle('sel', k === slash.sel));
+  btns[slash.sel].scrollIntoView({ block: 'nearest' });
+}
+
+// Change a block's kind (from "/" or the ⋮⋮ menu).
+function applyBlockType(id, type, fromSlash) {
+  const page = curPage();
+  if (!page) return;
+  const i = page.blocks.findIndex(x => x.id === id);
+  if (i < 0) return;
+  const b = page.blocks[i];
+  hideSlash();
+  if (fromSlash) b.text = b.text.replace(/^\/[^\s/]*/, '');
+  if (type === 'page') {
+    if (!b.text.trim()) page.blocks.splice(i, 1);
+    touchPage(page);
+    newEarnPage(page.id);
+    return;
+  }
+  if (type === 'divider') {
+    const nb = newBlock();
+    if (b.text.trim()) page.blocks.splice(i + 1, 0, newBlock('divider'), nb);
+    else { Object.assign(b, { type: 'divider', text: '', checked: false }); page.blocks.splice(i + 1, 0, nb); }
+    touchPage(page); redrawBlocks(nb.id, 0); return;
+  }
+  b.type = type;
+  if (type !== 'todo') b.checked = false;
+  touchPage(page); redrawBlocks(b.id, -1);
+}
+
+function newEarnPage(parentId = null) {
+  const p = normalizePage({ parentId, icon: parentId ? '📄' : '💰', by: myRef() });
+  earn.pages.push(p);
+  saveEarn();
+  ui.focusTitle = true;
+  location.hash = '#/earn/' + p.id;
+  return p;
+}
+
+function pageToText(page) {
+  let n = 0;
+  const lines = page.blocks.map(b => {
+    n = b.type === 'num' ? n + 1 : 0;
+    return ({ h1: '# ', h2: '## ', h3: '### ', bullet: '• ', num: n + '. ', todo: b.checked ? '[x] ' : '[ ] ', quote: '> ', callout: '💡 ' }[b.type] || '')
+      + (b.type === 'divider' ? '———' : b.text);
+  });
+  return `${page.icon} ${page.title || 'Untitled'}\n\n${lines.join('\n')}`.trim();
+}
+
+/* ----- Keyboard, typing and paste inside the editor ----- */
+document.addEventListener('keydown', e => {
+  const el = e.target;
+  if (el.id === 'pg-title') {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); titleEnter(); }
+    else if (e.key === 'ArrowDown') { const p = curPage(); if (p && p.blocks[0]) { e.preventDefault(); focusBlock(p.blocks[0].id, 0); } }
+    return;
+  }
+  if (!el.classList || !el.classList.contains('blk-text')) return;
+  if (slash && slash.blockId === el.dataset.id) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); moveSlash(e.key === 'ArrowDown' ? 1 : -1); return; }
+    if (e.key === 'Enter') { e.preventDefault(); applyBlockType(slash.blockId, slash.items[slash.sel][0], true); return; }
+    if (e.key === 'Escape') { hideSlash(); return; }
+  }
+  if (e.isComposing) return;
+  const isCode = el.tagName === 'TEXTAREA';
+  if (e.key === 'Enter' && !e.shiftKey && !isCode) { e.preventDefault(); blockEnter(el); return; }
+  if (e.key === 'Enter' && isCode && (e.ctrlKey || e.metaKey)) { e.preventDefault(); blockEnter(el); return; }
+  if (e.key === 'Enter' && e.shiftKey && !isCode) { e.preventDefault(); insertPlain('\n'); return; }
+  if (e.key === 'Backspace' && blockBackspace(el)) { e.preventDefault(); return; }
+  if (e.key === 'ArrowUp' && selCollapsed() && caretOffset(el) === 0 && focusNeighbour(el, -1)) { e.preventDefault(); return; }
+  if (e.key === 'ArrowDown' && selCollapsed() && caretOffset(el) === textOf(el).length && focusNeighbour(el, 1)) e.preventDefault();
+});
+
+// Phone keyboards often send Enter / Backspace only as "beforeinput" — handle them here too.
+document.addEventListener('beforeinput', e => {
+  const el = e.target;
+  if (el.id === 'pg-title' && (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak')) { e.preventDefault(); titleEnter(); return; }
+  if (!el.classList || !el.classList.contains('blk-text')) return;
+  const isCode = el.tagName === 'TEXTAREA';
+  if (e.inputType === 'insertParagraph' && !isCode) {
+    e.preventDefault();
+    if (slash && slash.blockId === el.dataset.id) applyBlockType(slash.blockId, slash.items[slash.sel][0], true);
+    else blockEnter(el);
+  } else if (e.inputType === 'deleteContentBackward' && blockBackspace(el)) {
+    e.preventDefault();
+  }
+});
+
+document.addEventListener('paste', e => {
+  const el = e.target.closest?.('.blk-text, #pg-title') || e.target.parentElement?.closest('.blk-text, #pg-title');
+  if (el && el.tagName !== 'TEXTAREA') onBlockPaste(e, el);
+});
+
+/* ----- Buttons (merged into `actions` in Section 14) ----- */
+const extraActions = {
+  'inbox-move'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    const opt = (value, label) => `<button type="button" class="btn" data-action="inbox-to" data-id="${t.id}" data-value="${value}">${label}</button>`;
+    const earnPart = !canEarn() ? '' : `<h3 class="sheet-sub">🔒 Private</h3>` + (earnCloud.code
+      ? `<div class="move-grid">${opt('earn:', '💰 Earning — naya page')}${topEarnPages().slice(0, 9).map(p => opt('earn:' + p.id, `↳ ${esc(p.icon)} ${esc(p.title || 'Untitled')}`)).join('')}</div>`
+      : '<p class="muted small" style="margin:0">💰 Earning me daalne ke liye pehle Earning unlock karo.</p>');
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `
+      <div class="sheet-inner">
+        <h2>📂 Kahan daalein?</h2>
+        <p class="small inbox-quote">${esc(t.text.slice(0, 200))}</p>
+        <h3 class="sheet-sub">💡 Naya idea banao</h3>
+        <div class="move-grid">${FOLDERS.map(f => opt('idea:' + f.key, `${f.emoji} ${f.label}`)).join('')}</div>
+        <h3 class="sheet-sub">🧰 Misc list me (to-do)</h3>
+        <div class="move-grid">${opt('misc:', '🧰 Main Misc')}${FOLDERS.map(f => opt('misc:' + f.key, `${f.emoji} ${f.label} · Misc`)).join('')}</div>
+        ${earnPart}
+        <button type="button" class="btn block" data-action="close-sheet" style="margin-top:16px">Cancel</button>
+      </div>`;
+    sheet.showModal();
+  },
+
+  'inbox-to'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    const [kind, key] = el.dataset.value.split(':');
+    const { title, rest } = splitNote(t.text);
+    const removeNote = () => { state.todos = state.todos.filter(x => x.id !== t.id); state.deleted[t.id] = Date.now(); };
+    let msg = '';
+    if (kind === 'idea') {
+      const f = folderOf(key);
+      const idea = normalizeIdea({ name: title, desc: rest, folder: f.key, owner: t.by || myRef(), editedBy: myRef() });
+      touch(idea);
+      state.ideas.push(idea);
+      removeNote();
+      msg = `✅ ${f.emoji} ${f.label} me idea ban gaya`;
+    } else if (kind === 'misc') {
+      t.folder = key || null;
+      t.updatedAt = Date.now();
+      msg = '✅ Misc list me chala gaya';
+    } else if (kind === 'earn') {
+      if (!earnCloud.code) return;
+      const target = key && findPage(key);
+      if (target) {
+        target.blocks.push(...notesToBlocks(t.text));
+        target.updatedAt = Date.now();
+        msg = `🔒 ${target.icon} ${target.title || 'Untitled'} me jud gaya`;
+      } else {
+        earn.pages.push(normalizePage({ title, icon: '💰', blocks: notesToBlocks(rest), by: t.by || myRef() }));
+        msg = '🔒 Earning me naya page ban gaya';
+      }
+      saveEarn();
+      removeNote();
+    }
+    saveState(); closeSheet(); render();
+    toast(msg);
+  },
+
+  'inbox-del'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    state.todos = state.todos.filter(x => x.id !== t.id);
+    state.deleted[t.id] = Date.now();
+    saveState(); render();
+    toast('🗑️ Deleted', () => {
+      t.updatedAt = Date.now();
+      delete state.deleted[t.id];
+      state.todos.push(t);
+      saveState(); render();
+    });
+  },
+
+  'earn-new'(el) { closeSheet(); newEarnPage(el.dataset.parent || null); },
+  'earn-lock': lockEarning,
+  'earn-slash'(el) { if (slash) applyBlockType(slash.blockId, el.dataset.value, true); },
+
+  'earn-check'(el) {
+    const page = curPage();
+    const b = page && page.blocks.find(x => x.id === el.dataset.id);
+    if (!b) return;
+    b.checked = !b.checked;
+    touchPage(page); redrawBlocks();
+  },
+
+  'earn-add-block'() {
+    const page = curPage();
+    if (!page) return;
+    const last = page.blocks[page.blocks.length - 1];
+    if (last && last.type === 'p' && !last.text) { focusBlock(last.id, 0); return; }
+    const nb = newBlock();
+    page.blocks.push(nb);
+    touchPage(page); redrawBlocks(nb.id, 0);
+  },
+
+  'earn-icon'() {
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `
+      <div class="sheet-inner">
+        <h2>Icon chuno</h2>
+        <div class="icon-grid">${PAGE_ICONS.map(i => `<button type="button" data-action="earn-set-icon" data-value="${i}">${i}</button>`).join('')}</div>
+        <button type="button" class="btn block" data-action="close-sheet" style="margin-top:14px">Cancel</button>
+      </div>`;
+    sheet.showModal();
+  },
+
+  'earn-set-icon'(el) {
+    const page = curPage();
+    if (!page) return;
+    page.icon = el.dataset.value;
+    touchPage(page); saveEarn(); closeSheet(); render();
+  },
+
+  'earn-page-menu'() {
+    const page = curPage();
+    if (!page) return;
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `
+      <div class="sheet-inner">
+        <h2>${esc(page.icon)} ${esc(page.title || 'Untitled')}</h2>
+        <div style="display:grid;gap:10px">
+          <button type="button" class="btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>
+          <button type="button" class="btn" data-action="earn-copy">📋 Saara text copy karo</button>
+          <button type="button" class="btn danger" data-action="earn-delete-page">🗑️ Ye page delete karo</button>
+          <button type="button" class="btn" data-action="earn-lock">🔒 Earning lock karo</button>
+          <button type="button" class="btn" data-action="close-sheet">Close</button>
+        </div>
+      </div>`;
+    sheet.showModal();
+  },
+
+  'earn-copy'() { const page = curPage(); if (page) { closeSheet(); copyText(pageToText(page)); } },
+
+  'earn-delete-page'() {
+    const page = curPage();
+    if (!page) return;
+    const inside = pageDescendants(page.id);
+    if (!confirm(`"${page.title || 'Untitled'}"${inside.length ? ` aur iske andar ke ${inside.length} page` : ''} delete karein?`)) return;
+    const gone = [page, ...inside];
+    const ids = new Set(gone.map(p => p.id));
+    const now = Date.now();
+    earn.pages = earn.pages.filter(p => !ids.has(p.id));
+    ids.forEach(id => (earn.deleted[id] = now));
+    saveEarn(); closeSheet();
+    location.hash = findPage(page.parentId) ? '#/earn/' + page.parentId : '#/earn';
+    toast('🗑️ Page deleted', () => {
+      const t = Date.now();
+      gone.forEach(p => { p.updatedAt = t; delete earn.deleted[p.id]; earn.pages.push(p); });
+      saveEarn(); render();
+    });
+  },
+
+  'earn-block-menu'(el) {
+    const id = el.dataset.id;
+    hideSlash();
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `
+      <div class="sheet-inner">
+        <h2>Block</h2>
+        <h3 class="sheet-sub" style="margin-top:0">Isko badlo</h3>
+        <div class="chip-group">${BLOCK_MENU.filter(m => m[0] !== 'page').map(([type, ico, label]) =>
+          `<button type="button" class="chip" data-action="earn-turn" data-id="${id}" data-value="${type}">${ico} ${label}</button>`).join('')}</div>
+        <div class="btn-row" style="margin-top:16px">
+          <button type="button" class="btn" data-action="earn-move" data-id="${id}" data-value="-1">⬆️ Upar</button>
+          <button type="button" class="btn" data-action="earn-move" data-id="${id}" data-value="1">⬇️ Neeche</button>
+          <button type="button" class="btn danger" data-action="earn-del-block" data-id="${id}">🗑️ Delete</button>
+        </div>
+        <button type="button" class="btn block" data-action="close-sheet" style="margin-top:10px">Close</button>
+      </div>`;
+    sheet.showModal();
+  },
+
+  'earn-turn'(el) { closeSheet(); applyBlockType(el.dataset.id, el.dataset.value, false); },
+
+  'earn-move'(el) {
+    const page = curPage();
+    if (!page) return;
+    const i = page.blocks.findIndex(x => x.id === el.dataset.id);
+    const j = i + Number(el.dataset.value);
+    if (i < 0 || j < 0 || j >= page.blocks.length) return;
+    [page.blocks[i], page.blocks[j]] = [page.blocks[j], page.blocks[i]];
+    touchPage(page); redrawBlocks();
+  },
+
+  'earn-del-block'(el) {
+    const page = curPage();
+    if (!page) return;
+    const i = page.blocks.findIndex(x => x.id === el.dataset.id);
+    if (i < 0) return;
+    const [removed] = page.blocks.splice(i, 1);
+    touchPage(page); closeSheet(); redrawBlocks();
+    toast('🗑️ Block deleted', () => {
+      const p = findPage(page.id);
+      if (!p) return;
+      p.blocks.splice(Math.min(i, p.blocks.length), 0, removed);
+      touchPage(p); redrawBlocks();
+    });
+  },
+};
 
 
 /* =====================================================================
@@ -2299,6 +3336,13 @@ function renderDrawer() {
     }).join('') : '<p class="muted small" style="margin:8px">Abhi koi idea nahi hai.</p>'}
     <h3>🧰 Misc to-do (${openTodos()} baaki)</h3>
     <a class="drawer-item" href="#/misc"><span class="name">🧰 To-do list kholo</span></a>
+    <h3>📥 Inbox (${myInbox().length})</h3>
+    <a class="drawer-item" href="#/quick"><span class="name">⚡ Jaldi likho</span></a>
+    <a class="drawer-item" href="#/inbox"><span class="name">📥 Inbox kholo</span></a>
+    ${canEarn() ? `<h3>💰 Earning (private)</h3>` + (earnCloud.code
+      ? topEarnPages().map(p => `<a class="drawer-item" href="#/earn/${p.id}"><span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>`).join('')
+        + '<a class="drawer-item" href="#/earn"><span class="name">💰 Saare earning methods</span></a>'
+      : '<a class="drawer-item" href="#/earn"><span class="name">🔒 Earning kholo</span></a>') : ''}
     <div class="drawer-links">
       <a class="btn primary" href="#/new">+ New idea</a>
       <a class="btn" href="#/">🗂️ All ideas</a>
@@ -2331,7 +3375,7 @@ document.addEventListener('touchstart', e => {
   const t = e.touches[0];
   if (e.touches.length !== 1 || drag) { swipe = null; return; }
   // skip things that scroll sideways or take typing
-  if (!isDrawerOpen() && e.target.closest('.chips-row, input, textarea, select, dialog')) { swipe = null; return; }
+  if (!isDrawerOpen() && e.target.closest('.chips-row, input, textarea, select, dialog, [contenteditable], .slash')) { swipe = null; return; }
   if (isDrawerOpen() || t.clientX < window.innerWidth * 0.4) swipe = { x: t.clientX, y: t.clientY, done: false };
   else swipe = null;
 }, { passive: true });
@@ -2436,6 +3480,16 @@ function render() {
     if (id && FOLDERS.some(f => f.key === id)) { ui.folder = id; try { localStorage.setItem(FOLDER_KEY, id); } catch { /* ignore */ } }
     app.innerHTML = renderMisc(id || null);
     if (ui.addSubTo) document.querySelector('#subtodo-form input')?.focus();
+  } else if (page === 'earn') {
+    app.innerHTML = renderEarn(id);
+    sizeCodes(app);
+    if (ui.focusTitle) { ui.focusTitle = false; const t = document.getElementById('pg-title'); if (t) placeCaret(t, -1); }
+  } else if (page === 'quick') {
+    app.innerHTML = renderQuick();
+    document.getElementById('quick-text')?.focus();
+    try { window.AndroidBridge?.showKeyboard?.(); } catch { /* older app */ }
+  } else if (page === 'inbox') {
+    app.innerHTML = renderInbox();
   } else if (page === 'new') {
     app.innerHTML = renderEdit(null);
   } else if ((page === 'idea' || page === 'edit') && id) {
@@ -2448,11 +3502,13 @@ function render() {
   }
   // PC sidebar on every screen (on phones it only shows on Home + Dashboard)
   if (!app.querySelector('.bottom-nav')) app.insertAdjacentHTML('beforeend', bottomNav('').replace('class="bottom-nav"', 'class="bottom-nav mobile-hidden"'));
-  document.title = page === 'idea' && findIdea(id) ? `${findIdea(id).name} · App Ideas` : 'App Ideas Tracker';
+  document.title = page === 'idea' && findIdea(id) ? `${findIdea(id).name} · App Ideas` : page === 'earn' ? '💰 Earning' : 'App Ideas Tracker';
   animateBars();
 }
 
 window.addEventListener('hashchange', () => {
+  hideSlash();
+  flushEarn();
   closeSheet();
   closeDrawer();
   // New idea page opened -> start on the Steps tab.
@@ -2736,8 +3792,11 @@ const actions = {
   },
 };
 
+Object.assign(actions, extraActions); // Inbox + Earning buttons (Section 11A/11B)
+
 // Clicks
 document.addEventListener('click', e => {
+  if (slash && !e.target.closest('#slash')) hideSlash();
   const el = e.target.closest('[data-action]');
   if (!el) return;
   e.preventDefault();
@@ -2750,6 +3809,8 @@ document.addEventListener('submit', e => {
   const form = e.target;
 
   if (form.id === 'idea-form') saveIdeaForm(form);
+  if (form.id === 'quick-form') saveQuick(form, e.submitter);
+  if (form.id === 'earn-lock-form') unlockEarning(form);
 
   if (form.id === 'password-form') {
     const button = form.querySelector('button[type="submit"]');
@@ -2842,6 +3903,8 @@ document.addEventListener('input', e => {
     ui.search = e.target.value;
     updateIdeaList();
   }
+  if (e.target.classList?.contains('blk-text')) onBlockInput(e.target);
+  if (e.target.id === 'pg-title') onTitleInput(e.target);
   if (e.target.name === 'manualVal') {
     document.getElementById('manual-out').textContent = e.target.value + '%';
   }
@@ -2896,6 +3959,7 @@ ui.tabFor = parseRoute().id;
 
 render();
 syncNow(); // get the latest ideas from the cloud (if sync is on)
+earnSyncNow(); // and the private Earning pages (if unlocked on this device)
 </script>
 </body>
 </html>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget: big "write fast" button + small Inbox button -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="5dp"
+    android:background="@drawable/widget_bg">
+
+    <TextView
+        android:id="@+id/widget_write"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:minHeight="44dp"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="8dp"
+        android:background="@drawable/widget_btn"
+        android:text="⚡  Jaldi idea likho…"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/widget_inbox"
+        android:layout_width="54dp"
+        android:layout_height="match_parent"
+        android:minHeight="44dp"
+        android:layout_marginStart="5dp"
+        android:gravity="center"
+        android:background="@drawable/widget_btn"
+        android:text="📥"
+        android:textSize="20sp" />
+</LinearLayout>
