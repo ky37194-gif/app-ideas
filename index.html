@@ -527,6 +527,13 @@
   .drawer-item:hover, .drawer-item.active { background: var(--surface-2); }
   .drawer-item .name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .drawer-item .meta { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+  .drawer-search { margin: 0 4px 10px; }
+  .dup-hint { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+  .dup-hint b { display: block; font-size: .85rem; margin-bottom: 6px; }
+  .dup-hint a { display: flex; align-items: center; gap: 8px; padding: 6px 4px; color: inherit; text-decoration: none; border-radius: 8px; }
+  .dup-hint a:hover { background: var(--surface); }
+  .dup-hint .meta { margin-left: auto; font-size: .78rem; color: var(--muted); white-space: nowrap; }
+  mark.hl { background: rgba(255, 196, 0, .35); color: inherit; border-radius: 3px; padding: 0 1px; }
   .drawer-links { display: grid; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 
   /* ---------- 17. Big screens (PC): bottom bar becomes a sidebar ---------- */
@@ -1120,6 +1127,40 @@ function bottomNav(active) {
 }
 
 
+/* ----- Search: finds ideas in every folder, best matches first ----- */
+// Score: name starts with query > name has it > word match > other fields. 0 = no match.
+function ideaMatchScore(idea, q) {
+  q = q.trim().toLowerCase();
+  if (!q) return 0;
+  const name = (idea.name || '').toLowerCase();
+  if (name === q) return 100;
+  if (name.startsWith(q)) return 80;
+  if (name.includes(q)) return 60;
+  const words = q.split(/\s+/).filter(Boolean);
+  if (words.length > 1 && words.every(w => name.includes(w))) return 50;
+  const other = [idea.owner ? idea.owner.name : '', idea.desc, idea.notes, idea.problem, idea.target,
+    idea.tags.join(' '), idea.features.map(f => f.title).join(' ')].join(' ').toLowerCase();
+  if (other.includes(q)) return 30;
+  if (words.every(w => name.includes(w) || other.includes(w))) return 20;
+  // a new name like "Pharma Notes" still finds "PharmaFlash"
+  const nameWords = name.split(/[^a-z0-9ऀ-ॿ]+/).filter(w => w.length > 2);
+  if (words.some(w => w.length > 2 && nameWords.some(n => n.startsWith(w) || w.startsWith(n)))) return 10;
+  return 0;
+}
+function searchIdeas(q, list = state.ideas) {
+  return list.map(i => [i, ideaMatchScore(i, q)]).filter(([, sc]) => sc > 0)
+    .sort((a, b) => b[1] - a[1] || b[0].updatedAt - a[0].updatedAt).map(([i]) => i);
+}
+// Escapes text and highlights the searched part.
+function hl(text, q) {
+  const t = esc(text || '');
+  q = (q || '').trim();
+  if (!q) return t;
+  const safe = esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return t.replace(new RegExp(safe, 'gi'), m => `<mark class="hl">${m}</mark>`);
+}
+
+
 /* =====================================================================
    SECTION 7: SCREEN — HOME (ideas list)
    ===================================================================== */
@@ -1147,7 +1188,7 @@ function renderHome() {
       ${inboxBanner()}
       <div class="folder-tabs" aria-label="Folders">${folderTabs}</div>
       <div class="search">
-        <input id="search" type="search" placeholder="Search ideas, tags, features…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
+        <input id="search" type="search" placeholder="Search — saare folders mein dhoondho…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
       </div>
       ${renderSetupCard()}
       <div class="person-switch" aria-label="Kiske ideas dikhayein">${[
@@ -1286,13 +1327,22 @@ function updateIdeaList() {
 
   const q = ui.search.trim().toLowerCase();
   const inFolder = state.ideas.filter(i => i.folder === ui.folder);
+
+  // Typing in search → look in EVERY folder (any status / person), best matches first.
+  if (q) {
+    const found = searchIdeas(q);
+    document.getElementById('result-count').textContent = `${found.length} mile · saare folders mein`;
+    listEl.innerHTML = found.length ? found.map(i => ideaCard(i, q)).join('')
+      : `<div class="card empty"><div class="big">🔎</div><p class="muted">"${esc(ui.search.trim())}" kahin nahi mila.</p>
+         <div class="btn-row" style="margin-top:12px"><a class="btn primary" href="#/new" data-action="new-from-search" data-value="${esc(ui.search.trim())}">+ Isi naam se naya idea</a></div></div>`;
+    animateBars();
+    return;
+  }
+
   let ideas = inFolder.filter(i => {
     if (ui.filter !== 'all' && i.status !== ui.filter) return false;
     if (ui.person !== 'all' && (!i.owner || i.owner.id !== ui.person)) return false;
-    if (!q) return true;
-    const haystack = [i.owner ? i.owner.name : '', i.name, i.desc, i.notes, i.problem, i.target, i.tags.join(' '), i.features.map(f => f.title).join(' ')]
-      .join(' ').toLowerCase();
-    return haystack.includes(q);
+    return true;
   });
 
   // Sorting
@@ -1354,17 +1404,17 @@ function miscFolderCard() {
     </a>`;
 }
 
-function ideaCard(idea) {
+function ideaCard(idea, q = '') {
   const pct = progressOf(idea);
   const s = statusOf(idea.status);
   const doneCount = idea.features.filter(f => f.status === 'done').length;
   return `
     <a class="card idea-card" href="#/idea/${idea.id}">
       <div class="card-top">
-        <h3 class="row" style="gap:8px;align-items:flex-start">${avatar(idea.owner)}<span>${esc(idea.name)}</span></h3>
+        <h3 class="row" style="gap:8px;align-items:flex-start">${avatar(idea.owner)}<span>${hl(idea.name, q)}${q ? ` <span class="muted small" title="${esc(folderOf(idea.folder).label)}">${folderOf(idea.folder).emoji}</span>` : ''}</span></h3>
         ${statusBadge(idea.status)}
       </div>
-      <p class="card-desc">${esc(idea.desc) || '<i>No description</i>'}</p>
+      <p class="card-desc">${hl(idea.desc, q) || '<i>No description</i>'}</p>
       ${idea.steps.length ? `<div class="step-line">${stepLine(idea)}</div>` : ''}
       ${progressBar('card-' + idea.id, pct, s.color)}
       <div class="card-meta">
@@ -1407,8 +1457,9 @@ function renderEdit(idea) {
             </div>
           </div>
           <label class="field"><span class="label">App name *</span>
-            <input name="name" required maxlength="80" value="${esc(d.name)}" placeholder="e.g. PharmaFlash">
+            <input name="name" required maxlength="80" value="${esc(isNew ? (ui.newName || '') : d.name)}" placeholder="e.g. PharmaFlash"${isNew ? ' data-dupcheck="1"' : ''}>
           </label>
+          ${isNew ? '<div id="dup-hint" aria-live="polite"></div>' : ''}
           <label class="field"><span class="label">One-line description</span>
             <input name="desc" maxlength="140" value="${esc(d.desc)}" placeholder="What does it do, in one line?">
           </label>
@@ -3651,10 +3702,27 @@ Object.assign(extraActions, {
    a list of every idea. Tap one to open it; swipe left / tap outside to close.
    ===================================================================== */
 function renderDrawer() {
-  const ideas = [...state.ideas].sort((a, b) => b.updatedAt - a.updatedAt);
-  const current = parseRoute().id;
   return `
-    <h2>💡 Saare ideas (${ideas.length})</h2>
+    <h2>💡 Saare ideas (${state.ideas.length})</h2>
+    <div class="search drawer-search"><input id="drawer-search" type="search" placeholder="Idea dhoondho…" value="${esc(ui.drawerSearch || '')}" aria-label="Search ideas" autocomplete="off"></div>
+    <div id="drawer-list">${drawerList()}</div>`;
+}
+
+function drawerList() {
+  const q = (ui.drawerSearch || '').trim();
+  const current = parseRoute().id;
+  if (q) {
+    const found = searchIdeas(q);
+    return `<h3>🔎 ${found.length} mile</h3>` + (found.length ? found.map(i => `
+      <a class="drawer-item ${i.id === current ? 'active' : ''}" href="#/idea/${i.id}">
+        ${avatar(i.owner)}
+        <span class="name">${hl(i.name, q)}</span>
+        <span class="meta">${folderOf(i.folder).emoji} ${statusOf(i.status).emoji} ${progressOf(i)}%</span>
+      </a>`).join('') : '<p class="muted small" style="margin:4px 8px">Kuch nahi mila.</p>')
+      + `<div class="drawer-links"><a class="btn primary" href="#/new" data-action="new-from-search" data-value="${esc(q)}">+ "${esc(q)}" naya idea banao</a></div>`;
+  }
+  const ideas = [...state.ideas].sort((a, b) => b.updatedAt - a.updatedAt);
+  return `
     ${ideas.length ? IDEA_FOLDERS().map(f => {
       const list = ideas.filter(i => i.folder === f.key);
       return `<h3>${f.emoji} ${f.label} (${list.length})</h3>` + (list.length ? list.map(i => `
@@ -3682,11 +3750,12 @@ function renderDrawer() {
     </div>`;
 }
 
-function openDrawer() {
+function openDrawer(focusSearch = false) {
   const drawer = document.getElementById('drawer');
   drawer.innerHTML = renderDrawer();
   drawer.classList.add('open');
   document.getElementById('drawer-backdrop').classList.add('open');
+  if (focusSearch) document.getElementById('drawer-search')?.focus();
 }
 
 function closeDrawer() {
@@ -3723,7 +3792,15 @@ document.addEventListener('touchmove', e => {
 }, { passive: true });
 
 document.addEventListener('touchend', () => { swipe = null; });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDrawer();
+  // PC: Ctrl+K (or "/" when not typing) → quick search from any page
+  const typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable;
+  if (cloud.code && ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === '/' && !typing))) {
+    e.preventDefault();
+    if (isDrawerOpen()) document.getElementById('drawer-search')?.focus(); else openDrawer(true);
+  }
+});
 
 
 /* =====================================================================
@@ -3826,6 +3903,9 @@ function render() {
     app.innerHTML = renderPriority();
   } else if (page === 'new') {
     app.innerHTML = renderEdit(null);
+    ui.newName = '';
+    const nameIn = document.querySelector('#idea-form input[name="name"]');
+    if (nameIn && nameIn.value) updateDupHint(nameIn.value);
   } else if ((page === 'idea' || page === 'edit') && id) {
     const idea = findIdea(id);
     if (!idea) { location.hash = '#/'; return; }
@@ -3878,6 +3958,13 @@ const actions = {
   },
 
   'load-sample': loadSample,
+
+  // "+ naya idea" from a search with no match → open the form with that name typed in
+  'new-from-search'(el) {
+    ui.newName = el.dataset.value || '';
+    closeDrawer();
+    location.hash = '#/new';
+  },
 
   tab(el) {
     ui.tab = el.dataset.value;
@@ -4235,12 +4322,29 @@ document.addEventListener('submit', e => {
   }
 });
 
+// New idea: while typing the name, show ideas that already look the same.
+function updateDupHint(name) {
+  const box = document.getElementById('dup-hint');
+  if (!box) return;
+  const q = name.trim();
+  const found = q.length >= 2 ? searchIdeas(q).slice(0, 4) : [];
+  box.className = found.length ? 'dup-hint' : '';
+  box.innerHTML = found.length ? '<b>👀 Ye pehle se hai? (tap karke kholo)</b>' + found.map(i => `
+    <a href="#/idea/${i.id}">${avatar(i.owner)}<span>${hl(i.name, q)}</span>
+      <span class="meta">${folderOf(i.folder).emoji} ${esc(folderOf(i.folder).label)} · ${progressOf(i)}%</span></a>`).join('') : '';
+}
+
 // Typing (search box, manual progress slider)
 document.addEventListener('input', e => {
   if (e.target.id === 'search') {
     ui.search = e.target.value;
     updateIdeaList();
   }
+  if (e.target.id === 'drawer-search') {
+    ui.drawerSearch = e.target.value;
+    document.getElementById('drawer-list').innerHTML = drawerList();
+  }
+  if (e.target.dataset?.dupcheck) updateDupHint(e.target.value);
   if (e.target.classList?.contains('blk-text')) onBlockInput(e.target);
   if (e.target.id === 'pg-title') onTitleInput(e.target);
   if (e.target.name === 'manualVal') {
@@ -4295,7 +4399,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-28b';
+const APP_VERSION = '2026-10-28c';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
