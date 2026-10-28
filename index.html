@@ -4204,6 +4204,30 @@ document.getElementById('sheet').addEventListener('click', e => {
 
 
 /* =====================================================================
+   SECTION 14B: AUTO-UPDATE
+   The phone app / an open tab can stay on an old version for days.
+   When the app comes back on screen (and every 10 min), check the live page;
+   if a newer version is out, reload — but never while you're typing.
+   ===================================================================== */
+const APP_VERSION = '2026-10-28a';
+async function checkForUpdate() {
+  if (location.protocol !== 'https:' || !navigator.onLine) return;
+  try {
+    const res = await fetch('./?v=' + Date.now(), { cache: 'no-store' });
+    const live = (/const APP_VERSION = '([^']+)'/.exec(await res.text()) || [])[1];
+    if (!live || live === APP_VERSION) return;
+    const a = document.activeElement;
+    const typing = a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable);
+    if (typing || document.getElementById('sheet').open || slash) return; // try again next time
+    flushEarn();
+    saveState(true);
+    location.reload();
+  } catch { /* offline — fine */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+setInterval(() => { if (!document.hidden) checkForUpdate(); }, 10 * 60 * 1000);
+
+/* =====================================================================
    SECTION 15: START THE APP
    ===================================================================== */
 applyTheme();
@@ -4212,6 +4236,7 @@ ui.tabFor = parseRoute().id;
 render();
 syncNow(); // get the latest ideas from the cloud (if sync is on)
 earnSyncNow(); // and the private Earning pages (if unlocked on this device)
+checkForUpdate();
 </script>
 </body>
 </html>
