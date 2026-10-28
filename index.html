@@ -270,6 +270,18 @@
   .todo-sub { font-size: 1.1rem; color: var(--primary); }
   @media (max-width: 420px) { .todo-children { margin-left: 10px; padding-left: 8px; } }
 
+  /* 🔥 Priority */
+  .prio-btn { font-size: 1rem; filter: grayscale(1); opacity: .35; }
+  .prio-btn.on { filter: none; opacity: 1; }
+  .todo.prio { border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); background: color-mix(in srgb, var(--danger) 6%, var(--surface)); }
+  .prio-where { font-size: .72rem; color: var(--muted); }
+  .hero-prio { min-height: 30px; }
+  @media (max-width: 480px) {
+    .todo { gap: 6px; padding-right: 2px; }
+    .todo .icon-btn { min-width: 32px; width: 32px; padding: 0; }
+  }
+  .hero-prio.on { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); border-color: transparent; }
+
   /* Quick note + Inbox */
   .quick-page textarea { min-height: 180px; font-size: 1.05rem; }
   .inbox-banner { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; text-decoration: none; color: inherit;
@@ -886,6 +898,7 @@ function normalizeTodo(raw = {}) {
     parentId: raw.parentId || null, // set = this task lives inside another task
     folder: raw.folder || null, // which Misc list: null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
     done: !!raw.done,
+    priority: !!raw.priority, // 🔥 = shows on the Priority page
     doneAt: Number(raw.doneAt) || null,
     doneBy: normPerson(raw.doneBy),
     by: normPerson(raw.by),
@@ -1100,6 +1113,7 @@ function bottomNav(active) {
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
       <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
+      <a class="nav-item ${active === 'priority' ? 'active' : ''}" href="#/priority"><span class="ico">🔥</span>Priority<span class="nav-count">${priorityCount() || ''}</span></a>
       <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
       ${canEarn() ? `<a class="nav-item ${active === 'earn' ? 'active' : ''}" href="#/earn"><span class="ico">💰</span>Earning</a>` : ''}
     </nav>`;
@@ -1222,7 +1236,7 @@ function todoRow(t) {
   const adding = ui.addSubTo === t.id;
   return `
     <li class="todo-item">
-      <div class="todo ${t.done ? 'done' : ''}">
+      <div class="todo ${t.done ? 'done' : ''}${t.priority && !t.done ? ' prio' : ''}">
         ${kids.length
           ? `<button class="todo-arrow ${isOpen ? 'open' : ''}" data-action="collapse-todo" data-id="${t.id}" aria-label="${isOpen ? 'Band karo' : 'Kholo'}">›</button>`
           : '<span class="todo-arrow-space"></span>'}
@@ -1230,6 +1244,7 @@ function todoRow(t) {
         <span class="todo-text">${esc(t.text)}</span>
         ${all.length ? `<span class="todo-count" title="Andar ke kaam">☰ ${all.filter(x => x.done).length}/${all.length}</span>` : ''}
         ${t.by ? avatar(t.by) : ''}
+        ${prioButton(t)}
         <button class="icon-btn todo-sub" data-action="add-subtodo" data-id="${t.id}" aria-label="Iske andar task add karo" title="Andar task add karo">＋</button>
         <button class="icon-btn todo-del" data-action="delete-todo" data-id="${t.id}" aria-label="Delete">✕</button>
       </div>
@@ -1246,7 +1261,7 @@ function todoRow(t) {
 function renderTodos(folder = null) {
   const ids = new Set(state.todos.map(t => t.id));
   const top = state.todos.filter(t => isTopTodo(t, ids) && t.folder === folder);
-  const open = top.filter(t => !t.done).sort((a, b) => b.createdAt - a.createdAt);
+  const open = top.filter(t => !t.done).sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
   const done = top.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   return `
     <form id="todo-form" class="todo-add" data-folder="${folder || ''}" autocomplete="off">
@@ -1556,7 +1571,8 @@ function renderDetail(idea) {
     ${topBar(esc(idea.name), { back: '#/', actions })}
     <main class="page">
       <section class="card hero">
-        <div class="badges">${statusBadge(idea.status)} ${priorityBadge(idea.priority)}</div>
+        <div class="badges" style="align-items:center">${statusBadge(idea.status)} ${priorityBadge(idea.priority)}
+          <button class="mini hero-prio ${idea.priority === 'High' ? 'on' : ''}" data-action="idea-prio">🔥 ${idea.priority === 'High' ? 'Priority hai' : 'Priority banao'}</button></div>
         ${idea.owner ? `<p class="row small muted" style="margin:10px 0 0;flex-wrap:wrap">${avatar(idea.owner)} Added by <b style="color:var(--text)">${personName(idea.owner)}</b>${idea.editedBy && idea.editedBy.id !== idea.owner.id ? ` · last edit by ${personName(idea.editedBy)}` : ''} · ${timeAgo(idea.updatedAt)}</p>` : ''}
         <h1>${esc(idea.name)}</h1>
         ${idea.desc ? `<p>${esc(idea.desc)}</p>` : ''}
@@ -2374,7 +2390,7 @@ const INBOX = 'inbox';
 const canEarn = () => me.name !== 'S'; // Earning is Kuldeep's private space
 const myInbox = () => state.todos
   .filter(t => t.folder === INBOX && (!t.by || !me.name || t.by.name === me.name))
-  .sort((a, b) => b.createdAt - a.createdAt);
+  .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
 
 // First line = title, the rest = details.
 function splitNote(text) {
@@ -2435,6 +2451,7 @@ function inboxCard(t) {
       <div class="row-between" style="margin-top:10px">
         <span class="muted small">${timeAgo(t.createdAt)}</span>
         <span class="row" style="gap:4px">
+          ${prioButton(t)}
           <button class="btn primary small-btn" data-action="inbox-move" data-id="${t.id}">📂 Folder me daalo</button>
           <button class="icon-btn todo-del" data-action="inbox-del" data-id="${t.id}" aria-label="Delete">✕</button>
         </span>
@@ -2462,6 +2479,54 @@ function saveQuick(form, submitter) {
   }
   render();
   document.querySelector('#quick-form [name="text"]')?.focus(); // ready for the next one
+}
+
+/* ----- 🔥 Priority: every 🔥 task + High-priority ideas in one place ----- */
+// Inbox notes are private to their writer, so only show your own.
+const visibleTodo = t => t.folder !== INBOX || !t.by || !me.name || t.by.name === me.name;
+const prioTodos = () => state.todos.filter(t => t.priority && !t.done && visibleTodo(t)).sort((a, b) => b.updatedAt - a.updatedAt);
+const prioIdeas = () => state.ideas.filter(i => i.priority === 'High' && i.status !== 'launched' && (ui.person === 'all' || (i.owner && i.owner.id === ui.person)));
+const priorityCount = () => prioTodos().length + prioIdeas().length;
+
+function prioButton(t) {
+  const label = t.priority ? 'Priority hatao' : 'Priority banao';
+  return `<button class="icon-btn prio-btn ${t.priority ? 'on' : ''}" data-action="toggle-prio" data-id="${t.id}" aria-label="${label}" title="${label}">🔥</button>`;
+}
+
+// Where a task lives: "🧰 Misc", "💡 App ideas · Misc › parent task", "📥 Inbox".
+function todoPlace(t) {
+  if (t.folder === INBOX) return '📥 Inbox';
+  const parent = t.parentId && state.todos.find(x => x.id === t.parentId);
+  const f = t.folder && FOLDERS.find(x => x.key === t.folder);
+  return (f ? `${f.emoji} ${f.label} · Misc` : '🧰 Misc') + (parent ? ` › ${parent.text.slice(0, 24)}` : '');
+}
+const todoLink = t => (t.folder === INBOX ? '#/inbox' : t.folder ? '#/misc/' + t.folder : '#/misc');
+
+function renderPriority() {
+  const todos = prioTodos();
+  const ideas = prioIdeas().sort((a, b) => b.updatedAt - a.updatedAt);
+  return `
+    ${topBar('🔥 Priority wale kaam')}
+    <main class="page" style="max-width:760px">
+      <p class="muted small" style="margin:0 0 12px">Sabse zaroori kaam yahan. Misc ya Inbox me kisi bhi kaam pe <b>🔥</b> dabao to wo yahan aa jata hai. Idea ke liye: idea kholo → <b>🔥 Priority banao</b>.</p>
+      <h2 class="section-title" style="margin-top:6px">✅ Kaam (${todos.length})</h2>
+      ${todos.length ? `<ul class="todo-list">${todos.map(t => `
+        <li><div class="todo prio">
+          <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Mark done"></button>
+          <a class="todo-text" href="${todoLink(t)}" style="color:inherit;text-decoration:none">${esc(t.text)}<br><span class="prio-where">${esc(todoPlace(t))}</span></a>
+          ${t.by ? avatar(t.by) : ''}
+          ${prioButton(t)}
+        </div></li>`).join('')}</ul>`
+        : '<div class="card empty" style="padding:24px 16px"><div class="big">🔥</div><p class="muted">Koi priority kaam nahi. Misc ya Inbox me kisi kaam pe 🔥 dabao.</p></div>'}
+      <h2 class="section-title">💡 Priority ideas (${ideas.length})</h2>
+      ${ideas.length ? `<div class="list">${ideas.map(i => `
+        <a class="card idea-card" href="#/idea/${i.id}">
+          <div class="card-top"><h3 class="row" style="gap:8px">${avatar(i.owner)} ${folderOf(i.folder).emoji} ${esc(i.name)}</h3>${statusBadge(i.status)}</div>
+          <p class="step-line" style="margin:8px 0 0">${stepLine(i)}</p>
+        </a>`).join('')}</div>`
+        : '<p class="muted small">Koi High priority idea nahi.</p>'}
+    </main>
+    ${bottomNav('priority')}`;
 }
 
 /* =====================================================================
@@ -3201,6 +3266,23 @@ const extraActions = {
     toast(msg);
   },
 
+  'toggle-prio'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    t.priority = !t.priority;
+    t.updatedAt = Date.now();
+    saveState(); render();
+    toast(t.priority ? '🔥 Priority me daal diya' : 'Priority se hata diya');
+  },
+
+  'idea-prio'() {
+    const idea = findIdea(currentIdeaId());
+    if (!idea) return;
+    idea.priority = idea.priority === 'High' ? 'Medium' : 'High';
+    touch(idea); saveState(); render();
+    toast(idea.priority === 'High' ? '🔥 Priority idea bana diya' : 'Priority hata di (Medium)');
+  },
+
   'inbox-del'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
@@ -3584,6 +3666,8 @@ function renderDrawer() {
     }).join('') : '<p class="muted small" style="margin:8px">Abhi koi idea nahi hai.</p>'}
     <h3>🧰 Misc to-do (${openTodos()} baaki)</h3>
     <a class="drawer-item" href="#/misc"><span class="name">🧰 To-do list kholo</span></a>
+    <h3>🔥 Priority (${priorityCount()})</h3>
+    <a class="drawer-item" href="#/priority"><span class="name">🔥 Priority wale kaam</span></a>
     <h3>📥 Inbox (${myInbox().length})</h3>
     <a class="drawer-item" href="#/quick"><span class="name">⚡ Jaldi likho</span></a>
     <a class="drawer-item" href="#/inbox"><span class="name">📥 Inbox kholo</span></a>
@@ -3738,6 +3822,8 @@ function render() {
     try { window.AndroidBridge?.showKeyboard?.(); } catch { /* older app */ }
   } else if (page === 'inbox') {
     app.innerHTML = renderInbox();
+  } else if (page === 'priority') {
+    app.innerHTML = renderPriority();
   } else if (page === 'new') {
     app.innerHTML = renderEdit(null);
   } else if ((page === 'idea' || page === 'edit') && id) {
@@ -4209,7 +4295,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-28a';
+const APP_VERSION = '2026-10-28b';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
