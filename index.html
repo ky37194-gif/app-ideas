@@ -1191,10 +1191,6 @@ function renderHome() {
         <input id="search" type="search" placeholder="Search — saare folders mein dhoondho…" value="${esc(ui.search)}" aria-label="Search ideas" autocomplete="off">
       </div>
       ${renderSetupCard()}
-      <div class="person-switch" aria-label="Kiske ideas dikhayein">${[
-        ...people().map(p => `<button class="${ui.person === p.id ? 'active' : ''}" data-action="person" data-value="${esc(p.id)}">${avatar(p)} ${esc(fullName(p.name))}</button>`),
-        `<button class="${ui.person === 'all' ? 'active' : ''}" data-action="person" data-value="all">👥 Dono</button>`,
-      ].join('')}</div>
       <div class="chips-row" aria-label="Filter by status">${filterChips}</div>
       <div class="row-between" style="margin:8px 0 12px">
         <span class="muted small" id="result-count"></span>
@@ -2158,7 +2154,7 @@ const writeJSON = (key, value) => { try { localStorage.setItem(key, JSON.stringi
 let me = readJSON(PROFILE_KEY);
 if (me.name === 'Me') me.name = 'K'; // older versions used "Me" for you
 // Home shows only your own ideas by default; the switch on top shows the other person's or both.
-ui.person = (() => { try { return localStorage.getItem(PERSON_KEY); } catch { return null; } })() || me.name || 'all';
+ui.person = 'all'; // person switch removed — always show everyone's ideas
 // Cloud sync settings for this device: { code, lastSync, off }
 let cloud = readJSON(CLOUD_KEY);
 const syncState = { status: cloud.code ? 'idle' : 'off', message: '', running: false, again: false, timer: null };
@@ -4181,8 +4177,6 @@ const actions = {
 
   'set-name'(el) {
     setMyName(el.dataset.value);
-    ui.person = me.name;
-    try { localStorage.setItem(PERSON_KEY, ui.person); } catch { /* ignore */ }
     toast(`👋 Hi ${fullName(me.name)}!`);
     render();
   },
@@ -4399,7 +4393,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-28c';
+const APP_VERSION = '2026-10-29a';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
