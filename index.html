@@ -2292,8 +2292,8 @@ async function syncNow() {
         : { ideas: [], todos: [], deleted: {} };
       const merged = mergeData({ ideas: state.ideas, todos: state.todos, deleted: state.deleted }, remote);
 
-      if (!got.data.data || fingerprint(merged) !== fingerprint(remote)) {
-        const saved = await cloudRequest('PUT', { data: { ...merged, savedAt: Date.now() }, etag: got.data.etag });
+      if (!got.data.data || got.data.data.space !== 'K' || fingerprint(merged) !== fingerprint(remote)) {
+        const saved = await cloudRequest('PUT', { data: { ...merged, space: 'K', savedAt: Date.now() }, etag: got.data.etag });
         if (saved.status === 409) continue; // someone else saved just now → download again
         if (!saved.ok) throw new Error(saved.data.error || 'Server error ' + saved.status);
       }
@@ -2324,7 +2324,7 @@ async function syncNow() {
 }
 
 // The real shared list always has Kuldeep's ideas. A wrong code opens an empty (or someone-else) list.
-const isRealList = data => !!data && (data.ideas || []).some(i => i.owner && i.owner.name === 'K');
+const isRealList = data => !!data && (data.space === 'K' || (data.ideas || []).some(i => i.owner && i.owner.name === 'K'));
 
 // Turn on sync with a password (same password on every device).
 async function connectWithPassword(password) {
@@ -2848,6 +2848,92 @@ function renderSm() {
     ${bottomNav('earn')}`;
 }
 
+// 💡 Turn one idea into an Earning page (everything in it becomes blocks).
+function ideaToPage(idea, parentId) {
+  const B = newBlock;
+  const blocks = [];
+  const st = statusOf(idea.status);
+  const info = [`${st.emoji || ''} ${st.label || idea.status}`.trim(), idea.priority ? `Priority: ${idea.priority}` : '',
+    idea.platforms.length ? idea.platforms.join(', ') : '', `Progress ${progressOf(idea)}%`].filter(Boolean).join(' · ');
+  blocks.push(B('callout', info));
+  if (idea.desc) blocks.push(B('p', idea.desc));
+  if (idea.problem) blocks.push(B('h3', '❓ Problem'), B('p', idea.problem));
+  if (idea.target) blocks.push(B('h3', '🎯 Kiske liye'), B('p', idea.target));
+  if (idea.steps.length) {
+    blocks.push(B('h2', '📍 Steps'));
+    idea.steps.forEach(x => blocks.push({ ...B('todo', x.title), checked: !!x.done }));
+  }
+  if (idea.features.length) {
+    blocks.push(B('h2', '✨ Features'));
+    idea.features.forEach(f => blocks.push({ ...B('todo', f.title + (f.desc ? ' — ' + f.desc : '') + (f.mvp ? '' : ' (nice to have)')), checked: f.status === 'done' }));
+  }
+  if (idea.monetization.length || idea.price) {
+    blocks.push(B('h2', '💵 Paisa kaise'));
+    if (idea.monetization.length) blocks.push(B('p', idea.monetization.join(', ')));
+    if (idea.price) blocks.push(B('p', 'Price: ' + idea.price));
+  }
+  if (idea.notes) blocks.push(B('h2', '📝 Notes'), ...idea.notes.split('\n').filter(l => l.trim()).map(l => B('p', l)));
+  if (idea.links.length) {
+    blocks.push(B('h2', '🔗 Links'));
+    idea.links.forEach(l => blocks.push(B('bullet', (l.label ? l.label + ': ' : '') + l.url)));
+  }
+  if (idea.tags.length) blocks.push(B('p', 'Tags: ' + idea.tags.map(t => '#' + t).join(' ')));
+  if (idea.log.length) {
+    blocks.push(B('h2', '📓 Journal'));
+    [...idea.log].sort((a, b) => b.createdAt - a.createdAt).forEach(l => blocks.push(B('bullet', `${l.date}: ${l.text}`)));
+  }
+  return normalizePage({
+    id: 'idea-' + idea.id, parentId, icon: folderOf(idea.folder).emoji, title: idea.name, blocks,
+    by: myRef(), createdAt: idea.createdAt, updatedAt: Date.now(),
+  });
+}
+
+// Move ALL ideas into Earning: one folder page per Ideas folder, each idea a page inside it.
+async function moveIdeasToEarn(btn) {
+  const ideas = [...state.ideas];
+  if (!ideas.length) { toast('Koi idea nahi hai'); return; }
+  if (!earnCloud.code) { toast('Pehle Earning unlock karo'); return; }
+  if (!confirm(`Saare ${ideas.length} ideas 💰 Earning me shift karein?\n\nHar folder (💡 App, 🥽 VR…) Earning me ek folder ban jayega aur ideas uske andar.\nIdeas list khali ho jayegi. Pehle ek backup file download hogi.`)) return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Shift ho raha hai…'; }
+  try {
+    exportJSON(); // backup file first
+    const now = Date.now();
+    FOLDERS.forEach(f => {
+      const inF = ideas.filter(i => i.folder === f.key);
+      if (!inF.length) return;
+      const fid = 'ideas-folder-' + f.key;
+      if (!findPage(fid)) {
+        delete earn.deleted[fid];
+        earn.pages.push(normalizePage({ id: fid, icon: f.emoji, title: f.label, blocks: [newBlock('p', `${f.label} — Ideas section se shift kiye gaye.`)], by: myRef(), createdAt: now, updatedAt: now }));
+      }
+      inF.forEach(i => {
+        const page = ideaToPage(i, fid);
+        delete earn.deleted[page.id];
+        earn.pages = earn.pages.filter(x => x.id !== page.id);
+        earn.pages.push(page);
+      });
+    });
+    saveEarn();
+    flushEarn();
+    for (let k = 0; k < 40 && earnSync.running; k++) await new Promise(res => setTimeout(res, 250));
+    earnSync.error = '';
+    await earnSyncNow();
+    if (earnSync.error || earnSync.running) { toast('❌ Earning cloud me save nahi hua (internet?) — ideas abhi hataye nahi. Phir try karo.'); if (btn) { btn.disabled = false; btn.textContent = '💡 Phir try karo'; } return; }
+    // Saved safely in Earning → now remove them from the Ideas list (on every device).
+    const t = Date.now();
+    ideas.forEach(i => { state.deleted[i.id] = t; });
+    const ids = new Set(ideas.map(i => i.id));
+    state.ideas = state.ideas.filter(i => !ids.has(i.id));
+    saveState();
+    toast(`✅ ${ideas.length} ideas Earning me shift ho gaye`);
+    location.hash = '#/earn';
+    render();
+  } catch (err) {
+    console.error(err); toast('❌ ' + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = '💡 Phir try karo'; }
+  }
+}
+
 function pagePreview(p) {
   const b = p.blocks.find(x => x.type !== 'divider' && x.text.trim());
   return b ? b.text.trim().slice(0, 140) : '';
@@ -2876,6 +2962,7 @@ function renderEarnHome() {
       ${earnCloud.id ? '' : '<button class="card inbox-banner" data-action="earn-creds" style="width:100%;font:inherit;text-align:left;cursor:pointer"><span class="big">🔑</span><span style="flex:1"><b>Earning ka ID + password set karo</b><br><span class="muted small">Abhi sirf password hai — ID add karke aur secure karo</span></span><span class="muted">›</span></button>'}
       <div class="row-between" style="margin:0 0 8px"><span class="muted small">🔒 Private — sirf aap</span><button class="btn" data-action="earn-creds">🔑 Password badlo</button></div>
       <p class="muted small" style="margin:0 0 12px"> Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
+      ${state.ideas.length ? `<button class="card sm-card" data-action="ideas-to-earn" style="cursor:pointer;border-color:var(--primary)"><span class="big" style="font-size:1.8rem">💡</span><span style="flex:1"><b>Saare ideas (${state.ideas.length}) yahan shift karo</b><br><span class="muted small">Har folder Earning me folder banega — phir ⠿ se jahan chaho daalo</span></span><span class="muted">›</span></button>` : ''}
       <a class="card sm-card" href="#/sm"><span class="big" style="font-size:1.8rem">📱</span><span style="flex:1"><b>SM — Content Planner</b><br><span class="muted small">Social media ke saare ideas, posts aur plan</span></span><span class="muted">›</span></a>
       <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
       ${top.length > 1 ? '<p class="hint" style="margin:10px 0 0">💡 <b>⠿</b> pakad ke kisi doosre page pe chhodo — wo uske folder me chala jayega.</p>' : ''}
@@ -3816,6 +3903,7 @@ Object.assign(extraActions, {
   'login-mode'(el) { ui.codeLogin = el.dataset.value === 'code'; render(); },
   'change-login-pw': openChangeLoginPw,
   'earn-creds': openEarnCreds,
+  'ideas-to-earn'(el) { moveIdeasToEarn(el); },
   'earn-mode'(el) { ui.earnNew = el.dataset.value === 'new'; render(); },
 });
 
@@ -4526,7 +4614,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-30h';
+const APP_VERSION = '2026-10-30i';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
