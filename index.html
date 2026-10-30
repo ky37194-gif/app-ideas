@@ -1620,7 +1620,7 @@ function renderDetail(idea) {
       <section class="card hero">
         <div class="badges" style="align-items:center">${statusBadge(idea.status)} ${priorityBadge(idea.priority)}
           <button class="mini hero-prio ${idea.priority === 'High' ? 'on' : ''}" data-action="idea-prio">🔥 ${idea.priority === 'High' ? 'Priority hai' : 'Priority banao'}</button></div>
-        ${idea.owner ? `<p class="row small muted" style="margin:10px 0 0;flex-wrap:wrap">${avatar(idea.owner)} Added by <b style="color:var(--text)">${personName(idea.owner)}</b>${idea.editedBy && idea.editedBy.id !== idea.owner.id ? ` · last edit by ${personName(idea.editedBy)}` : ''} · ${timeAgo(idea.updatedAt)}</p>` : ''}
+        <p class="row small muted" style="margin:10px 0 0;flex-wrap:wrap">Updated ${timeAgo(idea.updatedAt)}</p>
         <h1>${esc(idea.name)}</h1>
         ${idea.desc ? `<p>${esc(idea.desc)}</p>` : ''}
 
@@ -1728,7 +1728,7 @@ function renderStepsTab(idea) {
         <div class="f-title">${esc(st.title)}</div>
         <div class="f-tags">
           ${isNow ? `<span class="mini now-tag">📍 Abhi yahan ho</span>` : ''}
-          ${st.done ? `<span class="mini state-done" style="cursor:default;display:inline-flex;align-items:center;gap:4px">✓ Done${st.doneAt ? ' · ' + fmtDate(st.doneAt) : ''}${st.doneBy ? ' · ' + esc(fullName(st.doneBy.name)) : ''}</span>` : ''}
+          ${st.done ? `<span class="mini state-done" style="cursor:default;display:inline-flex;align-items:center;gap:4px">✓ Done${st.doneAt ? ' · ' + fmtDate(st.doneAt) : ''}</span>` : ''}
           ${!st.done && !isNow ? `<button class="mini" data-action="set-current-step" data-id="${st.id}" title="Is se pehle ke saare steps done mark ho jayenge">📍 Yahan hu</button>` : ''}
         </div>
       </div>
@@ -1837,7 +1837,7 @@ function renderJournalTab(idea) {
         ${g.items.map(e => `
           <div class="log-item">
             <div class="row-between">
-              <div><div class="text">${esc(e.text)}</div>${e.by ? `<div class="row small muted" style="gap:6px;margin-top:4px">${avatar(e.by)} ${personName(e.by)}</div>` : ''}</div>
+              <div><div class="text">${esc(e.text)}</div></div>
               <button class="icon-btn" data-action="delete-log" data-id="${e.id}" aria-label="Delete entry" style="font-size:.9rem;color:var(--muted);margin-top:-8px">✕</button>
             </div>
           </div>`).join('')}
@@ -2052,7 +2052,6 @@ function ideaToText(idea) {
   const lines = [];
   lines.push(`📱 ${idea.name}`);
   if (idea.desc) lines.push(idea.desc);
-  if (idea.owner) lines.push(`Added by: ${fullName(idea.owner.name)}`);
   lines.push('');
   lines.push(`Status: ${s.emoji} ${s.label} | Priority: ${idea.priority} | Progress: ${progressOf(idea)}%${mvp !== null ? ` (MVP ${mvp}%)` : ''}`);
   if (idea.platforms.length) lines.push(`Platforms: ${idea.platforms.join(', ')}`);
@@ -2175,6 +2174,7 @@ function setMyName(name) {
 
 // Coloured circle with the person's letter (K, S…).
 function avatar(person) {
+  return ''; // single user — no K/S letters anywhere
   if (!person || !person.name) return '';
   const fixed = { K: 230, S: 150 };
   let hue = fixed[person.name];
@@ -2734,7 +2734,7 @@ async function unlockEarning(form) {
   try {
     // Never allow the shared code — bhaiya knows that one.
     if (cloud.code && await passwordToCode(pw) === cloud.code) {
-      toast('❌ Ye to shared code hai (bhaiya ko pata hai) — Earning ka alag password rakho');
+      toast('❌ Ye site wala code hai — Earning ka alag password rakho');
       return ready('Unlock');
     }
     const code = await earnKeyFor(eid, pw);
@@ -2752,6 +2752,7 @@ async function unlockEarning(form) {
         toast('🔑 Purana Earning is ID pe shift ho gaya');
       }
     }
+    if (data && again) { toast('❌ Is ID + password se Earning pehle se hai — "Kholo" se kholo, ya doosra ID chuno'); return ready('Set karo'); }
     if (data && data.kind !== 'earning') { toast('❌ Ye password nahi chalega — doosra rakho'); return ready('Unlock'); }
     if (!data) {
       // Nothing saved with this password yet → make sure it's not a typo before creating a new space.
@@ -2770,6 +2771,7 @@ async function unlockEarning(form) {
     writeJSON(EARN_CLOUD_KEY, earnCloud);
     earn = mergeEarn({ pages: [], deleted: {} }, earnFromCloud(data));
     saveEarn(true);
+    ui.earnNew = false;
     toast(data ? '🔓 Earning khul gaya' : '✅ Aapka private Earning ban gaya');
     await earnSyncNow();
     render();
@@ -2807,13 +2809,18 @@ function renderEarnLock() {
       <div class="card stack" style="text-align:center;margin-top:24px">
         <div style="font-size:3rem">🔒</div>
         <h2 style="margin:0">Earning — sirf aapke liye</h2>
-        <p class="muted" style="margin:0">Iska <b>alag password</b> hai. Shared code (jo bhaiya ke paas hai) yahan kaam nahi karta, isliye wo ise nahi dekh sakte.</p>
+        <p class="muted" style="margin:0">Iska <b>alag password</b> hai — site wale code se nahi khulta.</p>
+        <div class="btn-row" style="justify-content:center">
+          <button type="button" class="btn ${ui.earnNew ? '' : 'primary'}" data-action="earn-mode" data-value="open">🔓 Kholo</button>
+          <button type="button" class="btn ${ui.earnNew ? 'primary' : ''}" data-action="earn-mode" data-value="new">🆕 Apna password set karo</button>
+        </div>
         <form id="earn-lock-form" class="stack" style="text-align:left">
-          <input name="eid" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Earning ID" aria-label="Earning ID">
-          <input name="password" type="password" minlength="6" required placeholder="Earning password" autocomplete="current-password" aria-label="Earning password">
-          <button class="btn primary" type="submit">Unlock</button>
+          <input name="eid" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="${ui.earnNew ? 'Apna naya Earning ID socho (jaise kuldeep)' : 'Earning ID'}" aria-label="Earning ID">
+          <input name="password" type="password" minlength="6" required placeholder="${ui.earnNew ? 'Naya password (kam se kam 6)' : 'Earning password'}" autocomplete="${ui.earnNew ? 'new-password' : 'current-password'}" aria-label="Earning password">
+          ${ui.earnNew ? '<input name="password2" type="password" minlength="6" required placeholder="Password dobara" autocomplete="new-password" aria-label="Password dobara">' : ''}
+          <button class="btn primary" type="submit">${ui.earnNew ? 'Set karo' : 'Unlock'}</button>
         </form>
-        <p class="hint" style="margin:0">Pehli baar? Apna naya Earning ID + password socho (site wale se alag rakho) aur yaad rakhna. Pehle sirf password se banaya tha? Koi bhi ID + wahi password daalo — data us ID pe shift ho jayega.</p>
+        <p class="hint" style="margin:0">${ui.earnNew ? 'ID + password khud chuno aur yaad rakhna — bhoolne pe data nahi khulega. Baad me 🔑 se kabhi bhi badal sakte ho.' : 'Pehli baar? Upar "🆕 Apna password set karo" dabao.'}</p>
       </div>
     </main>
     ${bottomNav('earn')}`;
@@ -2845,7 +2852,8 @@ function renderEarnHome() {
     ${topBar('💰 Earning', { actions: '<button class="icon-btn" data-action="earn-creds" aria-label="ID / password" title="ID / password badlo">🔑</button><button class="icon-btn" data-action="earn-lock" aria-label="Lock karo" title="Lock karo">🔒</button>' })}
     <main class="page">
       ${earnCloud.id ? '' : '<button class="card inbox-banner" data-action="earn-creds" style="width:100%;font:inherit;text-align:left;cursor:pointer"><span class="big">🔑</span><span style="flex:1"><b>Earning ka ID + password set karo</b><br><span class="muted small">Abhi sirf password hai — ID add karke aur secure karo</span></span><span class="muted">›</span></button>'}
-      <p class="muted small" style="margin:0 0 12px">🔒 Private — sirf aap dekh sakte ho. Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
+      <div class="row-between" style="margin:0 0 8px"><span class="muted small">🔒 Private — sirf aap</span><button class="btn" data-action="earn-creds">🔑 Password badlo</button></div>
+      <p class="muted small" style="margin:0 0 12px"> Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
       <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
       <div class="list" style="margin-top:12px">${top.length ? top.map(earnCard).join('')
         : '<div class="card empty"><div class="big">💰</div><p class="muted">Abhi kuch nahi. Upar ＋ dabao aur pehla earning method likho.</p></div>'}</div>
@@ -3653,7 +3661,7 @@ async function saveEarnCreds(form) {
   try {
     const oldCode = f.curId ? await earnKeyFor(f.curId.value, f.curPw.value) : await legacyEarnKey(f.curPw.value);
     if (oldCode !== earnCloud.code) { toast('❌ Abhi wala ID / password galat hai'); return done(); }
-    if (cloud.code && await passwordToCode(f.newPw.value) === cloud.code) { toast('❌ Ye shared code hai — alag password rakho'); return done(); }
+    if (cloud.code && await passwordToCode(f.newPw.value) === cloud.code) { toast('❌ Ye site wala code hai — alag password rakho'); return done(); }
     const newCode = await earnKeyFor(newId, f.newPw.value);
     if (newCode === oldCode) { toast('Kuch nahi badla'); return done(); }
     flushEarn();
@@ -3675,6 +3683,7 @@ Object.assign(extraActions, {
   'login-mode'(el) { ui.codeLogin = el.dataset.value === 'code'; render(); },
   'change-login-pw': openChangeLoginPw,
   'earn-creds': openEarnCreds,
+  'earn-mode'(el) { ui.earnNew = el.dataset.value === 'new'; render(); },
 });
 
 
@@ -4378,7 +4387,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-30a';
+const APP_VERSION = '2026-10-30c';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
