@@ -2435,7 +2435,7 @@ setInterval(() => { if (!document.hidden) { syncNow(); earnSyncNow(); } }, 30 * 
 const INBOX = 'inbox';
 const canEarn = () => me.name !== 'S'; // Earning is Kuldeep's private space
 const myInbox = () => state.todos
-  .filter(t => t.folder === INBOX && (!t.by || !me.name || t.by.name === me.name))
+  .filter(t => t.folder === INBOX) // single user — show every note, whoever saved it
   .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
 
 // First line = title, the rest = details.
@@ -2529,7 +2529,7 @@ function saveQuick(form, submitter) {
 
 /* ----- 🔥 Priority: every 🔥 task + High-priority ideas in one place ----- */
 // Inbox notes are private to their writer, so only show your own.
-const visibleTodo = t => t.folder !== INBOX || !t.by || !me.name || t.by.name === me.name;
+const visibleTodo = () => true; // single user — nothing is hidden
 const prioTodos = () => state.todos.filter(t => t.priority && !t.done && visibleTodo(t)).sort((a, b) => b.updatedAt - a.updatedAt);
 const prioIdeas = () => state.ideas.filter(i => i.priority === 'High' && i.status !== 'launched' && (ui.person === 'all' || (i.owner && i.owner.id === ui.person)));
 const priorityCount = () => prioTodos().length + prioIdeas().length;
@@ -4507,7 +4507,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-30d';
+const APP_VERSION = '2026-10-30e';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
