@@ -1,0 +1,2859 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#fafafa" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Content Planner</title>
+
+  <!-- Makes the app installable on a phone (home-screen icon, opens full screen) -->
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+  <!-- Runs inside App Ideas → 💰 Earning → 📱 SM. Data + sync are the same as content-planner-ps.vercel.app -->
+
+  <!-- Apply the saved theme BEFORE anything renders, so dark mode doesn't flash white -->
+  <script>
+    (function () {
+      try {
+        var saved = JSON.parse(localStorage.getItem('contentPlanner.v1') || '{}');
+        var theme = (saved.settings && saved.settings.theme) || 'system';
+        var dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- Tailwind CSS (Play CDN) – utility classes used everywhere below -->
+  <script src="https://cdn.tailwindcss.com/3.4.5"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class', // dark mode turns on when <html> has class="dark"
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'] } } },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    body { -webkit-tap-highlight-color: transparent; }
+    .dark input, .dark select, .dark textarea { color-scheme: dark; }
+    input[type="date"], input[type="time"] { min-width: 0; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    @keyframes sheetUp { from { transform: translateY(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .animate-sheet { animation: sheetUp .22s ease-out; }
+    @keyframes toastIn { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+    .animate-toast { animation: toastIn .18s ease-out; }
+  </style>
+</head>
+
+<body class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased">
+  <div id="root">
+    <div style="display:grid;place-items:center;height:100vh;font-family:system-ui;color:#a1a1aa">Loading Content Planner…</div>
+  </div>
+
+  <!-- React + Babel (Babel lets us write JSX directly in this file, no build step needed) -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+
+  <script type="text/babel" data-presets="react">
+/* =====================================================================
+   CONTENT PLANNER
+   One-file React app. All data lives in your browser's localStorage.
+
+   File map (search for these headings):
+     1. CONSTANTS      – statuses, formats, colours, default checklist
+     2. HELPERS        – dates, ids, copy-to-clipboard, stats maths
+     3. DATA / STORAGE – default data, load, save, sample ideas
+     4. UI BASICS      – Icon, Sheet (popup), chips, inputs, cards
+     5. DASHBOARD
+     6. CALENDAR
+     7. KANBAN BOARD
+     8. LIST VIEW
+     9. ACCOUNTS
+    10. IDEA EDITOR    – details, script, links, caption, checklist
+    11. QUICK CAPTURE, DUPLICATE, SETTINGS
+    12. APP            – global state + navigation
+   ===================================================================== */
+
+const { useState, useEffect, useMemo, useRef, useContext, createContext, useLayoutEffect } = React;
+
+/* =====================================================================
+   1. CONSTANTS
+   ===================================================================== */
+const STORAGE_KEY = 'contentPlanner.v1';
+
+// Workflow stages, in order. `cls` = colours for the little status pill.
+const STATUSES = [
+  { id: 'idea',      emoji: '💡', label: 'Idea',      bar: '#f59e0b', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300' },
+  { id: 'script',    emoji: '📝', label: 'Script',    bar: '#0ea5e9', cls: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300' },
+  { id: 'shooting',  emoji: '🎬', label: 'Shooting',  bar: '#8b5cf6', cls: 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300', long: 'Shooting / Generating' },
+  { id: 'editing',   emoji: '✂️', label: 'Editing',   bar: '#d946ef', cls: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-300' },
+  { id: 'scheduled', emoji: '📅', label: 'Scheduled', bar: '#6366f1', cls: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300' },
+  { id: 'posted',    emoji: '✅', label: 'Posted',    bar: '#10b981', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' },
+];
+const STATUS_BY_ID = Object.fromEntries(STATUSES.map(s => [s.id, s]));
+const STATUS_INDEX = Object.fromEntries(STATUSES.map((s, i) => [s.id, i]));
+
+const FORMATS = [
+  { id: 'yt-long',     label: 'YT Long Video', short: 'Long',     emoji: '🎞️', platform: 'youtube' },
+  { id: 'yt-short',    label: 'YT Short',      short: 'Short',    emoji: '⚡',  platform: 'youtube' },
+  { id: 'ig-reel',     label: 'IG Reel',       short: 'Reel',     emoji: '🎬', platform: 'instagram' },
+  { id: 'ig-post',     label: 'IG Post',       short: 'Post',     emoji: '🖼️', platform: 'instagram' },
+  { id: 'ig-carousel', label: 'IG Carousel',   short: 'Carousel', emoji: '🗂️', platform: 'instagram' },
+  { id: 'ig-story',    label: 'IG Story',      short: 'Story',    emoji: '⭕', platform: 'instagram' },
+];
+const FORMAT_BY_ID = Object.fromEntries(FORMATS.map(f => [f.id, f]));
+
+const PLATFORMS = {
+  youtube:   { label: 'YouTube',   emoji: '▶️', gradient: 'linear-gradient(135deg,#ef4444,#b91c1c)', tint: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' },
+  instagram: { label: 'Instagram', emoji: '📸', gradient: 'linear-gradient(135deg,#ec4899,#8b5cf6)', tint: 'bg-pink-50 text-pink-700 dark:bg-pink-500/10 dark:text-pink-300' },
+};
+
+const PRIORITIES = [
+  { id: 'high',   label: 'High',   dot: 'bg-red-500',    cls: 'text-red-600 dark:text-red-400' },
+  { id: 'medium', label: 'Medium', dot: 'bg-amber-400',  cls: 'text-amber-600 dark:text-amber-400' },
+  { id: 'low',    label: 'Low',    dot: 'bg-zinc-400',   cls: 'text-zinc-500' },
+];
+const PRIORITY_BY_ID = Object.fromEntries(PRIORITIES.map(p => [p.id, p]));
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+
+// Account colour presets. Red tones for YouTube, pink/purple gradients for Instagram (plus a few extras).
+const COLORS = {
+  red:     { name: 'YouTube Red',  solid: '#ef4444', gradient: 'linear-gradient(135deg,#ff2d2d,#b91c1c)' },
+  crimson: { name: 'Crimson',      solid: '#be123c', gradient: 'linear-gradient(135deg,#e11d48,#881337)' },
+  coral:   { name: 'Coral',        solid: '#f97316', gradient: 'linear-gradient(135deg,#fb7185,#ea580c)' },
+  insta:   { name: 'Insta Sunset', solid: '#e1306c', gradient: 'linear-gradient(135deg,#f58529,#dd2a7b 55%,#8134af)' },
+  pink:    { name: 'Pink Purple',  solid: '#c026d3', gradient: 'linear-gradient(135deg,#ec4899,#8b5cf6)' },
+  violet:  { name: 'Violet',       solid: '#7c3aed', gradient: 'linear-gradient(135deg,#a855f7,#4f46e5)' },
+  blue:    { name: 'Blue',         solid: '#3b82f6', gradient: 'linear-gradient(135deg,#60a5fa,#2563eb)' },
+  teal:    { name: 'Teal',         solid: '#14b8a6', gradient: 'linear-gradient(135deg,#2dd4bf,#0f766e)' },
+  green:   { name: 'Green',        solid: '#22c55e', gradient: 'linear-gradient(135deg,#4ade80,#15803d)' },
+  slate:   { name: 'Slate',        solid: '#64748b', gradient: 'linear-gradient(135deg,#94a3b8,#334155)' },
+};
+
+const ICON_CHOICES = ['▶️', '🎬', '📺', '🎥', '📸', '✨', '🌸', '🎨', '🍳', '💪', '🎮', '📚', '💼', '🎵', '✈️', '😂', '💄', '🧠', '💰', '🔥'];
+
+const DEFAULT_CHECKLIST = ['Script', 'Voiceover', 'Video', 'Thumbnail / Cover', 'Caption', 'Hashtags'];
+
+// Daily to-do list you tick off every day (editable on the Home screen)
+const DEFAULT_TASKS = ['Reply to comments & DMs', 'Write down 1 new idea', '15 min engaging with niche creators'];
+
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]; // Mon..Sun
+
+/* Posting targets per account. Each target says:
+   format  – what to post (e.g. 'ig-reel')
+   count   – how many
+   per     – 'day' or 'week'
+   days    – which weekdays (0 = Mon … 6 = Sun)
+   time    – planned posting time ("" = any time) */
+function starterTargets(platform) {
+  return platform === 'youtube'
+    ? [
+        { id: uid(), format: 'yt-short', count: 1, per: 'day', days: ALL_DAYS, time: '18:00' },
+        { id: uid(), format: 'yt-long', count: 1, per: 'week', days: [5], time: '11:00' },
+      ]
+    : [
+        { id: uid(), format: 'ig-reel', count: 1, per: 'day', days: ALL_DAYS, time: '19:00' },
+        { id: uid(), format: 'ig-post', count: 3, per: 'week', days: [0, 2, 4], time: '12:00' },
+        { id: uid(), format: 'ig-carousel', count: 2, per: 'week', days: [1, 4], time: '13:00' },
+        { id: uid(), format: 'ig-story', count: 3, per: 'day', days: ALL_DAYS, time: '' },
+      ];
+}
+
+/* Account label. If two accounts share a name (e.g. "Pharmsstrasse" on YouTube AND Instagram),
+   we add "· YT" / "· IG" so you can tell them apart. DUP_NAMES is refreshed by <App>. */
+let DUP_NAMES = new Set();
+const accLabel = a => (a ? (DUP_NAMES.has(a.name) ? `${a.name} · ${a.platform === 'youtube' ? 'YT' : 'IG'}` : a.name) : '');
+
+const LINK_TYPES = {
+  reference: { label: 'Reference / Inspiration', emoji: '🔍', hint: 'Other reels, videos, articles' },
+  asset:     { label: 'Assets',                  emoji: '📁', hint: 'Drive folder, Canva, thumbnail, music' },
+  final:     { label: 'Final post',              emoji: '🚀', hint: 'Live link after publishing' },
+};
+
+// Reusable Tailwind class strings (keeps the JSX below shorter)
+const INPUT = 'w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 min-h-[44px] text-base outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/30 placeholder:text-zinc-400';
+const CARD = 'rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800';
+const BTN = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-[44px] font-semibold transition active:scale-[.97] disabled:opacity-40';
+const BTN_PRIMARY = BTN + ' bg-zinc-900 text-white dark:bg-white dark:text-zinc-900';
+const BTN_GHOST = BTN + ' bg-zinc-100 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700';
+const BTN_DANGER = BTN + ' bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400';
+const ICON_BTN = 'inline-grid place-items-center w-11 h-11 rounded-xl text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 active:scale-95 transition';
+const BRAND_GRADIENT = 'linear-gradient(135deg,#ff3b3b,#ec4899 55%,#8b5cf6)';
+
+/* =====================================================================
+   2. HELPERS
+   ===================================================================== */
+const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-5);
+const pad = n => String(n).padStart(2, '0');
+
+// Dates are stored as plain "YYYY-MM-DD" strings (local time) – easy to compare and sort.
+const toISO = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fromISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const todayISO = () => toISO(new Date());
+const addDays = (date, n) => { const d = new Date(date.getFullYear(), date.getMonth(), date.getDate()); d.setDate(d.getDate() + n); return d; };
+const startOfWeek = date => { const d = new Date(date.getFullYear(), date.getMonth(), date.getDate()); return addDays(d, -((d.getDay() + 6) % 7)); }; // Monday
+const fmtDate = (iso, opts = { day: 'numeric', month: 'short' }) => (iso ? fromISO(iso).toLocaleDateString('en-IN', opts) : '');
+const fmtTime = t => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  return `${h % 12 || 12}:${pad(m)} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const toggleIn = (list, value) => (list.includes(value) ? list.filter(x => x !== value) : [...list, value]);
+const arr = v => (Array.isArray(v) ? v : []);
+
+// Checklist progress in %
+const progressOf = idea => {
+  const total = idea.checklist.length;
+  return total ? Math.round((idea.checklist.filter(c => c.done).length / total) * 100) : 0;
+};
+
+// Links: only allow http(s) so a bad link can never run code
+const normalizeUrl = u => {
+  u = (u || '').trim();
+  if (/^https?:\/\//i.test(u)) return u;
+  return 'https://' + u.replace(/^[a-z]+:\/*/i, '');
+};
+const hostOf = u => { try { return new URL(normalizeUrl(u)).hostname.replace(/^www\./, ''); } catch { return u; } };
+
+// Hashtags: "#a b, #c" -> ["#a", "#b", "#c"]
+const parseHashtags = str => (str || '').split(/[\s,]+/).filter(Boolean).map(t => (t.startsWith('#') ? t : '#' + t));
+const mergeHashtags = (a, b) => {
+  const seen = new Set(); const out = [];
+  [...parseHashtags(a), ...parseHashtags(b)].forEach(t => { const k = t.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(t); } });
+  return out.join(' ');
+};
+
+const wordCount = s => ((s || '').trim().match(/\S+/g) || []).length;
+const voiceoverTime = words => { const sec = Math.round((words / 150) * 60); return sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m ${sec % 60}s`; };
+
+const gradientOf = acc => (COLORS[acc?.color] || COLORS.slate).gradient;
+const solidOf = acc => (COLORS[acc?.color] || COLORS.slate).solid;
+
+// Copy text to clipboard (with a fallback for older browsers / file:// pages)
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch {}
+    ta.remove(); return ok;
+  }
+}
+
+/* Posting stats for one account:
+   - streak  = how many weeks in a row (up to now) had at least 1 post
+   - weeks8  = true/false for each of the last 8 weeks (oldest -> newest)
+   - last30  = posts in the last 30 days */
+function postingStats(ideas, accountId) {
+  const today = todayISO();
+  const dates = ideas
+    .filter(i => i.status === 'posted' && i.accountIds.includes(accountId))
+    .map(i => i.postedAt || i.date)
+    .filter(Boolean);
+  const weekKeys = new Set(dates.map(s => toISO(startOfWeek(fromISO(s)))));
+
+  let w = startOfWeek(new Date());
+  if (!weekKeys.has(toISO(w))) w = addDays(w, -7); // this week not posted yet? streak is still alive from last week
+  let streak = 0;
+  while (weekKeys.has(toISO(w))) { streak++; w = addDays(w, -7); }
+
+  const thisWeek = startOfWeek(new Date());
+  const weeks8 = [...Array(8)].map((_, k) => weekKeys.has(toISO(addDays(thisWeek, -7 * (7 - k)))));
+  const since = toISO(addDays(new Date(), -30));
+  const last30 = dates.filter(s => s > since && s <= today).length;
+  return { streak, weeks8, last30, totalPosted: dates.length };
+}
+
+/* ---------- Targets ---------- */
+const weekdayIndex = date => (date.getDay() + 6) % 7; // Mon = 0 … Sun = 6
+
+// Does this target need something from you today?
+const appliesToday = (t, dow) => t.days.includes(dow);
+
+// "Every day", "Weekdays", or "Mon, Thu"
+const daysLabel = days => {
+  if (days.length === 7) return 'Every day';
+  if (days.length === 5 && [0, 1, 2, 3, 4].every(d => days.includes(d))) return 'Weekdays';
+  return [...days].sort().map(d => WEEKDAYS[d]).join(', ');
+};
+
+/* How far along a target is.
+   done    = posts with status ✅ Posted in the period (today, or this week)
+   planned = ideas dated in the rest of the period that are not posted yet */
+function targetStatus(ideas, accountId, t) {
+  const today = todayISO();
+  const weekStart = toISO(startOfWeek(new Date()));
+  const weekEnd = toISO(addDays(startOfWeek(new Date()), 6));
+  const [from, to] = t.per === 'day' ? [today, today] : [weekStart, weekEnd];
+  const matches = i => i.accountIds.includes(accountId) && i.formats.includes(t.format);
+  const done = ideas.filter(i => matches(i) && i.status === 'posted' && (i.postedAt || i.date) >= from && (i.postedAt || i.date) <= to).length;
+  const planned = ideas.filter(i => matches(i) && i.status !== 'posted' && i.date >= today && i.date <= to).length;
+  return { done, planned, need: t.count, met: done >= t.count };
+}
+
+/* =====================================================================
+   3. DATA / STORAGE
+   ===================================================================== */
+function blankIdea(overrides = {}) {
+  const now = Date.now();
+  return {
+    id: uid(),
+    title: '', description: '', notes: '',
+    accountIds: [], formats: [],
+    status: 'idea', priority: 'medium', tags: [],
+    seriesName: '', seriesPart: null,
+    date: '', time: '',
+    links: [],
+    checklist: DEFAULT_CHECKLIST.map(text => ({ id: uid(), text, done: false })),
+    caption: '', hashtags: '', ytTitle: '', ytDescription: '', ytTags: '',
+    postedAt: null, createdAt: now, updatedAt: now,
+    ...overrides,
+  };
+}
+
+const DATA_VERSION = 5;
+
+// Your 4 starting accounts
+const DEFAULT_ACCOUNTS = [
+  { id: 'yt1', name: 'Pharmsstrasse',          platform: 'youtube',   color: 'red',     icon: '▶️' },
+  { id: 'ig1', name: 'Pharmsstrasse',          platform: 'instagram', color: 'insta',   icon: '📸' },
+  { id: 'yt2', name: 'German learning mit JK', platform: 'youtube',   color: 'crimson', icon: '🇩🇪' },
+  { id: 'ig2', name: 'German learning mit JK', platform: 'instagram', color: 'pink',    icon: '🇩🇪' },
+];
+
+// Fixed ids, so two fresh devices don't create duplicate default tasks when they sync
+const defaultTasks = () => DEFAULT_TASKS.map((text, k) => ({ id: 'task' + (k + 1), text, accountId: '', updatedAt: 0 }));
+
+function defaultData() {
+  return {
+    version: DATA_VERSION,
+    accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a, hashtagSets: [], targets: starterTargets(a.platform) })),
+    ideas: [],
+    dailyTasks: defaultTasks(),
+    taskLog: {}, // { "2026-10-21": { ids: [tasks ticked that day], at: time of last change } }
+    deleted: {}, // { id: time deleted } – lets cloud sync know something was deleted on another device
+    settings: { theme: 'system', lastQuickAccounts: [] },
+  };
+}
+
+/* Upgrades data saved by older versions of the app.
+   v1 → v2: rename the untouched default accounts, add starter targets + daily tasks. */
+function migrate(raw) {
+  if ((raw.version || 1) < 2) {
+    const oldNames = { yt1: 'YT Channel 1', yt2: 'YT Channel 2', ig1: 'IG Account 1', ig2: 'IG Account 2' };
+    raw.accounts = arr(raw.accounts).map(a => {
+      const def = DEFAULT_ACCOUNTS.find(d => d.id === a.id);
+      const renamed = def && a.name === oldNames[a.id] ? { name: def.name, icon: def.icon } : {};
+      return { ...a, ...renamed, targets: a.targets || starterTargets(a.platform) };
+    });
+    // Keep each brand's YT + IG next to each other (Pharmsstrasse, Pharmsstrasse, German, German); extra accounts stay at the end
+    const order = id => { const k = DEFAULT_ACCOUNTS.findIndex(d => d.id === id); return k < 0 ? 99 : k; };
+    raw.accounts.sort((x, y) => order(x.id) - order(y.id));
+    if (!raw.dailyTasks) raw.dailyTasks = defaultTasks();
+    raw.version = 2;
+  }
+  // v2 → v3: to-do ticks get a timestamp (needed for sync), deletions are remembered
+  if (raw.version < 3) {
+    const log = raw.taskLog && typeof raw.taskLog === 'object' ? raw.taskLog : {};
+    Object.keys(log).forEach(day => { if (Array.isArray(log[day])) log[day] = { ids: log[day], at: Date.now() }; });
+    raw.taskLog = log;
+    raw.deleted = raw.deleted || {};
+    raw.version = 3;
+  }
+  // v3 → v4: "PS" is now called "Pharmsstrasse" (only if you hadn't renamed it yourself)
+  if (raw.version < 4) {
+    raw.accounts = arr(raw.accounts).map(a => (['yt1', 'ig1'].includes(a.id) && a.name === 'PS' ? { ...a, name: 'Pharmsstrasse', updatedAt: Date.now() } : a));
+    raw.version = 4;
+  }
+  // v4 → v5: Instagram accounts also get a simple IG Post target (3 per week: Mon, Wed, Fri)
+  if (raw.version < 5) {
+    raw.accounts = arr(raw.accounts).map(a => (a.platform === 'instagram' && Array.isArray(a.targets) && !a.targets.some(t => t.format === 'ig-post')
+      ? { ...a, targets: [{ id: 'tgt-igpost-' + a.id, format: 'ig-post', count: 3, per: 'week', days: [0, 2, 4], time: '12:00' }, ...a.targets], updatedAt: Date.now() }
+      : a));
+    raw.version = 5;
+  }
+  return raw;
+}
+
+// Makes sure data loaded from storage / an imported file has every field we expect
+function normalizeData(raw) {
+  const base = defaultData();
+  if (!raw || typeof raw !== 'object') return base;
+  raw = migrate(raw);
+  const accounts = Array.isArray(raw.accounts)
+    ? raw.accounts.map(a => ({
+        id: a.id || uid(),
+        name: a.name || 'Account',
+        platform: a.platform === 'youtube' ? 'youtube' : 'instagram',
+        color: COLORS[a.color] ? a.color : 'slate',
+        icon: a.icon || '⭐',
+        updatedAt: a.updatedAt || 0,
+        hashtagSets: arr(a.hashtagSets).map(s => ({ id: s.id || uid(), name: s.name || 'Set', tags: s.tags || '' })),
+        targets: arr(a.targets).map(t => ({
+          id: t.id || uid(),
+          format: FORMAT_BY_ID[t.format] ? t.format : 'ig-reel',
+          count: Math.max(1, Number(t.count) || 1),
+          per: t.per === 'week' ? 'week' : 'day',
+          days: Array.isArray(t.days) && t.days.length ? t.days : ALL_DAYS,
+          time: t.time || '',
+        })),
+      }))
+    : base.accounts;
+  const ideas = arr(raw.ideas).map(i => {
+    const b = blankIdea();
+    return {
+      ...b, ...i,
+      id: i.id || b.id,
+      status: STATUS_BY_ID[i.status] ? i.status : 'idea',
+      priority: PRIORITY_BY_ID[i.priority] ? i.priority : 'medium',
+      accountIds: arr(i.accountIds), formats: arr(i.formats), tags: arr(i.tags),
+      links: arr(i.links), checklist: Array.isArray(i.checklist) ? i.checklist : b.checklist,
+    };
+  });
+  const dailyTasks = Array.isArray(raw.dailyTasks)
+    ? raw.dailyTasks.filter(t => t && t.text).map(t => ({ id: t.id || uid(), text: t.text, accountId: t.accountId || '', updatedAt: t.updatedAt || 0 }))
+    : base.dailyTasks;
+  const taskLog = {};
+  Object.entries(raw.taskLog && typeof raw.taskLog === 'object' ? raw.taskLog : {}).forEach(([day, v]) => {
+    taskLog[day] = Array.isArray(v) ? { ids: v, at: 0 } : { ids: arr(v && v.ids), at: (v && v.at) || 0 };
+  });
+  const deleted = raw.deleted && typeof raw.deleted === 'object' ? raw.deleted : {};
+  return { version: DATA_VERSION, accounts, ideas, dailyTasks, taskLog, deleted, settings: { ...base.settings, ...(raw.settings || {}) } };
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? normalizeData(JSON.parse(raw)) : defaultData();
+  } catch (e) {
+    console.warn('Could not load saved data', e);
+    return defaultData();
+  }
+}
+
+function saveData(data) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); return true; }
+  catch (e) { console.error('Save failed', e); return false; }
+}
+
+// A few demo ideas so you can see how everything looks (Settings → Add sample ideas)
+function makeSampleIdeas(accountIds) {
+  const d = n => toISO(addDays(new Date(), n));
+  const has = id => accountIds.includes(id);
+  const only = ids => ids.filter(has);
+  const doneList = () => DEFAULT_CHECKLIST.map(text => ({ id: uid(), text, done: true }));
+  return [
+    blankIdea({ title: '5 budget travel hacks nobody tells you', description: 'Quick-fire tips with B-roll from the Goa trip.', accountIds: only(['yt1', 'ig1']), formats: ['yt-short', 'ig-reel'], status: 'script', priority: 'high', tags: ['travel', 'tips'], seriesName: 'Budget Travel', seriesPart: 1, date: d(2), time: '18:00', links: [{ id: uid(), type: 'reference', label: 'Inspiration reel', url: 'https://www.instagram.com/' }] }),
+    blankIdea({ title: 'Budget Travel Part 2: cheap stays', accountIds: only(['yt1', 'ig1']), formats: ['yt-short', 'ig-reel'], status: 'idea', tags: ['travel'], seriesName: 'Budget Travel', seriesPart: 2, date: d(9), time: '18:00' }),
+    blankIdea({ title: 'My full desk setup tour', accountIds: only(['yt2']), formats: ['yt-long'], status: 'editing', priority: 'medium', tags: ['tech'], date: d(4), time: '11:00' }),
+    blankIdea({ title: 'Before / after: room makeover', accountIds: only(['ig2']), formats: ['ig-carousel'], status: 'scheduled', priority: 'high', tags: ['home'], date: d(1), time: '20:30' }),
+    blankIdea({ title: 'My 60-second morning routine', accountIds: only(['ig1']), formats: ['ig-reel'], status: 'posted', date: d(-3), postedAt: d(-3), checklist: doneList() }),
+    blankIdea({ title: 'Q&A: answering your comments', accountIds: only(['yt1']), formats: ['yt-long'], status: 'posted', date: d(-9), postedAt: d(-9), checklist: doneList() }),
+    blankIdea({ title: 'Is this viral gadget worth it?', accountIds: only(['yt1']), formats: ['yt-long'], status: 'shooting', priority: 'low', tags: ['review'] }),
+  ];
+}
+
+/* =====================================================================
+   3b. CLOUD SYNC
+   Same data on the website and the phone app.
+   - Each device keeps its own copy (localStorage) → works offline.
+   - With a "sync code", changes are merged with the cloud copy automatically
+     (on open, every 30 s, and ~1.5 s after you change something).
+   - Merge rule: for each idea / account / task, the most recently edited version wins.
+     Deletions are remembered in `deleted` so they spread to other devices too.
+   ===================================================================== */
+const SITE_URL = 'https://content-planner-ps.vercel.app';
+const SYNC_URL = (location.origin === SITE_URL ? '' : SITE_URL) + '/api/sync';
+const SYNC_STORAGE_KEY = 'contentPlanner.sync'; // { code, lastSync } – stays on this device only
+
+const SYNC_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid typos
+function newSyncCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(20)); // 20 random chars ≈ 100 bits – impossible to guess
+  return [...bytes].map(b => SYNC_ALPHABET[b % 32]).join('').match(/.{4}/g).join('-');
+}
+const cleanCode = c => (c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const prettyCode = c => (cleanCode(c).match(/.{1,4}/g) || []).join('-');
+// Password sync: the same password on every device → the same private cloud file.
+// The password is turned into a long code with PBKDF2 (slow on purpose, so it can't be guessed fast).
+// The password itself is never saved or sent anywhere.
+async function passwordToCode(password) {
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey('raw', enc.encode(password.trim()), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode('content-planner-ps-sync-v1'), iterations: 300000, hash: 'SHA-256' }, base, 256);
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase(); // 64 chars
+}
+const isPasswordCode = code => cleanCode(code).length === 64;
+const loadSyncInfo = () => { try { return JSON.parse(localStorage.getItem(SYNC_STORAGE_KEY)) || {}; } catch { return {}; } };
+const saveSyncInfo = info => { try { localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(info)); } catch {} };
+
+// Only these parts go to the cloud (theme etc. stay per device)
+const syncable = d => ({ version: d.version, accounts: d.accounts, ideas: d.ideas, dailyTasks: d.dailyTasks, taskLog: d.taskLog, deleted: d.deleted });
+
+// Merge two lists of {id, updatedAt}: newest version of each item wins, deleted ones are dropped
+function mergeList(local, remote, deleted) {
+  const newest = new Map();
+  [...remote, ...local].forEach(x => {
+    const cur = newest.get(x.id);
+    if (!cur || (x.updatedAt || 0) > (cur.updatedAt || 0)) newest.set(x.id, x);
+  });
+  const ids = [...new Set([...remote.map(x => x.id), ...local.map(x => x.id)])];
+  return ids.map(id => newest.get(id)).filter(x => !(deleted[x.id] && deleted[x.id] >= (x.updatedAt || 0)));
+}
+
+function mergeData(local, remote) {
+  const deleted = { ...(remote.deleted || {}) };
+  Object.entries(local.deleted || {}).forEach(([id, t]) => { if (!deleted[id] || t > deleted[id]) deleted[id] = t; });
+  const forgetBefore = Date.now() - 120 * 86400000; // forget deletions older than 120 days
+  Object.keys(deleted).forEach(id => { if (deleted[id] < forgetBefore) delete deleted[id]; });
+
+  const taskLog = { ...(remote.taskLog || {}) };
+  Object.entries(local.taskLog || {}).forEach(([day, v]) => { if (!taskLog[day] || (v.at || 0) > (taskLog[day].at || 0)) taskLog[day] = v; });
+
+  return {
+    ...local, // keeps this device's settings
+    version: DATA_VERSION,
+    accounts: mergeList(local.accounts, remote.accounts, deleted),
+    ideas: mergeList(local.ideas, remote.ideas, deleted).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
+    dailyTasks: mergeList(local.dailyTasks, remote.dailyTasks, deleted),
+    taskLog,
+    deleted,
+  };
+}
+
+async function syncRequest(method, code, body) {
+  const url = method === 'GET' ? `${SYNC_URL}?t=${Date.now()}` : SYNC_URL;
+  const res = await fetch(url, {
+    method,
+    cache: 'no-store',
+    headers: { 'x-sync-key': cleanCode(code), ...(body ? { 'content-type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 409) return { conflict: true };
+  if (!res.ok) throw new Error(`Sync failed (${res.status})`);
+  return res.json();
+}
+
+const timeAgo = ts => {
+  if (!ts) return 'never';
+  const s = Math.round((Date.now() - ts) / 1000);
+  if (s < 10) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  return new Date(ts).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+};
+
+/* A React "context" lets any component reach the data + actions without passing props down every level.
+   Use it like:  const { data, updateIdea } = useStore();  */
+const StoreContext = createContext(null);
+const useStore = () => useContext(StoreContext);
+
+/* =====================================================================
+   4. UI BASICS
+   ===================================================================== */
+// Simple line icons (paths in the style of Lucide icons)
+const ICONS = {
+  home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+  calendar: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+  board: 'M4 4h4v16H4zM10 4h4v10h-4zM16 4h4v13h-4z',
+  list: 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  plus: 'M12 5v14M5 12h14',
+  x: 'M18 6 6 18M6 6l12 12',
+  copy: 'M9 9h11v11H9zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1',
+  trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6',
+  sliders: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
+  left: 'm15 18-6-6 6-6',
+  right: 'm9 18 6-6-6-6',
+  back: 'M19 12H5M12 19l-7-7 7-7',
+  external: 'M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',
+  grip: 'M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01',
+  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35',
+  filter: 'M3 5h18l-7 8v6l-4 2v-8z',
+  edit: 'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z',
+  check: 'M20 6 9 17l-5-5',
+  sun: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42',
+  moon: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z',
+  alert: 'M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z',
+  download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
+  upload: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  layers: 'M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+  cloud: 'M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z',
+  refresh: 'M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5',
+};
+function Icon({ name, className = 'w-5 h-5', strokeWidth = 2 }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={name === 'grip' ? 3 : strokeWidth}
+      strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d={ICONS[name]} />
+    </svg>
+  );
+}
+
+/* Sheet = popup panel. Slides up from the bottom on phones, centred on bigger screens.
+   Only the top-most open sheet reacts to the Escape key. */
+const sheetStack = [];
+function Sheet({ title, onClose, children, full = false, headerRight = null, footer = null }) {
+  const idRef = useRef(uid());
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const id = idRef.current;
+    sheetStack.push(id);
+    document.body.style.overflow = 'hidden';
+    const onKey = e => { if (e.key === 'Escape' && sheetStack[sheetStack.length - 1] === id) closeRef.current(); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      sheetStack.splice(sheetStack.indexOf(id), 1);
+      if (!sheetStack.length) document.body.style.overflow = '';
+    };
+  }, []);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div
+        className={`animate-sheet relative w-full sm:max-w-2xl bg-zinc-50 dark:bg-zinc-950 shadow-2xl flex flex-col overflow-hidden ${full ? 'h-[100dvh] sm:h-[92vh] sm:rounded-3xl' : 'max-h-[88dvh] rounded-t-3xl sm:rounded-3xl'}`}
+        style={full ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}
+        role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}
+      >
+        <div className="flex items-center gap-1 px-2 h-14 shrink-0 border-b border-zinc-200 dark:border-zinc-800">
+          <button onClick={onClose} className={ICON_BTN} aria-label="Close"><Icon name="x" /></button>
+          <h2 className="font-bold text-lg flex-1 truncate px-1">{title}</h2>
+          {headerRight}
+        </div>
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4">{children}</div>
+        {footer && <div className="shrink-0 px-4 pt-3 pb-4 border-t border-zinc-200 dark:border-zinc-800" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+// A labelled block. (A <div>, not a <label>, so clicking the label doesn't press the first button inside.)
+function Field({ label, hint, children }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">{label}</span>
+        {hint && <span className="text-xs text-zinc-400 text-right">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Pill button that can be on/off. Pass `activeStyle` for a gradient when on.
+function ToggleChip({ active, onClick, children, activeStyle }) {
+  const on = activeStyle
+    ? 'text-white border-transparent shadow-sm'
+    : 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900 dark:border-white';
+  return (
+    <button type="button" onClick={onClick} style={active ? activeStyle : undefined}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 min-h-[40px] text-sm font-semibold border transition active:scale-95 whitespace-nowrap ${active ? on : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300'}`}>
+      {children}
+    </button>
+  );
+}
+
+function AccountAvatar({ account, size = 'w-9 h-9 text-lg' }) {
+  return (
+    <span className={`${size} shrink-0 rounded-xl grid place-items-center text-white shadow-sm`} style={{ background: gradientOf(account) }}>
+      {account?.icon || '•'}
+    </span>
+  );
+}
+
+function StatusPill({ status, small }) {
+  const s = STATUS_BY_ID[status] || STATUSES[0];
+  return <span className={`inline-flex items-center gap-1 rounded-full font-semibold ${small ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} ${s.cls}`}>{s.emoji} {s.label}</span>;
+}
+
+function ProgressBar({ pct, className = 'h-1.5' }) {
+  return (
+    <div className={`w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden ${className}`}>
+      <div className="h-full rounded-full transition-all" style={{ width: pct + '%', background: pct === 100 ? '#10b981' : BRAND_GRADIENT }} />
+    </div>
+  );
+}
+
+// Textarea that grows with its content
+function AutoTextarea({ value, onChange, className = '', minRows = 3, ...rest }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 2 + 'px';
+  }, [value]);
+  return <textarea ref={ref} rows={minRows} value={value} onChange={e => onChange(e.target.value)} className={`${INPUT} py-2.5 resize-none overflow-hidden leading-relaxed ${className}`} {...rest} />;
+}
+
+function SelectBox({ label, value, onChange, options }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold text-zinc-500 mb-1">{label}</div>
+      <select value={value} onChange={e => onChange(e.target.value)} className={INPUT}>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function EmptyState({ emoji = '🌱', title, text, action }) {
+  return (
+    <div className={`${CARD} p-6 text-center`}>
+      <div className="text-4xl mb-2">{emoji}</div>
+      <div className="font-bold">{title}</div>
+      {text && <p className="text-sm text-zinc-500 mt-1">{text}</p>}
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+
+function SectionTitle({ children, right }) {
+  return (
+    <div className="flex items-center justify-between mt-7 mb-2.5">
+      <h2 className="text-base font-extrabold tracking-tight">{children}</h2>
+      {right}
+    </div>
+  );
+}
+
+// Coloured stripe on the left of a card – one segment per account
+function AccountStripe({ accounts }) {
+  if (!accounts.length) return <div className="w-1.5 self-stretch rounded-full bg-zinc-200 dark:bg-zinc-700" />;
+  return (
+    <div className="w-1.5 self-stretch rounded-full overflow-hidden flex flex-col">
+      {accounts.map(a => <div key={a.id} className="flex-1" style={{ background: gradientOf(a) }} />)}
+    </div>
+  );
+}
+
+// Small "Short · Reel" badges
+function FormatBadges({ formats }) {
+  return formats.map(fid => {
+    const f = FORMAT_BY_ID[fid]; if (!f) return null;
+    return <span key={fid} className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${PLATFORMS[f.platform].tint}`}>{f.emoji} {f.short}</span>;
+  });
+}
+
+// The idea card used in lists, dashboard and account pages
+function IdeaCard({ idea, showStatus = true }) {
+  const { accountsById, openIdea } = useStore();
+  const accs = idea.accountIds.map(id => accountsById[id]).filter(Boolean);
+  const pct = progressOf(idea);
+  const today = todayISO();
+  const overdue = idea.date && idea.date < today && idea.status !== 'posted';
+  const pri = PRIORITY_BY_ID[idea.priority];
+  return (
+    <button onClick={() => openIdea(idea.id)} className={`${CARD} w-full text-left p-3 flex gap-3 hover:border-zinc-300 dark:hover:border-zinc-700 active:scale-[.99] transition`}>
+      <AccountStripe accounts={accs} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2">
+          <span className="font-semibold leading-snug line-clamp-2 flex-1">{idea.title || <span className="text-zinc-400">Untitled idea</span>}</span>
+          {idea.priority === 'high' && <span className={`text-[11px] font-bold ${pri.cls} shrink-0`}>● HIGH</span>}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          {showStatus && <StatusPill status={idea.status} small />}
+          <FormatBadges formats={idea.formats} />
+          {idea.date && (
+            <span className={`font-semibold ${overdue ? 'text-red-500' : 'text-zinc-500'}`}>
+              {overdue ? '⏰ ' : '🗓 '}{fmtDate(idea.date)}{idea.time ? ' · ' + fmtTime(idea.time) : ''}
+            </span>
+          )}
+          {idea.seriesName && <span className="text-zinc-500">📚 {idea.seriesName}{idea.seriesPart ? ` #${idea.seriesPart}` : ''}</span>}
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex -space-x-1.5">
+            {accs.map(a => <span key={a.id} title={accLabel(a)} className="w-5 h-5 rounded-full grid place-items-center text-[10px] ring-2 ring-white dark:ring-zinc-900" style={{ background: gradientOf(a) }}>{a.icon}</span>)}
+          </div>
+          <ProgressBar pct={pct} className="h-1.5 flex-1" />
+          <span className="text-[11px] font-semibold text-zinc-500 tabular-nums w-8 text-right">{pct}%</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// 8 little squares = last 8 weeks (filled = posted that week)
+function WeekSquares({ weeks, color }) {
+  return (
+    <div className="flex gap-1" title="Last 8 weeks">
+      {weeks.map((on, k) => <span key={k} className={`w-3 h-3 rounded-[4px] ${on ? '' : 'bg-zinc-200 dark:bg-zinc-800'}`} style={on ? { background: color } : undefined} />)}
+    </div>
+  );
+}
+
+// Row of account filter chips ("All" + each account)
+function AccountFilter({ value, onChange }) {
+  const { data } = useStore();
+  return (
+    <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 py-1">
+      <ToggleChip active={value.length === 0} onClick={() => onChange([])}>All</ToggleChip>
+      {data.accounts.map(a => (
+        <ToggleChip key={a.id} active={value.includes(a.id)} activeStyle={{ background: gradientOf(a) }} onClick={() => onChange(toggleIn(value, a.id))}>
+          {a.icon} {accLabel(a)}
+        </ToggleChip>
+      ))}
+    </div>
+  );
+}
+
+/* =====================================================================
+   5. DASHBOARD
+   ===================================================================== */
+// Little dots: ●●○ = 2 of 3 done
+function CountDots({ done, need, color }) {
+  if (need > 6) return <span className="text-xs font-bold tabular-nums">{done}/{need}</span>;
+  return (
+    <span className="flex gap-1">
+      {[...Array(need)].map((_, k) => (
+        <span key={k} className={`w-2.5 h-2.5 rounded-full ${k < done ? '' : 'bg-zinc-200 dark:bg-zinc-700'}`} style={k < done ? { background: color } : undefined} />
+      ))}
+    </span>
+  );
+}
+
+/* TODAY'S TARGETS – what you must post today (and this week) on each account,
+   plus your daily to-do list. Targets are set per account (Accounts → open one → Posting targets). */
+function TodayTargets({ onOpenAccount }) {
+  const { data, openQuick, toggleTask, setDailyTasks } = useStore();
+  const [editTasks, setEditTasks] = useState(false);
+  const [newTask, setNewTask] = useState('');
+  const [newTaskAcc, setNewTaskAcc] = useState('');
+  const today = todayISO();
+  const dow = weekdayIndex(new Date());
+
+  // Today's posting targets, grouped by account
+  const groups = data.accounts
+    .map(a => ({
+      account: a,
+      rows: (a.targets || [])
+        .filter(t => appliesToday(t, dow))
+        .map(t => ({ t, s: targetStatus(data.ideas, a.id, t) }))
+        .sort((x, y) => (x.t.time || '99').localeCompare(y.t.time || '99')),
+    }))
+    .filter(g => g.rows.length);
+
+  // All weekly targets (to see the week at a glance)
+  const weekly = data.accounts.flatMap(a => (a.targets || []).filter(t => t.per === 'week').map(t => ({ a, t, s: targetStatus(data.ideas, a.id, t) })));
+
+  const ticked = data.taskLog[today]?.ids || [];
+  const allRows = groups.flatMap(g => g.rows);
+  const total = allRows.length + data.dailyTasks.length;
+  const doneCount = allRows.filter(r => r.s.met).length + data.dailyTasks.filter(t => ticked.includes(t.id)).length;
+  const pct = total ? Math.round((doneCount / total) * 100) : 0;
+  const hasTargets = data.accounts.some(a => (a.targets || []).length);
+
+  const addTask = () => {
+    if (!newTask.trim()) return;
+    setDailyTasks([...data.dailyTasks, { id: uid(), text: newTask.trim(), accountId: newTaskAcc, updatedAt: Date.now() }]);
+    setNewTask('');
+  };
+
+  return (
+    <div className={`${CARD} mt-4 overflow-hidden`}>
+      {/* Header with today's overall progress */}
+      <div className="p-4 pb-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-extrabold text-base">🎯 Today's targets</h2>
+          <span className={`text-sm font-extrabold tabular-nums ${pct === 100 ? 'text-emerald-600' : ''}`}>{doneCount}/{total} {pct === 100 ? '🎉' : ''}</span>
+        </div>
+        <ProgressBar pct={pct} className="h-2 mt-2" />
+        <div className="text-xs text-zinc-500 mt-1.5">{fmtDate(today, { weekday: 'long' })} · a target counts as done when the idea is marked ✅ Posted</div>
+      </div>
+
+      {!hasTargets && (
+        <div className="px-4 pb-4 text-sm text-zinc-500">No posting targets yet. Open an account in <b>Accounts</b> to set them.</div>
+      )}
+
+      {/* Per-account posting targets */}
+      {groups.map(({ account, rows }) => (
+        <div key={account.id} className="border-t border-zinc-100 dark:border-zinc-800 px-4 py-2">
+          <button onClick={() => onOpenAccount(account.id)} className="flex items-center gap-2 min-h-[36px]">
+            <AccountAvatar account={account} size="w-6 h-6 text-xs rounded-lg" />
+            <span className="font-bold text-sm">{accLabel(account)}</span>
+            <span className="text-[11px] text-zinc-400">{PLATFORMS[account.platform].label}</span>
+          </button>
+          {rows.map(({ t, s }) => {
+            const f = FORMAT_BY_ID[t.format];
+            return (
+              <div key={t.id} className="flex items-center gap-3 min-h-[48px]">
+                <span className="w-8 text-center text-xl">{f.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-semibold ${s.met ? 'line-through text-zinc-400' : ''}`}>
+                    {t.count} × {f.label}{t.per === 'week' ? <span className="font-normal text-zinc-500"> (this week)</span> : ''}
+                  </div>
+                  <div className="text-xs text-zinc-500">
+                    {t.time ? `⏰ ${fmtTime(t.time)}` : 'Any time'}
+                    {s.planned > 0 && !s.met ? ` · ${s.planned} planned` : ''}
+                  </div>
+                </div>
+                <CountDots done={Math.min(s.done, s.need)} need={s.need} color={solidOf(account)} />
+                {s.met ? (
+                  <span className="w-[68px] text-right text-sm font-bold text-emerald-600 dark:text-emerald-400">✓ Done</span>
+                ) : (
+                  <button onClick={() => openQuick({ accountIds: [account.id], formats: [t.format], date: today, time: t.time })}
+                    className="w-[68px] shrink-0 rounded-xl min-h-[38px] text-sm font-bold text-white" style={{ background: gradientOf(account) }}>+ Plan</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {/* This week's progress for weekly targets */}
+      {weekly.length > 0 && (
+        <div className="border-t border-zinc-100 dark:border-zinc-800 px-4 py-3">
+          <div className="text-xs font-bold text-zinc-500 uppercase mb-2">This week</div>
+          <div className="space-y-2">
+            {weekly.map(({ a, t, s }) => {
+              const f = FORMAT_BY_ID[t.format];
+              return (
+                <div key={t.id} className="flex items-center gap-2 text-sm">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: solidOf(a) }} />
+                  <span className="flex-1 min-w-0 truncate"><b>{accLabel(a)}</b> · {f.emoji} {f.label} <span className="text-zinc-400 text-xs">({daysLabel(t.days)})</span></span>
+                  <span className={`font-bold tabular-nums ${s.met ? 'text-emerald-600' : ''}`}>{s.done}/{s.need}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Daily to-do list */}
+      <div className="border-t border-zinc-100 dark:border-zinc-800 px-4 py-3 bg-zinc-50/60 dark:bg-zinc-900/40">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-bold text-zinc-500 uppercase">Daily to-do</div>
+          <button onClick={() => setEditTasks(v => !v)} className="text-xs font-bold text-pink-600 dark:text-pink-400 min-h-[36px] px-2">{editTasks ? 'Done' : 'Edit'}</button>
+        </div>
+        <div className="space-y-1">
+          {data.dailyTasks.map(task => {
+            const on = ticked.includes(task.id);
+            const acc = data.accounts.find(a => a.id === task.accountId);
+            return (
+              <div key={task.id} className="flex items-center gap-2">
+                <button onClick={() => toggleTask(task.id)} className="flex-1 flex items-center gap-3 text-left min-h-[44px]">
+                  <span className={`w-6 h-6 shrink-0 rounded-lg grid place-items-center border-2 ${on ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-300 dark:border-zinc-600'}`}>
+                    {on && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
+                  </span>
+                  <span className={`text-sm font-medium ${on ? 'line-through text-zinc-400' : ''}`}>{task.text}</span>
+                  {acc && <span className="text-[11px] rounded-md px-1.5 py-0.5 text-white shrink-0" style={{ background: gradientOf(acc) }}>{acc.icon} {accLabel(acc)}</span>}
+                </button>
+                {editTasks && (
+                  <button onClick={() => setDailyTasks(data.dailyTasks.filter(x => x.id !== task.id))} className={ICON_BTN} aria-label="Remove task"><Icon name="trash" className="w-4 h-4" /></button>
+                )}
+              </div>
+            );
+          })}
+          {data.dailyTasks.length === 0 && !editTasks && <div className="text-sm text-zinc-400 py-2">No daily tasks. Tap Edit to add some.</div>}
+        </div>
+        {editTasks && (
+          <div className="mt-2 space-y-2">
+            <input value={newTask} onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="e.g. Learn 10 German words for content" className={INPUT} />
+            <div className="flex gap-2">
+              <select value={newTaskAcc} onChange={e => setNewTaskAcc(e.target.value)} className={INPUT + ' flex-1'}>
+                <option value="">All accounts</option>
+                {data.accounts.map(a => <option key={a.id} value={a.id}>{a.icon} {accLabel(a)}</option>)}
+              </select>
+              <button onClick={addTask} disabled={!newTask.trim()} className={BTN_PRIMARY}><Icon name="plus" /> Add</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ onOpenAccount, onFilterList }) {
+  const { data, openQuick, openIdea, accountsById } = useStore();
+  const { accounts, ideas } = data;
+  const today = todayISO();
+  const in6 = toISO(addDays(new Date(), 6)); // "next 7 days" = today + 6 more days
+  const weekStart = startOfWeek(new Date());
+  const weekDays = [...Array(7)].map((_, k) => toISO(addDays(weekStart, k)));
+
+  const accountStats = accounts.map(a => {
+    const mine = ideas.filter(i => i.accountIds.includes(a.id));
+    const upcoming = mine.filter(i => i.status !== 'posted' && i.date >= today && i.date <= in6).length;
+    return { account: a, total: mine.length, active: mine.filter(i => i.status !== 'posted').length, upcoming, ...postingStats(ideas, a.id) };
+  });
+  const noPlan = accountStats.filter(s => s.upcoming === 0);
+  const overdue = ideas.filter(i => i.status !== 'posted' && i.date && i.date < today);
+  const statusCounts = STATUSES.map(s => ({ ...s, count: ideas.filter(i => i.status === s.id).length }));
+  const maxCount = Math.max(1, ...statusCounts.map(s => s.count));
+  const postedDate = i => i.postedAt || i.date;
+  const postedThisWeek = ideas.filter(i => i.status === 'posted' && postedDate(i) >= weekDays[0] && postedDate(i) <= weekDays[6]).length;
+  const plannedThisWeek = ideas.filter(i => i.status !== 'posted' && i.date >= weekDays[0] && i.date <= weekDays[6]).length;
+  const inProgress = ideas.filter(i => ['script', 'shooting', 'editing'].includes(i.status)).length;
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  return (
+    <div>
+      {/* Hero */}
+      <div className="rounded-3xl p-5 text-white shadow-lg shadow-pink-500/20" style={{ background: BRAND_GRADIENT }}>
+        <div className="text-sm/5 opacity-90">{fmtDate(today, { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+        <div className="text-2xl font-extrabold tracking-tight mt-0.5">{greeting} 👋</div>
+        <div className="mt-1 text-sm opacity-95">
+          {plannedThisWeek} planned · {postedThisWeek} posted this week
+        </div>
+        <button onClick={() => openQuick()} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur px-4 min-h-[44px] font-semibold">
+          <Icon name="plus" /> Dump an idea
+        </button>
+      </div>
+
+      <TodayTargets onOpenAccount={onOpenAccount} />
+
+      {/* Warnings */}
+      {(noPlan.length > 0 || overdue.length > 0) && (
+        <div className="mt-4 grid gap-2 lg:grid-cols-2">
+          {noPlan.map(({ account }) => (
+            <div key={account.id} className="flex items-center gap-3 rounded-2xl border border-amber-300/70 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 p-3">
+              <AccountAvatar account={account} size="w-9 h-9 text-base" />
+              <div className="flex-1 min-w-0 text-sm">
+                <div className="font-bold text-amber-900 dark:text-amber-200 truncate">{accLabel(account)}</div>
+                <div className="text-amber-800/80 dark:text-amber-200/70">Nothing scheduled in the next 7 days</div>
+              </div>
+              <button onClick={() => openQuick({ accountIds: [account.id], date: today })} className="shrink-0 rounded-xl bg-amber-500 text-white font-semibold px-3 min-h-[40px] text-sm">Plan one</button>
+            </div>
+          ))}
+          {overdue.length > 0 && (
+            <button onClick={() => onFilterList({ when: 'overdue' })} className="w-full flex items-center gap-3 rounded-2xl border border-red-300/70 bg-red-50 dark:bg-red-500/10 dark:border-red-500/30 p-3 text-left">
+              <span className="w-9 h-9 grid place-items-center text-lg">⏰</span>
+              <div className="flex-1 text-sm">
+                <div className="font-bold text-red-700 dark:text-red-300">{overdue.length} overdue idea{overdue.length > 1 ? 's' : ''}</div>
+                <div className="text-red-700/70 dark:text-red-300/70">Planned date passed but not posted yet</div>
+              </div>
+              <Icon name="right" className="w-5 h-5 text-red-400" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+        {[
+          ['Total ideas', ideas.length, '💡', {}],
+          ['In progress', inProgress, '🛠️', {}],
+          ['Scheduled', statusCounts[4].count, '📅', { status: 'scheduled' }],
+          ['Posted (week)', postedThisWeek, '✅', { status: 'posted' }],
+        ].map(([label, value, emoji, filter]) => (
+          <button key={label} onClick={() => onFilterList(filter)} className={`${CARD} p-3.5 text-left active:scale-[.98] transition`}>
+            <div className="text-xs font-semibold text-zinc-500">{emoji} {label}</div>
+            <div className="text-2xl font-extrabold mt-1 tabular-nums">{value}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Accounts */}
+      <SectionTitle>Accounts</SectionTitle>
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-4 gap-3">
+        {accountStats.map(s => (
+          <button key={s.account.id} onClick={() => onOpenAccount(s.account.id)} className={`${CARD} overflow-hidden text-left active:scale-[.98] transition`}>
+            <div className="p-3 flex items-center gap-2.5 text-white" style={{ background: gradientOf(s.account) }}>
+              <span className="text-xl">{s.account.icon}</span>
+              <div className="min-w-0">
+                <div className="font-bold truncate leading-tight">{s.account.name}</div>
+                <div className="text-[11px] opacity-90">{PLATFORMS[s.account.platform].label}</div>
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="grid grid-cols-3 text-center">
+                <div><div className="text-lg font-extrabold tabular-nums">{s.total}</div><div className="text-[10px] text-zinc-500 font-semibold">IDEAS</div></div>
+                <div><div className={`text-lg font-extrabold tabular-nums ${s.upcoming === 0 ? 'text-amber-500' : ''}`}>{s.upcoming}</div><div className="text-[10px] text-zinc-500 font-semibold">NEXT 7D</div></div>
+                <div><div className="text-lg font-extrabold tabular-nums">{s.streak}{s.streak > 0 ? '🔥' : ''}</div><div className="text-[10px] text-zinc-500 font-semibold">WK STREAK</div></div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <WeekSquares weeks={s.weeks8} color={solidOf(s.account)} />
+                <span className="text-[11px] text-zinc-500 whitespace-nowrap">{s.weeks8.filter(Boolean).length}/8 wks</span>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* On a computer: Pipeline and This week sit side by side */}
+      <div className="lg:grid lg:grid-cols-2 lg:gap-5 lg:items-start">
+      <div>
+      {/* Pipeline */}
+      <SectionTitle>Pipeline</SectionTitle>
+      <div className={`${CARD} p-3 space-y-1`}>
+        {statusCounts.map(s => (
+          <button key={s.id} onClick={() => onFilterList({ status: s.id })} className="w-full flex items-center gap-3 min-h-[40px] rounded-lg px-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+            <span className="w-28 shrink-0 text-left text-sm font-semibold">{s.emoji} {s.label}</span>
+            <div className="flex-1 h-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+              <div className="h-full rounded-full" style={{ width: (s.count / maxCount) * 100 + '%', background: s.bar }} />
+            </div>
+            <span className="w-8 text-right text-sm font-bold tabular-nums">{s.count}</span>
+          </button>
+        ))}
+        {/* per account breakdown */}
+        <div className="pt-3 mt-2 border-t border-zinc-100 dark:border-zinc-800 overflow-x-auto no-scrollbar">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-zinc-500">
+                <th className="text-left font-semibold py-1 pr-2">Account</th>
+                {STATUSES.map(s => <th key={s.id} className="font-normal px-1" title={s.label}>{s.emoji}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map(a => (
+                <tr key={a.id} className="border-t border-zinc-100 dark:border-zinc-800">
+                  <td className="py-1.5 pr-2 font-semibold whitespace-nowrap"><span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: solidOf(a) }} />{accLabel(a)}</td>
+                  {STATUSES.map(s => {
+                    const n = ideas.filter(i => i.status === s.id && i.accountIds.includes(a.id)).length;
+                    return <td key={s.id} className={`text-center tabular-nums px-1 ${n ? 'font-bold' : 'text-zinc-300 dark:text-zinc-700'}`}>{n}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      </div>
+      <div>
+      {/* This week */}
+      <SectionTitle>This week's plan</SectionTitle>
+      <div className={`${CARD} divide-y divide-zinc-100 dark:divide-zinc-800`}>
+        {weekDays.map((iso, k) => {
+          const items = ideas.filter(i => i.date === iso).sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+          const isToday = iso === today;
+          return (
+            <div key={iso} className={`flex gap-3 p-3 ${isToday ? 'bg-pink-50/60 dark:bg-pink-500/5' : ''}`}>
+              <div className="w-11 shrink-0 text-center">
+                <div className={`text-[11px] font-bold ${isToday ? 'text-pink-600 dark:text-pink-400' : 'text-zinc-500'}`}>{WEEKDAYS[k].toUpperCase()}</div>
+                <div className={`text-lg font-extrabold leading-tight ${iso < today ? 'text-zinc-400' : ''}`}>{fromISO(iso).getDate()}</div>
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5 self-center">
+                {items.length === 0 && <div className="text-sm text-zinc-400">—</div>}
+                {items.map(i => {
+                  const accs = i.accountIds.map(id => accountsById[id]).filter(Boolean);
+                  return (
+                    <button key={i.id} onClick={() => openIdea(i.id)} className="w-full flex items-center gap-2 text-left min-h-[36px] rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 px-1">
+                      <span className="flex -space-x-1 shrink-0">
+                        {(accs.length ? accs : [null]).map((a, n) => <span key={n} className="w-3 h-3 rounded-full ring-2 ring-white dark:ring-zinc-900" style={{ background: a ? gradientOf(a) : '#a1a1aa' }} />)}
+                      </span>
+                      <span className={`flex-1 truncate text-sm font-medium ${i.status === 'posted' ? 'line-through text-zinc-400' : ''}`}>{i.title || 'Untitled'}</span>
+                      <span className="text-xs text-zinc-500 shrink-0">{i.time ? fmtTime(i.time) : ''} {STATUS_BY_ID[i.status].emoji}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      </div>
+      </div>
+
+      {ideas.length === 0 && (
+        <div className="mt-6">
+          <EmptyState emoji="🚀" title="No ideas yet" text="Tap the big + button to dump your first idea. Or load some sample ideas from Settings to explore." />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =====================================================================
+   6. CALENDAR
+   ===================================================================== */
+function CalendarView() {
+  const { data, accountsById, openQuick } = useStore();
+  const [mode, setMode] = useState('month'); // 'month' | 'week'
+  const [cursor, setCursor] = useState(() => new Date());
+  const [selected, setSelected] = useState(todayISO());
+  const [accFilter, setAccFilter] = useState([]);
+  const today = todayISO();
+
+  // Group dated ideas by day
+  const byDate = {};
+  data.ideas
+    .filter(i => i.date && (accFilter.length === 0 || i.accountIds.some(id => accFilter.includes(id))))
+    .forEach(i => { (byDate[i.date] ||= []).push(i); });
+  Object.values(byDate).forEach(list => list.sort((a, b) => (a.time || '99').localeCompare(b.time || '99')));
+
+  // Which accounts' colours to show for an idea (respecting the filter)
+  const accsFor = i => {
+    const list = i.accountIds.filter(id => accFilter.length === 0 || accFilter.includes(id)).map(id => accountsById[id]).filter(Boolean);
+    return list.length ? list : [null];
+  };
+
+  const y = cursor.getFullYear(), m = cursor.getMonth();
+  let days, title;
+  if (mode === 'month') {
+    const gridStart = startOfWeek(new Date(y, m, 1));
+    const last = new Date(y, m + 1, 0);
+    const weeks = Math.ceil((Math.round((last - gridStart) / 86400000) + 1) / 7);
+    days = [...Array(weeks * 7)].map((_, k) => addDays(gridStart, k));
+    title = cursor.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  } else {
+    const ws = startOfWeek(cursor);
+    days = [...Array(7)].map((_, k) => addDays(ws, k));
+    title = `${fmtDate(toISO(days[0]))} – ${fmtDate(toISO(days[6]))}`;
+  }
+  const move = dir => setCursor(mode === 'month' ? new Date(y, m + dir, 1) : addDays(cursor, 7 * dir));
+  const goToday = () => { setCursor(new Date()); setSelected(today); };
+
+  const selectedItems = byDate[selected] || [];
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <div className="inline-flex rounded-xl bg-zinc-200/70 dark:bg-zinc-800 p-1">
+          {['month', 'week'].map(md => (
+            <button key={md} onClick={() => setMode(md)} className={`px-4 min-h-[36px] rounded-lg text-sm font-semibold capitalize ${mode === md ? 'bg-white dark:bg-zinc-950 shadow-sm' : 'text-zinc-500'}`}>{md}</button>
+          ))}
+        </div>
+        <div className="flex-1" />
+        <button onClick={goToday} className="px-3 min-h-[40px] rounded-xl text-sm font-semibold bg-zinc-100 dark:bg-zinc-800">Today</button>
+      </div>
+
+      <div className="flex items-center justify-between mt-3">
+        <button onClick={() => move(-1)} className={ICON_BTN} aria-label="Previous"><Icon name="left" /></button>
+        <div className="font-extrabold text-lg">{title}</div>
+        <button onClick={() => move(1)} className={ICON_BTN} aria-label="Next"><Icon name="right" /></button>
+      </div>
+
+      <div className="mt-1"><AccountFilter value={accFilter} onChange={setAccFilter} /></div>
+
+      {mode === 'month' ? (
+        <>
+          <div className={`${CARD} p-1.5 mt-3`}>
+            <div className="grid grid-cols-7 text-center text-[11px] font-bold text-zinc-400 py-1">
+              {WEEKDAYS.map(d => <div key={d}>{d[0]}<span className="hidden sm:inline">{d.slice(1)}</span></div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-0.5">
+              {days.map(d => {
+                const iso = toISO(d);
+                const items = byDate[iso] || [];
+                const inMonth = d.getMonth() === m;
+                const isSel = iso === selected;
+                const dots = items.flatMap(i => accsFor(i));
+                return (
+                  <button key={iso} onClick={() => setSelected(iso)}
+                    className={`min-h-[58px] sm:min-h-[96px] rounded-xl p-1 flex flex-col items-center sm:items-stretch text-left transition ${inMonth ? '' : 'opacity-35'} ${isSel ? 'bg-pink-50 ring-2 ring-pink-500 dark:bg-pink-500/10' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+                    <span className={`text-xs font-bold w-6 h-6 grid place-items-center rounded-full ${iso === today ? 'bg-red-500 text-white' : ''}`}>{d.getDate()}</span>
+                    {/* phone: coloured dots */}
+                    <div className="flex flex-wrap justify-center gap-0.5 mt-1 sm:hidden">
+                      {dots.slice(0, 4).map((a, n) => <span key={n} className="w-2 h-2 rounded-full" style={{ background: a ? solidOf(a) : '#a1a1aa' }} />)}
+                      {dots.length > 4 && <span className="text-[9px] leading-none font-bold text-zinc-500">+{dots.length - 4}</span>}
+                    </div>
+                    {/* bigger screens: little title chips */}
+                    <div className="hidden sm:flex flex-col gap-0.5 mt-1">
+                      {items.slice(0, 3).map(i => (
+                        <span key={i.id} className={`truncate text-[11px] font-medium rounded px-1 py-px text-white ${i.status === 'posted' ? 'opacity-60' : ''}`} style={{ background: accsFor(i)[0] ? gradientOf(accsFor(i)[0]) : '#a1a1aa' }}>
+                          {i.time ? fmtTime(i.time).replace(' ', '') + ' ' : ''}{i.title || 'Untitled'}
+                        </span>
+                      ))}
+                      {items.length > 3 && <span className="text-[10px] text-zinc-500 px-1">+{items.length - 3} more</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-5 mb-2">
+            <h3 className="font-extrabold">{fmtDate(selected, { weekday: 'long', day: 'numeric', month: 'short' })}</h3>
+            <button onClick={() => openQuick({ date: selected })} className="inline-flex items-center gap-1 text-sm font-semibold text-pink-600 dark:text-pink-400 min-h-[40px] px-2"><Icon name="plus" className="w-4 h-4" /> Add</button>
+          </div>
+          <div className="space-y-2">
+            {selectedItems.length === 0 && <div className="text-sm text-zinc-400 py-3 text-center">Nothing planned for this day.</div>}
+            {selectedItems.map(i => <IdeaCard key={i.id} idea={i} />)}
+          </div>
+        </>
+      ) : (
+        <div className="mt-3 space-y-3">
+          {days.map(d => {
+            const iso = toISO(d);
+            const items = byDate[iso] || [];
+            return (
+              <div key={iso} className={`${CARD} p-3 ${iso === today ? 'ring-2 ring-pink-500/60' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <div className="font-bold">
+                    {d.toLocaleDateString('en-IN', { weekday: 'long' })} <span className="text-zinc-500 font-semibold">{fmtDate(iso)}</span>
+                    {iso === today && <span className="ml-2 text-[11px] font-bold rounded-full bg-red-500 text-white px-2 py-0.5">TODAY</span>}
+                  </div>
+                  <button onClick={() => openQuick({ date: iso })} className={ICON_BTN} aria-label="Add idea on this day"><Icon name="plus" /></button>
+                </div>
+                <div className="space-y-2 mt-1">
+                  {items.length === 0 ? <div className="text-sm text-zinc-400">—</div> : items.map(i => <IdeaCard key={i.id} idea={i} />)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =====================================================================
+   7. KANBAN BOARD
+   Drag works with mouse AND touch (using "pointer events"):
+   - Mouse: drag the whole card.
+   - Phone: drag using the ⠿ handle (so normal scrolling still works).
+   ===================================================================== */
+function BoardView() {
+  const { data, accountsById, updateIdea, openIdea } = useStore();
+  const [accFilter, setAccFilter] = useState([]);
+  const [drag, setDrag] = useState(null); // { id, title, x, y, over }
+  const scrollRef = useRef(null);
+  const justDragged = useRef(false);
+
+  const ideas = data.ideas.filter(i => accFilter.length === 0 || i.accountIds.some(id => accFilter.includes(id)));
+
+  const columnUnder = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    const col = el && el.closest('[data-status]');
+    return col ? col.dataset.status : null;
+  };
+
+  function startDrag(e, idea) {
+    const onHandle = !!e.target.closest('[data-grip]');
+    if (e.pointerType !== 'mouse' && !onHandle) return; // touch on card body = normal scroll/tap
+    if (e.button !== 0) return;
+    const startX = e.clientX, startY = e.clientY;
+    let last = { x: startX, y: startY };
+    let active = false;
+
+    // While dragging near an edge, auto-scroll the board / page
+    const timer = setInterval(() => {
+      if (!active || !scrollRef.current) return;
+      const r = scrollRef.current.getBoundingClientRect();
+      if (last.x < r.left + 48) scrollRef.current.scrollLeft -= 14;
+      else if (last.x > r.right - 48) scrollRef.current.scrollLeft += 14;
+      if (last.y < 80) window.scrollBy(0, -12);
+      else if (last.y > window.innerHeight - 100) window.scrollBy(0, 12);
+    }, 16);
+
+    const onMove = ev => {
+      last = { x: ev.clientX, y: ev.clientY };
+      if (!active) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 6) return; // tiny move = still a tap
+        active = true;
+      }
+      ev.preventDefault();
+      setDrag({ id: idea.id, title: idea.title, x: ev.clientX, y: ev.clientY, over: columnUnder(ev.clientX, ev.clientY) });
+    };
+    const onUp = ev => {
+      clearInterval(timer);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      if (active) {
+        const target = columnUnder(ev.clientX, ev.clientY);
+        if (target && target !== idea.status) updateIdea(idea.id, { status: target });
+        justDragged.current = true;
+        setTimeout(() => { justDragged.current = false; }, 50);
+      }
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  }
+
+  return (
+    <div>
+      <AccountFilter value={accFilter} onChange={setAccFilter} />
+      <p className="text-xs text-zinc-500 mt-2">Drag cards between stages (on phone use the <b>⠿</b> handle). Tap a card to open it.</p>
+
+      <div ref={scrollRef} className={`flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-6 pt-3 ${drag ? '' : 'snap-x snap-mandatory'}`}>
+        {STATUSES.map(s => {
+          const items = ideas.filter(i => i.status === s.id).sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || (a.date || '9').localeCompare(b.date || '9'));
+          const isOver = drag && drag.over === s.id;
+          return (
+            <div key={s.id} data-status={s.id}
+              className={`snap-start shrink-0 w-[80vw] max-w-[300px] rounded-2xl p-2 transition ${isOver ? 'bg-pink-100 ring-2 ring-pink-500 dark:bg-pink-500/15' : 'bg-zinc-100 dark:bg-zinc-900/60'}`}>
+              <div className="flex items-center justify-between px-1.5 py-1.5">
+                <span className="font-bold text-sm">{s.emoji} {s.long || s.label}</span>
+                <span className="text-xs font-bold rounded-full px-2 py-0.5 bg-white dark:bg-zinc-800 tabular-nums">{items.length}</span>
+              </div>
+              <div className="h-1 rounded-full mx-1.5 mb-2" style={{ background: s.bar }} />
+              <div className="space-y-2 min-h-[120px]">
+                {items.map(i => {
+                  const accs = i.accountIds.map(id => accountsById[id]).filter(Boolean);
+                  const pct = progressOf(i);
+                  return (
+                    <div key={i.id} onPointerDown={e => startDrag(e, i)}
+                      onClick={() => { if (!justDragged.current) openIdea(i.id); }}
+                      className={`${CARD} p-3 flex gap-2.5 select-none cursor-pointer ${drag?.id === i.id ? 'opacity-40' : ''}`}>
+                      <AccountStripe accounts={accs} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm leading-snug line-clamp-3">{i.title || <span className="text-zinc-400">Untitled</span>}</div>
+                        <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                          <FormatBadges formats={i.formats} />
+                          {i.date && <span className="text-[11px] font-semibold text-zinc-500">🗓 {fmtDate(i.date)}</span>}
+                          {i.priority === 'high' && <span className="text-[11px] font-bold text-red-500">● High</span>}
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <ProgressBar pct={pct} className="h-1 flex-1" />
+                          <span className="text-[10px] font-bold text-zinc-500 tabular-nums">{pct}%</span>
+                        </div>
+                      </div>
+                      <span data-grip className="-mr-1.5 -my-1 w-8 shrink-0 grid place-items-center text-zinc-400 cursor-grab active:cursor-grabbing" style={{ touchAction: 'none' }} aria-label="Drag handle">
+                        <Icon name="grip" className="w-5 h-5" />
+                      </span>
+                    </div>
+                  );
+                })}
+                {items.length === 0 && <div className="text-xs text-zinc-400 text-center py-8 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl">Drop here</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* The floating card that follows your finger / mouse */}
+      {drag && (
+        <div className="fixed z-[60] pointer-events-none w-60 rounded-2xl bg-white dark:bg-zinc-800 shadow-2xl p-3 font-semibold text-sm ring-2 ring-pink-500"
+          style={{ left: drag.x, top: drag.y, transform: 'translate(-50%,-60%) rotate(3deg)' }}>
+          {drag.title || 'Untitled'}
+          <div className="text-[11px] font-bold text-pink-600 dark:text-pink-400 mt-1">{drag.over ? `→ ${STATUS_BY_ID[drag.over].emoji} ${STATUS_BY_ID[drag.over].label}` : 'Move to a column'}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =====================================================================
+   8. LIST VIEW (with filters)
+   ===================================================================== */
+const DEFAULT_FILTERS = { q: '', account: 'all', format: 'all', status: 'all', priority: 'all', when: 'all', series: 'all', sort: 'date' };
+
+function ListView({ filters, setFilters }) {
+  const { data } = useStore();
+  const [showFilters, setShowFilters] = useState(false);
+  const f = filters;
+  const up = patch => setFilters({ ...f, ...patch });
+
+  const today = todayISO();
+  const in6 = toISO(addDays(new Date(), 6));
+  const monthPrefix = today.slice(0, 7);
+  const q = f.q.trim().toLowerCase();
+  const seriesNames = [...new Set(data.ideas.map(i => i.seriesName).filter(Boolean))].sort();
+
+  const list = data.ideas.filter(i => {
+    if (f.account !== 'all' && !i.accountIds.includes(f.account)) return false;
+    if (f.format !== 'all' && !i.formats.includes(f.format)) return false;
+    if (f.status !== 'all' && i.status !== f.status) return false;
+    if (f.priority !== 'all' && i.priority !== f.priority) return false;
+    if (f.series !== 'all' && i.seriesName !== f.series) return false;
+    if (f.when === 'overdue' && !(i.date && i.date < today && i.status !== 'posted')) return false;
+    if (f.when === 'today' && i.date !== today) return false;
+    if (f.when === 'next7' && !(i.date >= today && i.date <= in6)) return false;
+    if (f.when === 'month' && !(i.date || '').startsWith(monthPrefix)) return false;
+    if (f.when === 'nodate' && i.date) return false;
+    if (q) {
+      const haystack = [i.title, i.description, i.notes, i.caption, i.hashtags, i.tags.join(' '), i.seriesName].join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const byDate = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.time || '99').localeCompare(b.time || '99');
+  const sorters = {
+    date: byDate,
+    priority: (a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || byDate(a, b),
+    status: (a, b) => STATUS_INDEX[a.status] - STATUS_INDEX[b.status] || byDate(a, b),
+    updated: (a, b) => b.updatedAt - a.updatedAt,
+    series: (a, b) => (a.seriesName || '~').localeCompare(b.seriesName || '~') || (a.seriesPart || 0) - (b.seriesPart || 0),
+  };
+  list.sort(sorters[f.sort] || byDate);
+
+  const activeCount = ['account', 'format', 'status', 'priority', 'when', 'series'].filter(k => f[k] !== 'all').length;
+
+  return (
+    <div>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Icon name="search" className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input value={f.q} onChange={e => up({ q: e.target.value })} placeholder="Search ideas, captions, tags…" className={INPUT + ' pl-10'} />
+        </div>
+        <button onClick={() => setShowFilters(v => !v)} className={`${BTN_GHOST} relative px-3`} aria-label="Filters">
+          <Icon name="filter" />
+          {activeCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-pink-600 text-white text-[11px] grid place-items-center">{activeCount}</span>}
+        </button>
+      </div>
+
+      {/* Status quick chips */}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 py-3">
+        <ToggleChip active={f.status === 'all'} onClick={() => up({ status: 'all' })}>All</ToggleChip>
+        {STATUSES.map(s => (
+          <ToggleChip key={s.id} active={f.status === s.id} onClick={() => up({ status: f.status === s.id ? 'all' : s.id })}>
+            {s.emoji} {s.label}
+          </ToggleChip>
+        ))}
+      </div>
+
+      {showFilters && (
+        <div className={`${CARD} p-3 mb-3 grid grid-cols-2 gap-3`}>
+          <SelectBox label="Account" value={f.account} onChange={v => up({ account: v })} options={[['all', 'All accounts'], ...data.accounts.map(a => [a.id, `${a.icon} ${accLabel(a)}`])]} />
+          <SelectBox label="Format" value={f.format} onChange={v => up({ format: v })} options={[['all', 'All formats'], ...FORMATS.map(x => [x.id, `${x.emoji} ${x.label}`])]} />
+          <SelectBox label="Date" value={f.when} onChange={v => up({ when: v })} options={[['all', 'Any date'], ['overdue', '⏰ Overdue'], ['today', 'Today'], ['next7', 'Next 7 days'], ['month', 'This month'], ['nodate', 'No date yet']]} />
+          <SelectBox label="Priority" value={f.priority} onChange={v => up({ priority: v })} options={[['all', 'Any priority'], ...PRIORITIES.map(p => [p.id, p.label])]} />
+          <SelectBox label="Series" value={f.series} onChange={v => up({ series: v })} options={[['all', 'All series'], ...seriesNames.map(n => [n, n])]} />
+          <SelectBox label="Sort by" value={f.sort} onChange={v => up({ sort: v })} options={[['date', 'Post date'], ['priority', 'Priority'], ['status', 'Stage'], ['updated', 'Last edited'], ['series', 'Series / part']]} />
+          <button onClick={() => setFilters({ ...DEFAULT_FILTERS, q: f.q })} className={`${BTN_GHOST} col-span-2`}>Clear filters</button>
+        </div>
+      )}
+
+      <div className="text-xs font-semibold text-zinc-500 mb-2">{list.length} idea{list.length === 1 ? '' : 's'}</div>
+      <div className="space-y-2">
+        {list.map(i => <IdeaCard key={i.id} idea={i} />)}
+      </div>
+      {list.length === 0 && <EmptyState emoji="🔍" title="No ideas match" text="Try clearing filters or search." />}
+    </div>
+  );
+}
+
+/* =====================================================================
+   9. ACCOUNTS
+   ===================================================================== */
+function AccountsView({ openAccountId, setOpenAccountId }) {
+  const { data, addAccount } = useStore();
+  const [editingId, setEditingId] = useState(null);
+  const account = data.accounts.find(a => a.id === openAccountId);
+  if (account) return <AccountPage account={account} onBack={() => setOpenAccountId(null)} />;
+
+  const create = platform => { const id = addAccount(platform); setEditingId(id); };
+  const editing = data.accounts.find(a => a.id === editingId);
+
+  return (
+    <div>
+      <div className="space-y-2">
+        {data.accounts.map(a => {
+          const mine = data.ideas.filter(i => i.accountIds.includes(a.id));
+          const st = postingStats(data.ideas, a.id);
+          return (
+            <button key={a.id} onClick={() => setOpenAccountId(a.id)} className={`${CARD} w-full p-3 flex items-center gap-3 text-left active:scale-[.99] transition`}>
+              <AccountAvatar account={a} size="w-12 h-12 text-2xl" />
+              <div className="flex-1 min-w-0">
+                <div className="font-bold truncate">{a.name}</div>
+                <div className="text-xs text-zinc-500">{PLATFORMS[a.platform].label} · {mine.length} ideas · {st.totalPosted} posted{st.streak ? ` · ${st.streak}🔥` : ''}</div>
+              </div>
+              <Icon name="right" className="w-5 h-5 text-zinc-400" />
+            </button>
+          );
+        })}
+      </div>
+      <SectionTitle>Add account</SectionTitle>
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => create('youtube')} className={`${BTN} text-white`} style={{ background: PLATFORMS.youtube.gradient }}>▶️ YouTube</button>
+        <button onClick={() => create('instagram')} className={`${BTN} text-white`} style={{ background: PLATFORMS.instagram.gradient }}>📸 Instagram</button>
+      </div>
+      {editing && <AccountEditor account={editing} onClose={() => setEditingId(null)} />}
+    </div>
+  );
+}
+
+function AccountPage({ account, onBack }) {
+  const { data, openQuick } = useStore();
+  const [editOpen, setEditOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const today = todayISO();
+  const in6 = toISO(addDays(new Date(), 6));
+  const mine = data.ideas.filter(i => i.accountIds.includes(account.id));
+  const stats = postingStats(data.ideas, account.id);
+  const upcoming = mine.filter(i => i.status !== 'posted' && i.date >= today && i.date <= in6).length;
+  const shown = mine
+    .filter(i => statusFilter === 'all' || i.status === statusFilter)
+    .sort((a, b) => STATUS_INDEX[a.status] - STATUS_INDEX[b.status] || (a.date || '9999').localeCompare(b.date || '9999'));
+
+  return (
+    <div>
+      <div className="rounded-3xl p-4 text-white shadow-lg" style={{ background: gradientOf(account) }}>
+        <div className="flex items-center justify-between -mx-1 -mt-1">
+          <button onClick={onBack} className="inline-grid place-items-center w-11 h-11 rounded-xl hover:bg-white/15" aria-label="Back"><Icon name="back" /></button>
+          <button onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-white/20 hover:bg-white/30 px-3 min-h-[40px] text-sm font-semibold"><Icon name="edit" className="w-4 h-4" /> Edit</button>
+        </div>
+        <div className="flex items-center gap-3 mt-2">
+          <span className="w-14 h-14 rounded-2xl bg-white/20 grid place-items-center text-3xl">{account.icon}</span>
+          <div className="min-w-0">
+            <div className="text-2xl font-extrabold tracking-tight truncate">{accLabel(account)}</div>
+            <div className="text-sm opacity-90">{PLATFORMS[account.platform].label}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-2 mt-4 text-center">
+          {[['Ideas', mine.length], ['Next 7d', upcoming], ['Posted', stats.totalPosted], ['Streak', `${stats.streak}🔥`]].map(([l, v]) => (
+            <div key={l} className="rounded-xl bg-white/15 py-2">
+              <div className="text-lg font-extrabold tabular-nums">{v}</div>
+              <div className="text-[10px] font-semibold uppercase opacity-90">{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {upcoming === 0 && (
+        <div className="mt-3 flex items-center gap-2 rounded-2xl border border-amber-300/70 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 p-3 text-sm">
+          <Icon name="alert" className="w-5 h-5 text-amber-500 shrink-0" />
+          <span className="flex-1 text-amber-900 dark:text-amber-200">Nothing scheduled in the next 7 days.</span>
+          <button onClick={() => openQuick({ accountIds: [account.id], date: today })} className="font-bold text-amber-700 dark:text-amber-300 min-h-[40px] px-2">Plan one</button>
+        </div>
+      )}
+
+      <div className={`${CARD} p-3 mt-3 flex items-center justify-between gap-3`}>
+        <div>
+          <div className="text-sm font-bold">Consistency</div>
+          <div className="text-xs text-zinc-500">{stats.weeks8.filter(Boolean).length} of last 8 weeks · {stats.last30} posts in 30 days</div>
+        </div>
+        <WeekSquares weeks={stats.weeks8} color={solidOf(account)} />
+      </div>
+
+      <SectionTitle right={<button onClick={() => openQuick({ accountIds: [account.id] })} className="inline-flex items-center gap-1 text-sm font-semibold text-pink-600 dark:text-pink-400 min-h-[40px] px-2"><Icon name="plus" className="w-4 h-4" /> New idea</button>}>
+        Ideas
+      </SectionTitle>
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-3">
+        <ToggleChip active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>All {mine.length}</ToggleChip>
+        {STATUSES.map(s => {
+          const n = mine.filter(i => i.status === s.id).length;
+          return <ToggleChip key={s.id} active={statusFilter === s.id} onClick={() => setStatusFilter(s.id)}>{s.emoji} {n}</ToggleChip>;
+        })}
+      </div>
+      <div className="space-y-2">
+        {shown.map(i => <IdeaCard key={i.id} idea={i} />)}
+        {shown.length === 0 && <EmptyState emoji="🌱" title="No ideas here yet" />}
+      </div>
+
+      <SectionTitle>🎯 Posting targets</SectionTitle>
+      <TargetsEditor account={account} />
+
+      <SectionTitle>Saved hashtag sets</SectionTitle>
+      <HashtagSets account={account} />
+
+      {editOpen && <AccountEditor account={account} onClose={() => setEditOpen(false)} onDeleted={onBack} />}
+    </div>
+  );
+}
+
+/* Set how much to post on this account: e.g. "1 Reel per day at 7 PM", "2 Carousels per week on Tue & Fri" */
+function TargetsEditor({ account }) {
+  const { data, updateAccount } = useStore();
+  const targets = account.targets || [];
+  const save = list => updateAccount(account.id, { targets: list });
+  const upd = (id, patch) => save(targets.map(t => (t.id === id ? { ...t, ...patch } : t)));
+  // This platform's formats first
+  const formats = [...FORMATS].sort((x, y) => (y.platform === account.platform) - (x.platform === account.platform));
+  const addTarget = () => {
+    const f = formats[0];
+    save([...targets, { id: uid(), format: f.id, count: 1, per: 'day', days: ALL_DAYS, time: '' }]);
+  };
+
+  return (
+    <div className="space-y-2">
+      {targets.map(t => {
+        const s = targetStatus(data.ideas, account.id, t);
+        return (
+          <div key={t.id} className={`${CARD} p-3 space-y-3`}>
+            <div className="flex items-center gap-2">
+              <select value={t.format} onChange={e => upd(t.id, { format: e.target.value })} className={INPUT + ' flex-1 font-semibold'} aria-label="Format">
+                {formats.map(f => <option key={f.id} value={f.id}>{f.emoji} {f.label}</option>)}
+              </select>
+              <button onClick={() => save(targets.filter(x => x.id !== t.id))} className={ICON_BTN} aria-label="Delete target"><Icon name="trash" /></button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* how many */}
+              <div className="flex items-center rounded-xl border border-zinc-200 dark:border-zinc-700">
+                <button onClick={() => upd(t.id, { count: Math.max(1, t.count - 1) })} className="w-11 h-11 text-xl font-bold" aria-label="Less">−</button>
+                <span className="w-8 text-center font-extrabold tabular-nums">{t.count}</span>
+                <button onClick={() => upd(t.id, { count: Math.min(20, t.count + 1) })} className="w-11 h-11 text-xl font-bold" aria-label="More">+</button>
+              </div>
+              {/* per day / week */}
+              <div className="flex-1 grid grid-cols-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 p-1">
+                {[['day', 'per day'], ['week', 'per week']].map(([id, l]) => (
+                  <button key={id} onClick={() => upd(t.id, { per: id })} className={`min-h-[36px] rounded-lg text-sm font-semibold ${t.per === id ? 'bg-white dark:bg-zinc-950 shadow-sm' : 'text-zinc-500'}`}>{l}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* which days */}
+            <div>
+              <div className="text-xs font-semibold text-zinc-500 mb-1.5">{t.per === 'day' ? 'On these days' : 'Preferred days'} · {daysLabel(t.days)}</div>
+              <div className="grid grid-cols-7 gap-1">
+                {WEEKDAYS.map((d, k) => {
+                  const on = t.days.includes(k);
+                  return (
+                    <button key={d} onClick={() => { const next = toggleIn(t.days, k); if (next.length) upd(t.id, { days: next.sort() }); }}
+                      className={`min-h-[40px] rounded-lg text-xs font-bold ${on ? 'text-white' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'}`}
+                      style={on ? { background: gradientOf(account) } : undefined}>{d.slice(0, 2)}</button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* time */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-zinc-500 w-20">Post time</span>
+              <input type="time" value={t.time} onChange={e => upd(t.id, { time: e.target.value })} className={INPUT + ' flex-1'} />
+              {t.time && <button onClick={() => upd(t.id, { time: '' })} className="text-xs font-semibold text-zinc-500 underline px-1 min-h-[36px]">Any</button>}
+            </div>
+
+            <div className="text-xs text-zinc-500">
+              {t.per === 'day' ? 'Today' : 'This week'}: <b className={s.met ? 'text-emerald-600' : ''}>{s.done}/{s.need} posted</b>{s.planned ? ` · ${s.planned} planned` : ''}
+            </div>
+          </div>
+        );
+      })}
+      <button onClick={addTarget} className={`${BTN_GHOST} w-full`}><Icon name="plus" /> Add target</button>
+    </div>
+  );
+}
+
+// Reusable hashtag groups for one account
+function HashtagSets({ account }) {
+  const { updateAccount, toast } = useStore();
+  const sets = account.hashtagSets || [];
+  const [name, setName] = useState('');
+  const [tags, setTags] = useState('');
+  const save = list => updateAccount(account.id, { hashtagSets: list });
+  const add = () => {
+    if (!tags.trim()) return;
+    save([...sets, { id: uid(), name: name.trim() || `Set ${sets.length + 1}`, tags: mergeHashtags('', tags) }]);
+    setName(''); setTags(''); toast('Hashtag set saved');
+  };
+  return (
+    <div className="space-y-2">
+      {sets.map(s => (
+        <div key={s.id} className={`${CARD} p-3`}>
+          <div className="flex items-center gap-2">
+            <input value={s.name} onChange={e => save(sets.map(x => (x.id === s.id ? { ...x, name: e.target.value } : x)))} className="flex-1 min-w-0 bg-transparent font-bold outline-none min-h-[36px]" aria-label="Set name" />
+            <span className="text-xs text-zinc-500">{parseHashtags(s.tags).length} tags</span>
+            <button onClick={async () => toast((await copyText(s.tags)) ? 'Hashtags copied ✓' : 'Copy failed')} className={ICON_BTN} aria-label="Copy"><Icon name="copy" /></button>
+            <button onClick={() => { if (confirm(`Delete hashtag set "${s.name}"?`)) save(sets.filter(x => x.id !== s.id)); }} className={ICON_BTN} aria-label="Delete"><Icon name="trash" /></button>
+          </div>
+          <AutoTextarea minRows={2} value={s.tags} onChange={v => save(sets.map(x => (x.id === s.id ? { ...x, tags: v } : x)))} className="text-sm mt-1" />
+        </div>
+      ))}
+      <div className={`${CARD} p-3 space-y-2 border-dashed`}>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Set name (e.g. Travel core)" className={INPUT} />
+        <AutoTextarea minRows={2} value={tags} onChange={setTags} placeholder="#travel #budgettravel #india" />
+        <button onClick={add} disabled={!tags.trim()} className={`${BTN_PRIMARY} w-full`}><Icon name="plus" /> Save hashtag set</button>
+      </div>
+    </div>
+  );
+}
+
+function AccountEditor({ account, onClose, onDeleted }) {
+  const { updateAccount, deleteAccount } = useStore();
+  const set = patch => updateAccount(account.id, patch);
+  return (
+    <Sheet title="Edit account" onClose={onClose} footer={<button onClick={onClose} className={`${BTN_PRIMARY} w-full`}>Done</button>}>
+      <div className="space-y-5">
+        <div className="rounded-2xl p-4 text-white flex items-center gap-3" style={{ background: gradientOf(account) }}>
+          <span className="text-3xl">{account.icon}</span>
+          <span className="font-extrabold text-xl truncate">{account.name || 'Account'}</span>
+        </div>
+        <Field label="Name"><input value={account.name} onChange={e => set({ name: e.target.value })} className={INPUT} /></Field>
+        <Field label="Platform">
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(PLATFORMS).map(([id, p]) => (
+              <ToggleChip key={id} active={account.platform === id} activeStyle={{ background: p.gradient }} onClick={() => set({ platform: id })}>{p.emoji} {p.label}</ToggleChip>
+            ))}
+          </div>
+        </Field>
+        <Field label="Colour">
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(COLORS).map(([id, c]) => (
+              <button key={id} onClick={() => set({ color: id })} title={c.name} aria-label={c.name}
+                className={`w-11 h-11 rounded-xl transition ${account.color === id ? 'ring-4 ring-offset-2 ring-zinc-900 dark:ring-white dark:ring-offset-zinc-950 scale-105' : ''}`}
+                style={{ background: c.gradient }} />
+            ))}
+          </div>
+        </Field>
+        <Field label="Icon" hint="Or type any emoji">
+          <div className="flex flex-wrap gap-2">
+            {ICON_CHOICES.map(ic => (
+              <button key={ic} onClick={() => set({ icon: ic })} className={`w-11 h-11 rounded-xl text-xl grid place-items-center ${account.icon === ic ? 'bg-zinc-900 dark:bg-white' : 'bg-zinc-100 dark:bg-zinc-800'}`}>{ic}</button>
+            ))}
+            <input value={account.icon} onChange={e => set({ icon: [...e.target.value].slice(-2).join('') || '⭐' })} className={INPUT + ' !w-20 text-center text-xl'} aria-label="Custom emoji" />
+          </div>
+        </Field>
+        <button onClick={() => { if (confirm(`Delete "${account.name}"? Its ideas stay but get unlinked from this account.`)) { deleteAccount(account.id); onClose(); onDeleted && onDeleted(); } }} className={`${BTN_DANGER} w-full`}>
+          <Icon name="trash" /> Delete account
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/* =====================================================================
+   10. IDEA EDITOR
+   Every change saves instantly (no Save button needed).
+   ===================================================================== */
+function IdeaEditor({ idea, onClose }) {
+  const { updateIdea, deleteIdea, toast, createNextPart } = useStore();
+  const [tab, setTab] = useState('details');
+  const [dupOpen, setDupOpen] = useState(false);
+  const set = patch => updateIdea(idea.id, patch);
+  const pct = progressOf(idea);
+
+  const tabs = [
+    ['details', 'Details'],
+    ['script', 'Script'],
+    ['links', `Links${idea.links.length ? ` · ${idea.links.length}` : ''}`],
+    ['caption', 'Caption'],
+    ['checklist', `Checklist · ${pct}%`],
+  ];
+
+  const headerRight = (
+    <>
+      <button onClick={() => setDupOpen(true)} className={ICON_BTN} aria-label="Duplicate / repurpose" title="Duplicate / repurpose"><Icon name="layers" /></button>
+      <button onClick={() => { if (confirm('Delete this idea? This cannot be undone.')) { deleteIdea(idea.id); onClose(); toast('Idea deleted'); } }} className={ICON_BTN} aria-label="Delete idea" title="Delete"><Icon name="trash" /></button>
+    </>
+  );
+
+  return (
+    <Sheet full onClose={onClose} headerRight={headerRight}
+      title={<span className="flex items-center gap-2 text-base"><StatusPill status={idea.status} small /><span className="text-xs font-semibold text-zinc-400">Auto-saved</span></span>}>
+      <AutoTextarea minRows={1} value={idea.title} onChange={v => set({ title: v })} placeholder="Hook / title…"
+        className="!border-transparent !bg-transparent !px-0 !text-2xl font-extrabold tracking-tight focus:!ring-0" />
+      <div className="flex items-center gap-2 mt-1">
+        <ProgressBar pct={pct} className="h-2 flex-1" />
+        <span className="text-xs font-bold text-zinc-500 tabular-nums">{pct}% ready</span>
+      </div>
+
+      {/* Tabs (sticky while scrolling) */}
+      <div className="sticky -top-4 z-10 -mx-4 px-4 pt-3 pb-2 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+          {tabs.map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} className={`shrink-0 px-3.5 min-h-[40px] rounded-xl text-sm font-semibold ${tab === id ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-zinc-200/60 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-3 pb-8">
+        {tab === 'details' && <DetailsTab idea={idea} set={set} onNextPart={() => createNextPart(idea.id)} />}
+        {tab === 'script' && <ScriptTab idea={idea} set={set} />}
+        {tab === 'links' && <div className="space-y-6">{Object.keys(LINK_TYPES).map(t => <LinkGroup key={t} type={t} idea={idea} set={set} />)}</div>}
+        {tab === 'caption' && <CaptionTab idea={idea} set={set} />}
+        {tab === 'checklist' && <ChecklistTab idea={idea} set={set} />}
+      </div>
+
+      {dupOpen && <DuplicateSheet idea={idea} onClose={() => setDupOpen(false)} />}
+    </Sheet>
+  );
+}
+
+function DetailsTab({ idea, set, onNextPart }) {
+  const { data, toast } = useStore();
+  const platforms = new Set(idea.accountIds.map(id => data.accounts.find(a => a.id === id)?.platform).filter(Boolean));
+
+  const setStatus = status => {
+    set({ status });
+    if (status === 'posted' && !idea.links.some(l => l.type === 'final')) toast('🎉 Posted! Add the final link in the Links tab');
+  };
+
+  return (
+    <div className="space-y-6">
+      <Field label="Stage">
+        <div className="grid grid-cols-2 min-[420px]:grid-cols-3 gap-2">
+          {STATUSES.map(s => (
+            <button key={s.id} onClick={() => setStatus(s.id)}
+              className={`rounded-xl px-2 min-h-[44px] text-sm font-semibold border transition ${idea.status === s.id ? `${s.cls} border-current` : 'border-zinc-200 dark:border-zinc-700 text-zinc-500'}`}>
+              {s.emoji} {s.long || s.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Accounts" hint="One or more">
+        <div className="flex flex-wrap gap-2">
+          {data.accounts.map(a => (
+            <ToggleChip key={a.id} active={idea.accountIds.includes(a.id)} activeStyle={{ background: gradientOf(a) }} onClick={() => set({ accountIds: toggleIn(idea.accountIds, a.id) })}>
+              {a.icon} {accLabel(a)}
+            </ToggleChip>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Format" hint="Pick all that apply">
+        <div className="flex flex-wrap gap-2">
+          {FORMATS.map(f => {
+            const dim = platforms.size > 0 && !platforms.has(f.platform) && !idea.formats.includes(f.id);
+            return (
+              <span key={f.id} className={dim ? 'opacity-40' : ''}>
+                <ToggleChip active={idea.formats.includes(f.id)} activeStyle={{ background: PLATFORMS[f.platform].gradient }} onClick={() => set({ formats: toggleIn(idea.formats, f.id) })}>
+                  {f.emoji} {f.label}
+                </ToggleChip>
+              </span>
+            );
+          })}
+        </div>
+      </Field>
+
+      <Field label="Priority">
+        <div className="grid grid-cols-3 gap-2">
+          {PRIORITIES.map(p => (
+            <button key={p.id} onClick={() => set({ priority: p.id })}
+              className={`rounded-xl min-h-[44px] text-sm font-semibold border flex items-center justify-center gap-2 ${idea.priority === p.id ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900' : 'border-zinc-200 dark:border-zinc-700'}`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${p.dot}`} />{p.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Post date"><input type="date" value={idea.date} onChange={e => set({ date: e.target.value })} className={INPUT} /></Field>
+        <Field label="Time"><input type="time" value={idea.time} onChange={e => set({ time: e.target.value })} className={INPUT} /></Field>
+      </div>
+      {(idea.date || idea.time) && (
+        <button onClick={() => set({ date: '', time: '' })} className="-mt-4 text-xs font-semibold text-zinc-500 underline min-h-[32px]">Clear date</button>
+      )}
+
+      <Field label="Tags" hint="Topic, theme… press Enter">
+        <TagInput value={idea.tags} onChange={tags => set({ tags })} />
+      </Field>
+
+      <Field label="Series" hint="e.g. Part 1, 2, 3 of a topic">
+        <div className="flex gap-2">
+          <input list="series-names" value={idea.seriesName} onChange={e => set({ seriesName: e.target.value })} placeholder="Series name" className={INPUT + ' flex-1'} />
+          <input type="number" min="1" inputMode="numeric" value={idea.seriesPart ?? ''} onChange={e => set({ seriesPart: e.target.value ? Number(e.target.value) : null })} placeholder="Part" className={INPUT + ' !w-24'} />
+        </div>
+        {idea.seriesName && (
+          <button onClick={onNextPart} className={`${BTN_GHOST} w-full mt-2`}><Icon name="plus" /> Create Part {(idea.seriesPart || 1) + 1}</button>
+        )}
+        <SeriesSiblings idea={idea} />
+      </Field>
+
+      <Field label="Short description">
+        <AutoTextarea value={idea.description} onChange={v => set({ description: v })} placeholder="What's this about? Angle, hook, target viewer…" />
+      </Field>
+    </div>
+  );
+}
+
+// Shows the other parts of the same series
+function SeriesSiblings({ idea }) {
+  const { data, openIdea } = useStore();
+  if (!idea.seriesName) return null;
+  const parts = data.ideas.filter(i => i.seriesName === idea.seriesName).sort((a, b) => (a.seriesPart || 0) - (b.seriesPart || 0));
+  if (parts.length < 2) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {parts.map(p => (
+        <button key={p.id} onClick={() => p.id !== idea.id && openIdea(p.id)}
+          className={`rounded-lg px-2.5 min-h-[34px] text-xs font-semibold ${p.id === idea.id ? 'bg-pink-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
+          #{p.seriesPart || '?'} {STATUS_BY_ID[p.status].emoji}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TagInput({ value, onChange }) {
+  const [text, setText] = useState('');
+  const add = raw => {
+    const parts = raw.split(',').map(s => s.trim().replace(/^#/, '')).filter(Boolean);
+    if (parts.length) onChange([...new Set([...value, ...parts])]);
+    setText('');
+  };
+  return (
+    <div className={`${INPUT} flex flex-wrap items-center gap-1.5 py-1.5 h-auto`}>
+      {value.map(t => (
+        <span key={t} className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 pl-2.5 pr-1 py-1 text-sm font-medium">
+          {t}
+          <button onClick={() => onChange(value.filter(x => x !== t))} className="w-6 h-6 grid place-items-center rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700" aria-label={`Remove ${t}`}><Icon name="x" className="w-3.5 h-3.5" /></button>
+        </span>
+      ))}
+      <input value={text} placeholder={value.length ? '' : 'travel, tips…'}
+        onChange={e => (e.target.value.endsWith(',') ? add(e.target.value) : setText(e.target.value))}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); add(text); }
+          if (e.key === 'Backspace' && !text && value.length) onChange(value.slice(0, -1));
+        }}
+        onBlur={() => text && add(text)}
+        className="flex-1 min-w-[90px] bg-transparent outline-none min-h-[32px]" />
+    </div>
+  );
+}
+
+function ScriptTab({ idea, set }) {
+  const words = wordCount(idea.notes);
+  return (
+    <Field label="Script / notes" hint={`${words} words · ~${voiceoverTime(words)} voiceover`}>
+      <AutoTextarea minRows={14} value={idea.notes} onChange={v => set({ notes: v })}
+        placeholder={'HOOK (0-3s):\n\nPOINT 1:\n\nPOINT 2:\n\nCTA:'} className="font-mono text-[15px]" />
+    </Field>
+  );
+}
+
+function LinkGroup({ type, idea, set }) {
+  const t = LINK_TYPES[type];
+  const links = idea.links.filter(l => l.type === type);
+  const [label, setLabel] = useState('');
+  const [url, setUrl] = useState('');
+  const [editingId, setEditingId] = useState(null);
+
+  const add = () => {
+    if (!url.trim()) return;
+    set({ links: [...idea.links, { id: uid(), type, label: label.trim() || hostOf(url), url: normalizeUrl(url) }] });
+    setLabel(''); setUrl('');
+  };
+  const update = (id, patch) => set({ links: idea.links.map(l => (l.id === id ? { ...l, ...patch } : l)) });
+  const remove = id => set({ links: idea.links.filter(l => l.id !== id) });
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <h3 className="font-bold">{t.emoji} {t.label}</h3>
+        <span className="text-xs text-zinc-400">{t.hint}</span>
+      </div>
+      <div className="space-y-2">
+        {links.map(l => editingId === l.id ? (
+          <div key={l.id} className={`${CARD} p-2 space-y-2`}>
+            <input value={l.label} onChange={e => update(l.id, { label: e.target.value })} className={INPUT} placeholder="Label" />
+            <input value={l.url} onChange={e => update(l.id, { url: e.target.value })} onBlur={e => update(l.id, { url: normalizeUrl(e.target.value) })} className={INPUT} placeholder="https://" inputMode="url" />
+            <button onClick={() => setEditingId(null)} className={`${BTN_PRIMARY} w-full`}>Done</button>
+          </div>
+        ) : (
+          <div key={l.id} className={`${CARD} flex items-center gap-1 pl-3 pr-1`}>
+            <a href={normalizeUrl(l.url)} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 py-2.5 group">
+              <div className="font-semibold truncate group-hover:underline flex items-center gap-1.5">{l.label || hostOf(l.url)} <Icon name="external" className="w-3.5 h-3.5 shrink-0 text-zinc-400" /></div>
+              <div className="text-xs text-zinc-500 truncate">{hostOf(l.url)}</div>
+            </a>
+            <button onClick={() => setEditingId(l.id)} className={ICON_BTN} aria-label="Edit link"><Icon name="edit" className="w-4 h-4" /></button>
+            <button onClick={() => remove(l.id)} className={ICON_BTN} aria-label="Delete link"><Icon name="trash" className="w-4 h-4" /></button>
+          </div>
+        ))}
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <input value={label} onChange={e => setLabel(e.target.value)} placeholder="Label (optional)" className={INPUT + ' col-span-2'} />
+          <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Paste link…" inputMode="url" className={INPUT} />
+          <button onClick={add} disabled={!url.trim()} className={`${BTN_PRIMARY} px-4`}><Icon name="plus" /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// A text field with a label, character counter and Copy button
+function CopyField({ label, value, onChange, placeholder, multiline = true, minRows = 3, max, info, extra }) {
+  const { toast } = useStore();
+  const count = (value || '').length;
+  const copy = async () => {
+    if (!value) return toast('Nothing to copy yet');
+    toast((await copyText(value)) ? `${label} copied ✓` : 'Copy failed');
+  };
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">{label}</span>
+        <div className="flex items-center gap-2">
+          {info && <span className="text-xs text-zinc-400">{info}</span>}
+          {max && <span className={`text-xs tabular-nums ${count > max ? 'text-red-500 font-bold' : 'text-zinc-400'}`}>{count}/{max}</span>}
+          <button type="button" onClick={copy} className="inline-flex items-center gap-1 rounded-lg px-3 min-h-[36px] text-sm font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 active:scale-95">
+            <Icon name="copy" className="w-4 h-4" /> Copy
+          </button>
+        </div>
+      </div>
+      {multiline
+        ? <AutoTextarea minRows={minRows} value={value} onChange={onChange} placeholder={placeholder} />
+        : <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={INPUT} />}
+      {extra}
+    </div>
+  );
+}
+
+function CaptionTab({ idea, set }) {
+  const { data, updateAccount, toast } = useStore();
+  const [showYT, setShowYT] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [setName, setSetName] = useState('');
+
+  const chosen = data.accounts.filter(a => idea.accountIds.includes(a.id));
+  const relevant = chosen.length ? chosen : data.accounts;
+  const [saveTo, setSaveTo] = useState(relevant[0]?.id || '');
+  const sets = relevant.flatMap(a => (a.hashtagSets || []).map(s => ({ ...s, account: a })));
+  const tagCount = parseHashtags(idea.hashtags).length;
+
+  const hasYT = chosen.some(a => a.platform === 'youtube') || idea.formats.some(f => f.startsWith('yt')) || idea.ytTitle || idea.ytDescription || idea.ytTags;
+
+  const saveSet = () => {
+    const acc = data.accounts.find(a => a.id === saveTo);
+    if (!acc || !idea.hashtags.trim()) return;
+    updateAccount(acc.id, { hashtagSets: [...(acc.hashtagSets || []), { id: uid(), name: setName.trim() || `Set ${(acc.hashtagSets || []).length + 1}`, tags: mergeHashtags('', idea.hashtags) }] });
+    setSaveOpen(false); setSetName(''); toast(`Saved to ${accLabel(acc)}`);
+  };
+
+  const copyBoth = async () => {
+    const text = [idea.caption, idea.hashtags].filter(Boolean).join('\n\n');
+    if (!text) return toast('Nothing to copy yet');
+    toast((await copyText(text)) ? 'Caption + hashtags copied ✓' : 'Copy failed');
+  };
+
+  return (
+    <div className="space-y-6">
+      <CopyField label="Caption" value={idea.caption} onChange={v => set({ caption: v })} max={2200} minRows={5} placeholder="Write your caption…" />
+
+      <CopyField label="Hashtags" value={idea.hashtags} onChange={v => set({ hashtags: v })} minRows={2}
+        info={<span className={tagCount > 30 ? 'text-red-500 font-bold' : ''}>{tagCount} tags</span>}
+        placeholder="#reels #creator"
+        extra={
+          <div className="mt-2 space-y-2">
+            {sets.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {sets.map(s => (
+                  <button key={s.id} onClick={() => set({ hashtags: mergeHashtags(idea.hashtags, s.tags) })}
+                    className="inline-flex items-center gap-1 rounded-lg px-2.5 min-h-[36px] text-xs font-semibold bg-pink-50 text-pink-700 dark:bg-pink-500/10 dark:text-pink-300">
+                    <Icon name="plus" className="w-3.5 h-3.5" /> {s.name} <span className="opacity-60">· {s.account.icon}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {!saveOpen ? (
+              <button onClick={() => setSaveOpen(true)} disabled={!idea.hashtags.trim()} className="text-xs font-semibold text-zinc-500 underline min-h-[32px] disabled:opacity-40">Save these as a reusable set…</button>
+            ) : (
+              <div className={`${CARD} p-2 grid grid-cols-2 gap-2`}>
+                <input value={setName} onChange={e => setSetName(e.target.value)} placeholder="Set name" className={INPUT + ' col-span-2'} />
+                <select value={saveTo} onChange={e => setSaveTo(e.target.value)} className={INPUT}>
+                  {data.accounts.map(a => <option key={a.id} value={a.id}>{a.icon} {accLabel(a)}</option>)}
+                </select>
+                <button onClick={saveSet} className={BTN_PRIMARY}>Save set</button>
+              </div>
+            )}
+          </div>
+        }
+      />
+
+      <button onClick={copyBoth} className={`${BTN} w-full text-white`} style={{ background: PLATFORMS.instagram.gradient }}>
+        <Icon name="copy" /> Copy caption + hashtags
+      </button>
+
+      {hasYT || showYT ? (
+        <div className="space-y-5 pt-2">
+          <h3 className="font-bold flex items-center gap-2"><span className="w-6 h-6 rounded-md grid place-items-center text-xs text-white" style={{ background: PLATFORMS.youtube.gradient }}>▶</span> YouTube</h3>
+          <CopyField label="YouTube title" value={idea.ytTitle} onChange={v => set({ ytTitle: v })} multiline={false} max={100} placeholder="Click-worthy title" />
+          <CopyField label="YouTube description" value={idea.ytDescription} onChange={v => set({ ytDescription: v })} max={5000} minRows={5} placeholder="Description, timestamps, links…" />
+          <CopyField label="YouTube tags" value={idea.ytTags} onChange={v => set({ ytTags: v })} max={500} minRows={2} placeholder="tag one, tag two, tag three" />
+        </div>
+      ) : (
+        <button onClick={() => setShowYT(true)} className={`${BTN_GHOST} w-full`}>▶️ Show YouTube fields</button>
+      )}
+    </div>
+  );
+}
+
+function ChecklistTab({ idea, set }) {
+  const [text, setText] = useState('');
+  const list = idea.checklist;
+  const done = list.filter(c => c.done).length;
+  const pct = progressOf(idea);
+  const update = (id, patch) => set({ checklist: list.map(c => (c.id === id ? { ...c, ...patch } : c)) });
+  const add = () => { if (!text.trim()) return; set({ checklist: [...list, { id: uid(), text: text.trim(), done: false }] }); setText(''); };
+  return (
+    <div>
+      <div className={`${CARD} p-4`}>
+        <div className="flex items-end justify-between">
+          <div className="text-3xl font-extrabold tabular-nums">{pct}%</div>
+          <div className="text-sm text-zinc-500">{done} of {list.length} done</div>
+        </div>
+        <ProgressBar pct={pct} className="h-3 mt-2" />
+      </div>
+      <div className="mt-3 space-y-2">
+        {list.map(c => (
+          <div key={c.id} className={`${CARD} flex items-center gap-1 pl-1 pr-1`}>
+            <button onClick={() => update(c.id, { done: !c.done })} className="w-12 h-12 grid place-items-center shrink-0" aria-label={c.done ? 'Mark not done' : 'Mark done'}>
+              <span className={`w-7 h-7 rounded-lg grid place-items-center border-2 transition ${c.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-300 dark:border-zinc-600'}`}>
+                {c.done && <Icon name="check" className="w-4 h-4" strokeWidth={3} />}
+              </span>
+            </button>
+            <input value={c.text} onChange={e => update(c.id, { text: e.target.value })} className={`flex-1 min-w-0 bg-transparent outline-none min-h-[44px] font-medium ${c.done ? 'line-through text-zinc-400' : ''}`} />
+            <button onClick={() => set({ checklist: list.filter(x => x.id !== c.id) })} className={ICON_BTN} aria-label="Remove item"><Icon name="x" className="w-4 h-4" /></button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-3">
+        <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Add a step (e.g. B-roll)" className={INPUT} />
+        <button onClick={add} disabled={!text.trim()} className={`${BTN_PRIMARY} px-4`}><Icon name="plus" /></button>
+      </div>
+      <div className="flex gap-2 mt-4">
+        <button onClick={() => set({ checklist: list.map(c => ({ ...c, done: true })) })} className={`${BTN_GHOST} flex-1 text-sm`}>Tick all</button>
+        <button onClick={() => { if (confirm('Reset checklist to the default 6 steps?')) set({ checklist: DEFAULT_CHECKLIST.map(t => ({ id: uid(), text: t, done: false })) }); }} className={`${BTN_GHOST} flex-1 text-sm`}>Reset to default</button>
+      </div>
+    </div>
+  );
+}
+
+/* =====================================================================
+   11. QUICK CAPTURE, DUPLICATE, SETTINGS
+   ===================================================================== */
+function QuickCapture({ preset, onClose }) {
+  const { data, addIdea, setSettings, openIdea, toast } = useStore();
+  const validIds = ids => (ids || []).filter(id => data.accounts.some(a => a.id === id));
+  const [title, setTitle] = useState('');
+  const [accs, setAccs] = useState(() => validIds(preset?.accountIds ?? data.settings.lastQuickAccounts));
+  const [date, setDate] = useState(preset?.date || '');
+  const inputRef = useRef(null);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const save = openAfter => {
+    if (!title.trim()) { inputRef.current?.focus(); return; }
+    const id = addIdea({ title: title.trim(), accountIds: accs, date, formats: preset?.formats || [], time: preset?.time || '' });
+    setSettings({ lastQuickAccounts: accs });
+    toast('Idea saved 💡');
+    onClose();
+    if (openAfter) openIdea(id);
+  };
+
+  return (
+    <Sheet title="💡 Quick idea" onClose={onClose}
+      footer={
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => save(true)} className={BTN_GHOST}>Save + details</button>
+          <button onClick={() => save(false)} className={`${BTN} text-white`} style={{ background: BRAND_GRADIENT }}>Save idea</button>
+        </div>
+      }>
+      <input ref={inputRef} value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && save(false)}
+        placeholder="Type the idea in one line…" className={INPUT + ' !min-h-[56px] !text-lg font-semibold'} enterKeyHint="done" />
+      {preset?.formats?.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-zinc-500 font-semibold">For target:</span>
+          <FormatBadges formats={preset.formats} />
+          {preset.time && <span className="font-semibold text-zinc-500">⏰ {fmtTime(preset.time)}</span>}
+        </div>
+      )}
+      <div className="mt-4">
+        <div className="text-xs font-semibold text-zinc-500 mb-2">For which account? (optional)</div>
+        <div className="flex flex-wrap gap-2">
+          {data.accounts.map(a => (
+            <ToggleChip key={a.id} active={accs.includes(a.id)} activeStyle={{ background: gradientOf(a) }} onClick={() => setAccs(toggleIn(accs, a.id))}>{a.icon} {accLabel(a)}</ToggleChip>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 flex items-center gap-2">
+        <span className="text-xs font-semibold text-zinc-500">Date (optional)</span>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} className={INPUT + ' !w-auto flex-1'} />
+      </div>
+      <p className="text-xs text-zinc-400 mt-3">Press Enter to save. Fill the details later.</p>
+    </Sheet>
+  );
+}
+
+function DuplicateSheet({ idea, onClose }) {
+  const { data, duplicateIdea } = useStore();
+  const [accs, setAccs] = useState(idea.accountIds);
+  const [fmts, setFmts] = useState(idea.formats);
+  const [keep, setKeep] = useState(true);
+  return (
+    <Sheet title="Duplicate / repurpose" onClose={onClose}
+      footer={<button onClick={() => { duplicateIdea(idea.id, { accountIds: accs, formats: fmts }, keep); onClose(); }} className={`${BTN_PRIMARY} w-full`}><Icon name="layers" /> Create copy</button>}>
+      <p className="text-sm text-zinc-500 mb-4">Make a copy, e.g. turn this Reel into a YT Short. The copy starts at 💡 Idea with an unticked checklist.</p>
+      <div className="space-y-5">
+        <Field label="Accounts for the copy">
+          <div className="flex flex-wrap gap-2">
+            {data.accounts.map(a => <ToggleChip key={a.id} active={accs.includes(a.id)} activeStyle={{ background: gradientOf(a) }} onClick={() => setAccs(toggleIn(accs, a.id))}>{a.icon} {accLabel(a)}</ToggleChip>)}
+          </div>
+        </Field>
+        <Field label="Format for the copy">
+          <div className="flex flex-wrap gap-2">
+            {FORMATS.map(f => <ToggleChip key={f.id} active={fmts.includes(f.id)} activeStyle={{ background: PLATFORMS[f.platform].gradient }} onClick={() => setFmts(toggleIn(fmts, f.id))}>{f.emoji} {f.label}</ToggleChip>)}
+          </div>
+        </Field>
+        <button onClick={() => setKeep(!keep)} className={`${CARD} w-full p-3 flex items-center gap-3 text-left`}>
+          <span className={`w-7 h-7 rounded-lg grid place-items-center border-2 ${keep ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-300 dark:border-zinc-600'}`}>{keep && <Icon name="check" className="w-4 h-4" strokeWidth={3} />}</span>
+          <span className="text-sm font-semibold">Keep script, caption, hashtags & links</span>
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/* Cloud icon in the top bar: green = synced, blue = syncing, amber = offline/error, grey = off */
+const SYNC_STATUS = {
+  off:     { dot: 'bg-zinc-400',                 text: 'Sync is off' },
+  idle:    { dot: 'bg-sky-500',                  text: 'Waiting to sync…' },
+  syncing: { dot: 'bg-sky-500 animate-pulse',    text: 'Syncing…' },
+  ok:      { dot: 'bg-emerald-500',              text: 'Synced' },
+  offline: { dot: 'bg-amber-500',                text: 'Offline – will sync when back online' },
+  error:   { dot: 'bg-amber-500',                text: 'Sync problem – will retry' },
+};
+function SyncBadge({ sync, onClick }) {
+  const st = SYNC_STATUS[sync.status] || SYNC_STATUS.off;
+  return (
+    <button onClick={onClick} className={ICON_BTN + ' relative'} aria-label={`Cloud sync: ${st.text}`} title={st.text}>
+      <Icon name="cloud" />
+      <span className={`absolute right-2 bottom-2 w-2.5 h-2.5 rounded-full ring-2 ring-zinc-50 dark:ring-zinc-950 ${st.dot}`} />
+    </button>
+  );
+}
+
+/* Type the same password on phone and computer once → both use the same cloud data forever */
+function PasswordConnect({ onDone }) {
+  const { connectSync } = useStore();
+  const [pw, setPw] = useState('');
+  const [show, setShow] = useState(false);
+  const [working, setWorking] = useState(false);
+  const ok = pw.trim().length >= 6;
+  const go = async () => {
+    setWorking(true);
+    const done = await connectSync(await passwordToCode(pw), 'password');
+    setWorking(false);
+    if (done) { setPw(''); onDone && onDone(); }
+  };
+  return (
+    <form onSubmit={e => { e.preventDefault(); if (ok && !working) go(); }} className="space-y-2">
+      <p className="text-xs text-zinc-500">Use the <b>same password</b> on your phone and your computer. Type it once per device – after that everything syncs by itself.</p>
+      <div className="flex gap-2">
+        <input type={show ? 'text' : 'password'} value={pw} onChange={e => setPw(e.target.value)} placeholder="Sync password (min 6 letters)" autoComplete="current-password" className={INPUT} />
+        <button type="button" onClick={() => setShow(v => !v)} className={BTN_GHOST + ' px-3 text-sm'}>{show ? 'Hide' : 'Show'}</button>
+      </div>
+      <button type="submit" disabled={!ok || working} className={`${BTN} w-full text-white`} style={{ background: BRAND_GRADIENT }}>
+        <Icon name="cloud" /> {working ? 'Connecting…' : 'Connect'}
+      </button>
+    </form>
+  );
+}
+
+function SyncSection() {
+  const { sync, connectSync, disconnectSync, runSync, toast } = useStore();
+  const [code, setCode] = useState('');
+  const [working, setWorking] = useState(false);
+  const [show, setShow] = useState(false);
+  const [, tick] = useState(0);
+  useEffect(() => { const t = setInterval(() => tick(n => n + 1), 10000); return () => clearInterval(t); }, []); // refresh "x min ago"
+
+  const go = async fn => { setWorking(true); await fn(); setWorking(false); };
+  const st = SYNC_STATUS[sync.status] || SYNC_STATUS.off;
+
+  if (!sync.code) {
+    return (
+      <Field label="☁️ Cloud sync" hint="Website + phone, same data">
+        <PasswordConnect />
+        <div className="text-center text-xs text-zinc-400 my-3">— or use a sync code —</div>
+        <div className="flex gap-2">
+          <input value={code} onChange={e => setCode(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autoCapitalize="characters" autoComplete="off" spellCheck="false" className={INPUT + ' font-mono text-sm'} />
+          <button disabled={working || cleanCode(code).length < 16} onClick={() => go(() => connectSync(code, 'join'))} className={BTN_PRIMARY}>Connect</button>
+        </div>
+        <p className="text-xs text-zinc-400 mt-2">Find the code on your other device: Settings → Cloud sync.</p>
+      </Field>
+    );
+  }
+
+  const link = `${SITE_URL}/#sync=${sync.code}`;
+  const copy = async (text, what) => toast((await copyText(text)) ? `${what} copied ✓` : 'Copy failed');
+  return (
+    <Field label="☁️ Cloud sync" hint={sync.status === 'ok' ? `Synced ${timeAgo(sync.lastSync)}` : st.text}>
+      <div className={`${CARD} p-3 space-y-3`}>
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <span className={`w-2.5 h-2.5 rounded-full ${st.dot}`} />
+          {sync.status === 'ok' ? `Synced ${timeAgo(sync.lastSync)}` : st.text}
+          <button disabled={working} onClick={() => go(runSync)} className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-pink-600 dark:text-pink-400 min-h-[36px] px-2">
+            <Icon name="refresh" className="w-4 h-4" /> Sync now
+          </button>
+        </div>
+        {isPasswordCode(sync.code) ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">✅ Connected with your password. Phone and computer now share the same data by themselves. On a new device, just type the same password once.</p>
+        ) : (<>
+        <div>
+          <div className="text-xs text-zinc-500 mb-1">Your sync code – keep it private (anyone with it can open your planner)</div>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 min-w-0 truncate rounded-lg bg-zinc-100 dark:bg-zinc-800 px-3 py-2.5 font-mono text-sm">{show ? sync.code : '••••-••••-••••-••••-' + sync.code.slice(-4)}</code>
+            <button onClick={() => setShow(v => !v)} className={BTN_GHOST + ' !min-h-[40px] px-3 text-sm'}>{show ? 'Hide' : 'Show'}</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => copy(sync.code, 'Sync code')} className={BTN_GHOST + ' text-sm'}><Icon name="copy" className="w-4 h-4" /> Copy code</button>
+          <button onClick={() => copy(link, 'Setup link')} className={BTN_GHOST + ' text-sm'}><Icon name="external" className="w-4 h-4" /> Copy setup link</button>
+        </div>
+        {location.origin !== SITE_URL && (
+          <a href={link} target="_blank" rel="noopener noreferrer" className={`${BTN} w-full text-sm text-white`} style={{ background: BRAND_GRADIENT }}>
+            🌐 Open the website with this data
+          </a>
+        )}
+        <p className="text-xs text-zinc-500">On another device: open the setup link, or go to Settings → Cloud sync → paste the code.</p>
+        <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="text-sm font-bold mb-1">🔑 Switch to password sync (easier)</div>
+          <PasswordConnect />
+        </div>
+        </>)}
+        <button onClick={() => { if (confirm('Stop syncing on this device? Your data stays here and in the cloud.')) disconnectSync(); }} className={`${BTN_DANGER} w-full text-sm`}>Turn off sync on this device</button>
+      </div>
+    </Field>
+  );
+}
+
+function SettingsSheet({ onClose }) {
+  const { data, setSettings, replaceData, addSampleIdeas, eraseAll, toast } = useStore();
+  const fileRef = useRef(null);
+  const sizeKB = Math.round(new Blob([JSON.stringify(data)]).size / 1024);
+
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `content-planner-backup-${todayISO()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast('Backup downloaded');
+  };
+
+  const importJSON = async e => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow picking the same file again later
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!Array.isArray(parsed.ideas) || !Array.isArray(parsed.accounts)) throw new Error('Not a Content Planner backup');
+      if (!confirm(`Replace your current data (${data.ideas.length} ideas) with this backup (${parsed.ideas.length} ideas)?`)) return;
+      replaceData(normalizeData(parsed));
+      toast('Backup imported ✓');
+      onClose();
+    } catch (err) {
+      alert('Could not import this file: ' + err.message);
+    }
+  };
+
+  return (
+    <Sheet title="Settings" onClose={onClose}>
+      <div className="space-y-6">
+        <SyncSection />
+
+        <Field label="Theme">
+          <div className="grid grid-cols-3 gap-2">
+            {[['system', 'Auto'], ['light', '☀️ Light'], ['dark', '🌙 Dark']].map(([id, l]) => (
+              <ToggleChip key={id} active={data.settings.theme === id} onClick={() => setSettings({ theme: id })}>{l}</ToggleChip>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="Backup" hint={`${data.ideas.length} ideas · ${sizeKB} KB`}>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={exportJSON} className={BTN_GHOST}><Icon name="download" /> Export JSON</button>
+            <button onClick={() => fileRef.current?.click()} className={BTN_GHOST}><Icon name="upload" /> Import JSON</button>
+          </div>
+          <input ref={fileRef} type="file" accept="application/json,.json" onChange={importJSON} className="hidden" />
+          <p className="text-xs text-zinc-500 mt-2">Your data is saved only in this browser. Export a backup now and then (e.g. to Google Drive), especially before clearing browser data.</p>
+        </Field>
+
+        <Field label="Demo">
+          <button onClick={() => { addSampleIdeas(); toast('Sample ideas added'); onClose(); }} className={`${BTN_GHOST} w-full`}>✨ Add sample ideas</button>
+        </Field>
+
+        <Field label="Danger zone">
+          <button onClick={() => { if (confirm('Erase ALL ideas and accounts? Export a backup first!') && confirm('Really erase everything?')) { eraseAll(); toast('All data erased'); onClose(); } }} className={`${BTN_DANGER} w-full`}>
+            <Icon name="trash" /> Erase everything
+          </button>
+        </Field>
+
+        <p className="text-xs text-zinc-400 text-center">Tip: press <kbd className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800">N</kbd> on a keyboard for a quick idea.</p>
+      </div>
+    </Sheet>
+  );
+}
+
+/* =====================================================================
+   12. APP – holds all data + navigation
+   ===================================================================== */
+const NAV = [
+  ['home', 'Home', 'home'],
+  ['calendar', 'Calendar', 'calendar'],
+  ['board', 'Board', 'board'],
+  ['list', 'Ideas', 'list'],
+  ['accounts', 'Accounts', 'users'],
+];
+
+function App() {
+  const [data, setData] = useState(loadData);
+  const [tab, setTab] = useState('home');
+  const [openIdeaId, setOpenIdeaId] = useState(null);
+  const [openAccountId, setOpenAccountId] = useState(null);
+  const [quick, setQuick] = useState(null); // null = closed, {} = open (with optional preset)
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [toastMsg, setToastMsg] = useState(null);
+  const [systemDark, setSystemDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches);
+  const toastTimer = useRef(null);
+
+  // Save to localStorage whenever data changes
+  const saveWarned = useRef(false);
+  useEffect(() => {
+    const ok = saveData(data);
+    if (!ok && !saveWarned.current) { saveWarned.current = true; toast('⚠️ Could not save – storage full? Export a backup.'); }
+  }, [data]);
+
+  // Theme handling
+  const theme = data.settings.theme;
+  const isDark = theme === 'dark' || (theme === 'system' && systemDark);
+  useEffect(() => {
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setSystemDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark);
+    document.querySelector('meta[name=theme-color]').setAttribute('content', isDark ? '#09090b' : '#fafafa');
+  }, [isDark]);
+
+  // Keyboard shortcut: N = quick idea (when not typing)
+  useEffect(() => {
+    const onKey = e => {
+      const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+      if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'n' && !sheetStack.length) { e.preventDefault(); setQuick({}); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  function toast(msg) {
+    setToastMsg(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 2200);
+  }
+
+  /* ---------- Cloud sync engine ---------- */
+  const [sync, setSync] = useState(() => {
+    const info = loadSyncInfo();
+    // Auto sync: unless you turned sync off on this device, use the built-in key
+    return info.code ? { ...info, status: 'idle' } : { status: 'off' };
+  });
+  // First start: ask for the sync password once (unless sync is on or you said "Not now")
+  const [askPassword, setAskPassword] = useState(() => { const i = loadSyncInfo(); return !i.code && !i.off; });
+  const skipPassword = () => { saveSyncInfo({ off: true }); setAskPassword(false); };
+  const dataRef = useRef(data); dataRef.current = data;
+  const syncRef = useRef(sync); syncRef.current = sync;
+  const busy = useRef(false);     // a sync is running
+  const again = useRef(false);    // something changed while syncing → run once more
+  const lastSynced = useRef(null); // JSON of what the cloud has, to skip useless uploads
+
+  /* Pull cloud copy → merge with this device → push the result.
+     opts.code        use this code (when connecting)
+     opts.mustExist   fail if the cloud has nothing for this code (typo protection)
+     opts.replaceLocal take the cloud data as-is (new device with no ideas yet) */
+  async function runSync(opts = {}) {
+    const code = opts.code || syncRef.current.code;
+    if (!code) return false;
+    if (busy.current) { again.current = true; return false; }
+    if (!navigator.onLine) { setSync(s => ({ ...s, status: 'offline' })); return false; }
+    busy.current = true;
+    setSync(s => ({ ...s, status: 'syncing' }));
+    try {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const remote = await syncRequest('GET', code);
+        if (!remote.data && opts.mustExist) throw new Error('No data found for this sync code');
+        const local = dataRef.current;
+        const remoteData = remote.data ? normalizeData(remote.data) : null;
+        const merged = !remoteData ? local
+          : opts.replaceLocal ? { ...remoteData, settings: local.settings }
+          : mergeData(local, remoteData);
+        const mergedJSON = JSON.stringify(syncable(merged));
+        if (!remoteData || mergedJSON !== JSON.stringify(syncable(remoteData))) {
+          const saved = await syncRequest('PUT', code, { data: syncable(merged), etag: remote.etag });
+          if (saved.conflict) { await new Promise(r => setTimeout(r, 300 * (attempt + 1))); continue; } // another device saved at the same moment → pull again
+        }
+        lastSynced.current = mergedJSON;
+        // If you edited something while we were syncing, merge that in too
+        setData(d => (d === local ? merged : mergeData(d, merged)));
+        const info = { code: prettyCode(code), lastSync: Date.now() };
+        saveSyncInfo(info);
+        setSync({ ...info, status: 'ok' });
+        return true;
+      }
+      throw new Error('Too many conflicts, will retry');
+    } catch (err) {
+      console.warn('Sync:', err);
+      setSync(s => ({ ...s, status: navigator.onLine ? 'error' : 'offline', error: err.message }));
+      if (opts.code) toast('⚠️ ' + err.message);
+      return false;
+    } finally {
+      busy.current = false;
+      if (again.current) { again.current = false; setTimeout(() => runSync(), 400); }
+    }
+  }
+
+  // Upload ~1.5 s after any change
+  useEffect(() => {
+    if (!sync.code) return;
+    if (JSON.stringify(syncable(data)) === lastSynced.current) return;
+    const t = setTimeout(() => runSync(), 1500);
+    return () => clearTimeout(t);
+  }, [data, sync.code]);
+
+  // Download when the app opens, comes back to the screen, gets internet, and every 30 s
+  useEffect(() => {
+    if (!sync.code) return;
+    runSync();
+    const onShow = () => { if (document.visibilityState === 'visible') runSync(); };
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('online', onShow);
+    const timer = setInterval(onShow, 30000);
+    return () => { document.removeEventListener('visibilitychange', onShow); window.removeEventListener('online', onShow); clearInterval(timer); };
+  }, [sync.code]);
+
+  // mode 'new' = start syncing this device's data with a new code; 'join' = use the code from your other device
+  async function connectSync(code, mode) {
+    const clean = cleanCode(code);
+    if (clean.length < 16) { toast('That sync code looks too short'); return false; }
+    const ok = await runSync({
+      code: clean,
+      mustExist: mode === 'join',
+      replaceLocal: mode === 'join' && dataRef.current.ideas.length === 0,
+    });
+    if (ok) toast(mode === 'join' ? '☁️ Connected – your data is here' : '☁️ Sync is on – phone & computer stay the same');
+    return ok;
+  }
+  function disconnectSync() {
+    saveSyncInfo({ off: true }); // remember: don't auto-connect again on this device
+    lastSynced.current = null;
+    setSync({ status: 'off' });
+    toast('Sync turned off on this device');
+  }
+
+  // Setup link: opening https://…/#sync=CODE on a new device offers to connect it
+  useEffect(() => {
+    const m = location.hash.match(/sync=([A-Za-z0-9-]+)/);
+    if (!m) return;
+    history.replaceState(null, '', location.pathname + location.search); // remove the code from the address bar
+    if (syncRef.current.code) return;
+    if (confirm('Connect this device to your Content Planner cloud data?')) connectSync(m[1], 'join');
+  }, []);
+
+  /* ---------- Actions (everything that changes data) ---------- */
+  const updateIdea = (id, patch) => setData(d => ({
+    ...d,
+    ideas: d.ideas.map(i => {
+      if (i.id !== id) return i;
+      const next = { ...i, ...patch, updatedAt: Date.now() };
+      // Remember the day it was posted (used for streaks)
+      if (patch.status && patch.status !== i.status) next.postedAt = patch.status === 'posted' ? (i.date && i.date <= todayISO() ? i.date : todayISO()) : null;
+      return next;
+    }),
+  }));
+
+  const addIdea = partial => {
+    const idea = blankIdea(partial);
+    setData(d => ({ ...d, ideas: [idea, ...d.ideas] }));
+    return idea.id;
+  };
+
+  // Deleting remembers the id + time in `deleted`, so sync removes it on your other devices too
+  const deleteIdea = id => setData(d => ({ ...d, ideas: d.ideas.filter(i => i.id !== id), deleted: { ...d.deleted, [id]: Date.now() } }));
+
+  const duplicateIdea = (id, overrides = {}, keepContent = true) => {
+    const src = data.ideas.find(i => i.id === id); if (!src) return;
+    const copy = blankIdea({
+      ...JSON.parse(JSON.stringify(src)),
+      id: uid(), title: src.title + ' (copy)', status: 'idea', postedAt: null, date: '', time: '',
+      createdAt: Date.now(), updatedAt: Date.now(),
+      checklist: src.checklist.map(c => ({ ...c, id: uid(), done: false })),
+      links: keepContent ? src.links.filter(l => l.type !== 'final').map(l => ({ ...l, id: uid() })) : [],
+      ...overrides,
+    });
+    if (!keepContent) Object.assign(copy, { notes: '', caption: '', hashtags: '', ytTitle: '', ytDescription: '', ytTags: '' });
+    setData(d => ({ ...d, ideas: [copy, ...d.ideas] }));
+    setOpenIdeaId(copy.id);
+    toast('Copy created – edit it now');
+  };
+
+  const createNextPart = id => {
+    const src = data.ideas.find(i => i.id === id); if (!src) return;
+    const part = (src.seriesPart || 1) + 1;
+    const title = /part\s*\d+/i.test(src.title) ? src.title.replace(/part\s*\d+/i, `Part ${part}`) : `${src.seriesName} – Part ${part}`;
+    const next = blankIdea({ title, accountIds: src.accountIds, formats: src.formats, tags: src.tags, priority: src.priority, seriesName: src.seriesName, seriesPart: part });
+    setData(d => ({ ...d, ideas: [next, ...d.ideas.map(i => (i.id === id && !i.seriesPart ? { ...i, seriesPart: 1 } : i))] }));
+    setOpenIdeaId(next.id);
+    toast(`Part ${part} created`);
+  };
+
+  const updateAccount = (id, patch) => setData(d => ({ ...d, accounts: d.accounts.map(a => (a.id === id ? { ...a, ...patch, updatedAt: Date.now() } : a)) }));
+
+  const addAccount = platform => {
+    const count = data.accounts.filter(a => a.platform === platform).length + 1;
+    const acc = {
+      id: uid(), platform, hashtagSets: [], targets: starterTargets(platform), updatedAt: Date.now(),
+      name: platform === 'youtube' ? `YT Channel ${count}` : `IG Account ${count}`,
+      color: platform === 'youtube' ? 'coral' : 'violet',
+      icon: platform === 'youtube' ? '📺' : '🌸',
+    };
+    setData(d => ({ ...d, accounts: [...d.accounts, acc] }));
+    return acc.id;
+  };
+
+  const deleteAccount = id => {
+    setData(d => ({
+      ...d,
+      accounts: d.accounts.filter(a => a.id !== id),
+      ideas: d.ideas.map(i => (i.accountIds.includes(id) ? { ...i, accountIds: i.accountIds.filter(x => x !== id), updatedAt: Date.now() } : i)),
+      deleted: { ...d.deleted, [id]: Date.now() },
+    }));
+    if (openAccountId === id) setOpenAccountId(null);
+  };
+
+  const setSettings = patch => setData(d => ({ ...d, settings: { ...d.settings, ...patch } }));
+
+  // Daily to-do: tick / untick a task for today (only the last 60 days of ticks are kept)
+  const toggleTask = id => setData(d => {
+    const today = todayISO();
+    const list = d.taskLog[today]?.ids || [];
+    const log = { ...d.taskLog, [today]: { ids: toggleIn(list, id), at: Date.now() } };
+    const cutoff = toISO(addDays(new Date(), -60));
+    Object.keys(log).forEach(k => { if (k < cutoff) delete log[k]; });
+    return { ...d, taskLog: log };
+  });
+  const setDailyTasks = list => setData(d => {
+    const deleted = { ...d.deleted };
+    d.dailyTasks.forEach(t => { if (!list.some(x => x.id === t.id)) deleted[t.id] = Date.now(); });
+    return { ...d, dailyTasks: list, deleted };
+  });
+  const replaceData = next => { setData(next); setOpenIdeaId(null); setOpenAccountId(null); };
+
+  // Erase: mark everything as deleted (so synced devices erase too), then start fresh
+  const eraseAll = () => {
+    setData(d => {
+      const now = Date.now();
+      const deleted = { ...d.deleted };
+      [...d.ideas, ...d.dailyTasks, ...d.accounts].forEach(x => { deleted[x.id] = now; });
+      const fresh = defaultData();
+      // the fresh default accounts/tasks are newer than the deletion, so they survive
+      fresh.accounts.forEach(a => { a.updatedAt = now + 1; });
+      fresh.dailyTasks.forEach(t => { t.updatedAt = now + 1; });
+      return { ...fresh, deleted, settings: d.settings };
+    });
+    setOpenIdeaId(null); setOpenAccountId(null);
+  };
+  const addSampleIdeas = () => setData(d => ({ ...d, ideas: [...makeSampleIdeas(d.accounts.map(a => a.id)), ...d.ideas] }));
+
+  const accountsById = useMemo(() => Object.fromEntries(data.accounts.map(a => [a.id, a])), [data.accounts]);
+
+  // Names used by more than one account (so labels can add "· YT" / "· IG")
+  const seen = new Set();
+  DUP_NAMES = new Set();
+  data.accounts.forEach(a => { if (seen.has(a.name)) DUP_NAMES.add(a.name); seen.add(a.name); });
+
+  // Everything components can use via useStore()
+  const store = {
+    data, accountsById, toast,
+    updateIdea, addIdea, deleteIdea, duplicateIdea, createNextPart,
+    updateAccount, addAccount, deleteAccount, setSettings, replaceData, addSampleIdeas,
+    toggleTask, setDailyTasks, eraseAll,
+    sync, runSync: () => runSync(), connectSync, disconnectSync,
+    openIdea: id => setOpenIdeaId(id),
+    openQuick: (preset = {}) => setQuick(preset),
+  };
+
+  const goTab = id => { setTab(id); if (id === 'accounts') setOpenAccountId(null); window.scrollTo(0, 0); };
+  const openAccount = id => { setTab('accounts'); setOpenAccountId(id); window.scrollTo(0, 0); };
+  const filterList = patch => { setFilters({ ...DEFAULT_FILTERS, ...patch }); goTab('list'); };
+
+  const openIdeaObj = data.ideas.find(i => i.id === openIdeaId);
+  const seriesNames = [...new Set(data.ideas.map(i => i.seriesName).filter(Boolean))];
+  const titles = { home: 'Content Planner', calendar: 'Calendar', board: 'Board', list: 'All ideas', accounts: 'Accounts' };
+
+  return (
+    <StoreContext.Provider value={store}>
+      <div className="min-h-[100dvh] pb-[calc(150px_+_env(safe-area-inset-bottom))] lg:pb-12 lg:pl-64">
+        {/* Computer screens: menu on the left side instead of the bottom bar */}
+        <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-40 w-64 flex-col gap-1 p-4 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+          <div className="flex items-center gap-2.5 px-2 h-12 mb-3">
+            <span className="w-9 h-9 rounded-xl grid place-items-center text-white shadow" style={{ background: BRAND_GRADIENT }}>▶</span>
+            <span className="font-extrabold text-lg tracking-tight">Content Planner</span>
+          </div>
+          <button onClick={() => setQuick({})} className="mb-3 flex items-center justify-center gap-2 rounded-xl text-white font-bold min-h-[46px] shadow-lg shadow-pink-500/30 active:scale-[.98] transition" style={{ background: BRAND_GRADIENT }}>
+            <Icon name="plus" className="w-5 h-5" strokeWidth={2.5} /> New idea <kbd className="ml-1 text-[11px] font-semibold opacity-80 border border-white/40 rounded px-1">N</kbd>
+          </button>
+          {NAV.map(([id, label, icon]) => (
+            <button key={id} onClick={() => goTab(id)} aria-current={tab === id ? 'page' : undefined}
+              className={`flex items-center gap-3 rounded-xl px-3 min-h-[44px] text-sm font-semibold transition ${tab === id ? 'bg-pink-50 text-pink-600 dark:bg-pink-500/10 dark:text-pink-400' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+              <Icon name={icon} className="w-5 h-5" />{label}
+            </button>
+          ))}
+          <div className="flex-1" />
+          {data.accounts.map(a => (
+            <button key={a.id} onClick={() => openAccount(a.id)} className="flex items-center gap-2.5 rounded-xl px-2 min-h-[38px] text-sm text-left hover:bg-zinc-100 dark:hover:bg-zinc-800">
+              <AccountAvatar account={a} size="w-7 h-7 text-sm" /><span className="truncate font-medium">{accLabel(a)}</span>
+            </button>
+          ))}
+          <button onClick={() => setSettingsOpen(true)} className="mt-3 flex items-center gap-2.5 rounded-xl px-3 min-h-[44px] text-sm font-semibold border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+            <span className={`w-2.5 h-2.5 rounded-full ${(SYNC_STATUS[sync.status] || SYNC_STATUS.off).dot}`} />
+            {sync.code ? (SYNC_STATUS[sync.status] || SYNC_STATUS.off).text : 'Connect with phone'}
+          </button>
+        </aside>
+
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 bg-zinc-50/85 dark:bg-zinc-950/85 backdrop-blur border-b border-zinc-200/70 dark:border-zinc-800/70" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="max-w-5xl lg:max-w-7xl mx-auto px-4 lg:px-8 h-14 flex items-center gap-2">
+            <span className="lg:hidden w-8 h-8 rounded-xl grid place-items-center text-white text-sm shadow" style={{ background: BRAND_GRADIENT }}>▶</span>
+            <h1 className="font-extrabold text-lg tracking-tight flex-1 truncate">{titles[tab]}</h1>
+            <SyncBadge sync={sync} onClick={() => setSettingsOpen(true)} />
+            <button onClick={() => setSettings({ theme: isDark ? 'light' : 'dark' })} className={ICON_BTN} aria-label="Toggle dark mode"><Icon name={isDark ? 'sun' : 'moon'} /></button>
+            <button onClick={() => setSettingsOpen(true)} className={ICON_BTN} aria-label="Settings"><Icon name="sliders" /></button>
+          </div>
+        </header>
+
+        <main className="max-w-5xl lg:max-w-7xl mx-auto px-4 lg:px-8 pt-4">
+          {/* Until this device uses password sync, show the password box right on Home */}
+          {tab === 'home' && !isPasswordCode(sync.code) && (
+            <div className={`${CARD} p-4 mb-4 border-2 !border-pink-400`}>
+              <div className="font-extrabold mb-1">🔑 Phone + computer: same data</div>
+              <PasswordConnect />
+            </div>
+          )}
+          {tab === 'home' && <Dashboard onOpenAccount={openAccount} onFilterList={filterList} />}
+          {tab === 'calendar' && <CalendarView />}
+          {tab === 'board' && <BoardView />}
+          {tab === 'list' && <ListView filters={filters} setFilters={setFilters} />}
+          {tab === 'accounts' && <AccountsView openAccountId={openAccountId} setOpenAccountId={setOpenAccountId} />}
+        </main>
+
+        {/* Big + button (quick capture) */}
+        <button onClick={() => setQuick({})} aria-label="Quick add idea"
+          className="lg:hidden fixed right-4 z-40 w-16 h-16 rounded-full text-white grid place-items-center shadow-xl shadow-pink-500/40 active:scale-90 transition"
+          style={{ background: BRAND_GRADIENT, bottom: 'calc(76px + env(safe-area-inset-bottom))' }}>
+          <Icon name="plus" className="w-8 h-8" strokeWidth={2.5} />
+        </button>
+
+        {/* Bottom navigation */}
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur border-t border-zinc-200 dark:border-zinc-800 pb-safe">
+          <div className="max-w-xl mx-auto grid grid-cols-5">
+            {NAV.map(([id, label, icon]) => (
+              <button key={id} onClick={() => goTab(id)} aria-current={tab === id ? 'page' : undefined}
+                className={`flex flex-col items-center justify-center gap-0.5 min-h-[62px] text-[11px] font-semibold transition ${tab === id ? 'text-pink-600 dark:text-pink-400' : 'text-zinc-500'}`}>
+                <Icon name={icon} className="w-6 h-6" />{label}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        {/* Popups */}
+        {openIdeaObj && <IdeaEditor key={openIdeaObj.id} idea={openIdeaObj} onClose={() => setOpenIdeaId(null)} />}
+        {quick && <QuickCapture preset={quick} onClose={() => setQuick(null)} />}
+        {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
+        {askPassword && !sync.code && !settingsOpen && (
+          <Sheet title="☁️ Same data on phone & computer" onClose={skipPassword}>
+            <div className="p-4 pb-6 space-y-3">
+              <PasswordConnect onDone={() => setAskPassword(false)} />
+              <button onClick={skipPassword} className="w-full text-sm text-zinc-500 min-h-[40px]">Not now (turn on later in Settings → Cloud sync)</button>
+            </div>
+          </Sheet>
+        )}
+
+        <datalist id="series-names">{seriesNames.map(n => <option key={n} value={n} />)}</datalist>
+
+        {toastMsg && (
+          <div className="animate-toast fixed left-1/2 z-[70] -translate-x-1/2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 px-4 py-3 text-sm font-semibold shadow-xl max-w-[90vw] text-center"
+            style={{ bottom: window.innerWidth >= 1024 ? 32 : 'calc(152px + env(safe-area-inset-bottom))' }} role="status">
+            {toastMsg}
+          </div>
+        )}
+      </div>
+    </StoreContext.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

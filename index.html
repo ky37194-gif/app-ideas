@@ -579,6 +579,10 @@
     font-weight: 600; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); transform: translate(-50%, -140%); white-space: nowrap; max-width: 70vw; overflow: hidden; text-overflow: ellipsis; }
   .drop-root { display: none; margin: 0 0 12px; padding: 14px; border: 2px dashed var(--border); border-radius: 14px; text-align: center; color: var(--muted); }
   body.pg-drag-on .drop-root { display: block; }
+  /* 📱 SM planner inside Earning */
+  .sm-frame { display: block; width: 100%; height: calc(100dvh - 64px); border: 0; background: var(--bg); }
+  @media (max-width: 899px) { .sm-frame { height: calc(100dvh - 64px - 64px); } }
+  .sm-card { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px; font: inherit; text-align: left; text-decoration: none; color: inherit; }
 </style>
 </head>
 
@@ -2347,7 +2351,7 @@ async function connectWithPassword(password) {
 function refreshAfterSync() {
   const { page, id } = parseRoute();
   const typing = document.activeElement && (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable);
-  if (page === 'edit' || page === 'new' || typing || drag || pgDrag || slash || document.getElementById('sheet').open) return;
+  if (page === 'sm' || page === 'edit' || page === 'new' || typing || drag || pgDrag || slash || document.getElementById('sheet').open) return;
   if (page === 'idea' && !findIdea(id)) { location.hash = '#/'; return; }
   render();
 }
@@ -2836,6 +2840,14 @@ function renderEarnLock() {
     ${bottomNav('earn')}`;
 }
 
+// 📱 SM Content Planner (its own look, data and sync), opened inside Earning.
+function renderSm() {
+  return `
+    ${topBar('📱 SM Planner', { back: '#/earn', actions: '<a class="icon-btn" href="/sm/" target="_blank" rel="noopener" aria-label="Alag tab me kholo" title="Alag tab me kholo">↗</a>' })}
+    <iframe id="sm-frame" class="sm-frame" src="/sm/" title="SM Content Planner" allow="clipboard-read; clipboard-write; web-share"></iframe>
+    ${bottomNav('earn')}`;
+}
+
 function pagePreview(p) {
   const b = p.blocks.find(x => x.type !== 'divider' && x.text.trim());
   return b ? b.text.trim().slice(0, 140) : '';
@@ -2864,6 +2876,7 @@ function renderEarnHome() {
       ${earnCloud.id ? '' : '<button class="card inbox-banner" data-action="earn-creds" style="width:100%;font:inherit;text-align:left;cursor:pointer"><span class="big">🔑</span><span style="flex:1"><b>Earning ka ID + password set karo</b><br><span class="muted small">Abhi sirf password hai — ID add karke aur secure karo</span></span><span class="muted">›</span></button>'}
       <div class="row-between" style="margin:0 0 8px"><span class="muted small">🔒 Private — sirf aap</span><button class="btn" data-action="earn-creds">🔑 Password badlo</button></div>
       <p class="muted small" style="margin:0 0 12px"> Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
+      <a class="card sm-card" href="#/sm"><span class="big" style="font-size:1.8rem">📱</span><span style="flex:1"><b>SM — Content Planner</b><br><span class="muted small">Social media ke saare ideas, posts aur plan</span></span><span class="muted">›</span></a>
       <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
       ${top.length > 1 ? '<p class="hint" style="margin:10px 0 0">💡 <b>⠿</b> pakad ke kisi doosre page pe chhodo — wo uske folder me chala jayega.</p>' : ''}
       <div class="list" style="margin-top:12px">${top.length ? top.map(earnCard).join('')
@@ -3852,6 +3865,7 @@ function drawerList() {
     <a class="drawer-item" href="#/inbox"><span class="name">📥 Inbox kholo</span></a>
     ${canEarn() ? `<h3>💰 Earning (private)</h3>` + (earnCloud.code
       ? topEarnPages().map(p => `<a class="drawer-item" href="#/earn/${p.id}"><span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>`).join('')
+        + '<a class="drawer-item" href="#/sm"><span>📱</span><span class="name">SM Planner</span></a>'
         + '<a class="drawer-item" href="#/earn"><span class="name">💰 Saare earning methods</span></a>'
       : '<a class="drawer-item" href="#/earn"><span class="name">🔒 Earning kholo</span></a>') : ''}
     <div class="drawer-links">
@@ -3999,6 +4013,11 @@ function render() {
     if (id && FOLDERS.some(f => f.key === id)) { ui.folder = id; try { localStorage.setItem(FOLDER_KEY, id); } catch { /* ignore */ } }
     app.innerHTML = renderMisc(id || null);
     if (ui.addSubTo) document.querySelector('#subtodo-form input')?.focus();
+  } else if (page === 'sm') {
+    if (!canEarn()) { location.hash = '#/'; return; }
+    if (!earnCloud.code) { app.innerHTML = renderEarnLock(); return; }
+    if (app.querySelector('#sm-frame')) return; // already open — don't reload the planner
+    app.innerHTML = renderSm();
   } else if (page === 'earn') {
     app.innerHTML = renderEarn(id);
     sizeCodes(app);
@@ -4026,7 +4045,7 @@ function render() {
   }
   // PC sidebar on every screen (on phones it only shows on Home + Dashboard)
   if (!app.querySelector('.bottom-nav')) app.insertAdjacentHTML('beforeend', bottomNav('').replace('class="bottom-nav"', 'class="bottom-nav mobile-hidden"'));
-  document.title = page === 'idea' && findIdea(id) ? `${findIdea(id).name} · App Ideas` : page === 'earn' ? '💰 Earning' : 'App Ideas Tracker';
+  document.title = page === 'idea' && findIdea(id) ? `${findIdea(id).name} · App Ideas` : page === 'earn' ? '💰 Earning' : page === 'sm' ? '📱 SM Planner' : 'App Ideas Tracker';
   animateBars();
 }
 
@@ -4507,7 +4526,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-30e';
+const APP_VERSION = '2026-10-30f';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
