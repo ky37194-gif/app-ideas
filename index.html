@@ -569,6 +569,16 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
   }
+  /* Earning: drag a page onto another page to put it inside */
+  .pg-drag { flex: none; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
+    color: var(--muted); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; font-size: 1.1rem; }
+  .pg-drag:hover { background: rgba(127, 127, 127, .15); color: var(--text); }
+  .pg-dragging { opacity: .35; }
+  .drop-hover { outline: 2px dashed var(--primary); outline-offset: 2px; }
+  .drag-ghost { position: fixed; z-index: 1000; pointer-events: none; padding: 8px 14px; border-radius: 12px; background: var(--primary); color: var(--primary-ink, #fff);
+    font-weight: 600; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); transform: translate(-50%, -140%); white-space: nowrap; max-width: 70vw; overflow: hidden; text-overflow: ellipsis; }
+  .drop-root { display: none; margin: 0 0 12px; padding: 14px; border: 2px dashed var(--border); border-radius: 14px; text-align: center; color: var(--muted); }
+  body.pg-drag-on .drop-root { display: block; }
 </style>
 </head>
 
@@ -2337,7 +2347,7 @@ async function connectWithPassword(password) {
 function refreshAfterSync() {
   const { page, id } = parseRoute();
   const typing = document.activeElement && (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || document.activeElement.isContentEditable);
-  if (page === 'edit' || page === 'new' || typing || drag || slash || document.getElementById('sheet').open) return;
+  if (page === 'edit' || page === 'new' || typing || drag || pgDrag || slash || document.getElementById('sheet').open) return;
   if (page === 'idea' && !findIdea(id)) { location.hash = '#/'; return; }
   render();
 }
@@ -2836,10 +2846,10 @@ function earnCard(p) {
   const todos = p.blocks.filter(b => b.type === 'todo');
   const meta = [inside ? `📄 ${inside} page andar` : '', todos.length ? `☑ ${todos.filter(b => b.checked).length}/${todos.length}` : ''].filter(Boolean).join(' · ');
   return `
-    <a class="card idea-card" href="#/earn/${p.id}">
+    <a class="card idea-card" href="#/earn/${p.id}" data-drop-page="${p.id}">
       <div class="card-top">
         <h3 class="row" style="gap:10px"><span class="earn-card-ico">${esc(p.icon)}</span><span>${esc(p.title || 'Untitled')}</span></h3>
-        <span class="muted small">›</span>
+        <span class="pg-drag" data-drag-page="${p.id}" title="Pakad ke kisi page pe chhodo — uske andar chala jayega" aria-label="Drag">⠿</span>
       </div>
       ${pagePreview(p) ? `<p class="card-desc" style="margin-bottom:0">${esc(pagePreview(p))}</p>` : ''}
       <div class="card-meta"><span>${meta}</span><span>${timeAgo(p.updatedAt)}</span></div>
@@ -2855,6 +2865,7 @@ function renderEarnHome() {
       <div class="row-between" style="margin:0 0 8px"><span class="muted small">🔒 Private — sirf aap</span><button class="btn" data-action="earn-creds">🔑 Password badlo</button></div>
       <p class="muted small" style="margin:0 0 12px"> Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
       <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
+      ${top.length > 1 ? '<p class="hint" style="margin:10px 0 0">💡 <b>⠿</b> pakad ke kisi doosre page pe chhodo — wo uske folder me chala jayega.</p>' : ''}
       <div class="list" style="margin-top:12px">${top.length ? top.map(earnCard).join('')
         : '<div class="card empty"><div class="big">💰</div><p class="muted">Abhi kuch nahi. Upar ＋ dabao aur pehla earning method likho.</p></div>'}</div>
     </main>
@@ -2863,7 +2874,7 @@ function renderEarnHome() {
 
 function renderEarnPage(page) {
   const parent = findPage(page.parentId);
-  const crumbs = pageAncestors(page).map(p => `<a href="#/earn/${p.id}">${esc(p.icon)} ${esc(p.title || 'Untitled')}</a><span>›</span>`).join('');
+  const crumbs = pageAncestors(page).map(p => `<a href="#/earn/${p.id}" data-drop-page="${p.id}">${esc(p.icon)} ${esc(p.title || 'Untitled')}</a><span>›</span>`).join('');
   const kids = childPages(page.id);
   return `
     ${topBar(`<span id="earn-top-title">${esc(page.icon)} ${esc(page.title || 'Untitled')}</span>`, {
@@ -2871,20 +2882,21 @@ function renderEarnPage(page) {
       actions: '<button class="icon-btn" data-action="earn-page-menu" aria-label="Page options" title="Page options">⋯</button>',
     })}
     <main class="page notion">
-      <nav class="crumbs"><a href="#/earn">💰 Earning</a><span>›</span>${crumbs}</nav>
+      <nav class="crumbs"><a href="#/earn" data-drop-root>💰 Earning</a><span>›</span>${crumbs}<a href="#/earn/${page.id}" data-drop-page="${page.id}">${esc(page.icon)} ${esc(page.title || 'Untitled')}</a></nav>
       <button class="pg-icon" data-action="earn-icon" aria-label="Icon badlo" title="Icon badlo">${esc(page.icon)}</button>
       <div id="pg-title" class="pg-title" contenteditable="${CE}" data-ph="Untitled" role="textbox" aria-label="Page title">${esc(page.title)}</div>
       <div class="muted small">${page.by ? avatar(page.by) + ' ' : ''}Last edit ${timeAgo(page.updatedAt)}</div>
       <div id="blocks" class="blocks">${blocksHTML(page)}</div>
       <button class="add-block" data-action="earn-add-block">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
       <section class="subpages">
+        <div class="drop-root" ${page.parentId && findPage(page.parentId) ? `data-drop-page="${page.parentId}"` : 'data-drop-root'}>⬆️ Yahan chhodo — is folder se bahar nikalo</div>
         <div class="row-between">
           <h3>📁 Andar ke pages${kids.length ? ` (${kids.length})` : ''}</h3>
           <button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Naya page</button>
         </div>
         ${kids.map(k => {
           const n = pageDescendants(k.id).length;
-          return `<a class="subpage" href="#/earn/${k.id}"><span>${esc(k.icon)}</span><span class="name">${esc(k.title || 'Untitled')}</span><span class="muted small">${n ? '📄 ' + n + ' ' : ''}›</span></a>`;
+          return `<a class="subpage" href="#/earn/${k.id}" data-drop-page="${k.id}"><span class="pg-drag" data-drag-page="${k.id}" title="Pakad ke kisi page pe chhodo" aria-label="Drag">⠿</span><span>${esc(k.icon)}</span><span class="name">${esc(k.title || 'Untitled')}</span><span class="muted small">${n ? '📄 ' + n + ' ' : ''}›</span></a>`;
         }).join('')}
       </section>
       <p class="hint" style="margin-top:22px">Shortcut: <b>#</b> heading · <b>-</b> list · <b>1.</b> number · <b>[]</b> checkbox · <b>&gt;</b> quote · <b>---</b> line · <b>/</b> sab options · <b>⋮⋮</b> se block badlo / hatao</p>
@@ -3196,6 +3208,90 @@ function newEarnPage(parentId = null) {
   return p;
 }
 
+// Put a page (with everything inside it) into another page. null = back to the main list.
+function movePageInto(pageId, targetId) {
+  const page = findPage(pageId);
+  if (!page) return false;
+  targetId = targetId && findPage(targetId) ? targetId : null;
+  if (targetId === pageId || (targetId && pageDescendants(pageId).some(p => p.id === targetId))) {
+    toast('❌ Page ko uske apne andar nahi daal sakte'); return false;
+  }
+  const from = page.parentId && findPage(page.parentId) ? page.parentId : null;
+  if (from === targetId) return false;
+  page.parentId = targetId;
+  page.updatedAt = Date.now();
+  saveEarn();
+  render();
+  const to = targetId ? findPage(targetId) : null;
+  toast(`📁 "${page.title || 'Untitled'}" → ${to ? to.icon + ' ' + (to.title || 'Untitled') : 'main list'}`, () => {
+    const p = findPage(pageId);
+    if (!p) return;
+    p.parentId = from; p.updatedAt = Date.now(); saveEarn(); render();
+  });
+  return true;
+}
+
+// Drag ⠿ on an Earning page and drop it on another page (card, sub-page row or breadcrumb).
+let pgDrag = null;
+let pgJustDragged = 0;
+function pgDropTarget(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const t = el && el.closest('[data-drop-page],[data-drop-root]');
+  if (!t || !pgDrag || t.dataset.dropPage === pgDrag.id) return null;
+  return t;
+}
+document.addEventListener('pointerdown', e => {
+  const h = e.target.closest('[data-drag-page]');
+  if (!h || e.button > 0) return;
+  e.preventDefault();
+  const page = findPage(h.dataset.dragPage);
+  if (!page) return;
+  pgDrag = { id: page.id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false, src: h.closest('[data-drop-page]'), ghost: null, over: null, title: page.icon + ' ' + (page.title || 'Untitled') };
+  try { h.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+});
+document.addEventListener('pointermove', e => {
+  if (!pgDrag || e.pointerId !== pgDrag.pointerId) return;
+  e.preventDefault();
+  if (!pgDrag.moved) {
+    if (Math.hypot(e.clientX - pgDrag.x, e.clientY - pgDrag.y) < 6) return;
+    pgDrag.moved = true;
+    pgDrag.ghost = document.createElement('div');
+    pgDrag.ghost.className = 'drag-ghost';
+    pgDrag.ghost.textContent = pgDrag.title;
+    document.body.appendChild(pgDrag.ghost);
+    document.body.classList.add('pg-drag-on');
+    if (pgDrag.src) pgDrag.src.classList.add('pg-dragging');
+  }
+  pgDrag.ghost.style.left = e.clientX + 'px';
+  pgDrag.ghost.style.top = e.clientY + 'px';
+  const t = pgDropTarget(e.clientX, e.clientY);
+  if (t !== pgDrag.over) {
+    if (pgDrag.over) pgDrag.over.classList.remove('drop-hover');
+    pgDrag.over = t;
+    if (t) t.classList.add('drop-hover');
+  }
+  if (e.clientY < 90) window.scrollBy(0, -12);
+  else if (e.clientY > window.innerHeight - 90) window.scrollBy(0, 12);
+});
+function endPgDrag(e, cancel) {
+  if (!pgDrag || e.pointerId !== pgDrag.pointerId) return;
+  const d = pgDrag;
+  pgDrag = null;
+  document.body.classList.remove('pg-drag-on');
+  if (d.ghost) d.ghost.remove();
+  if (d.over) d.over.classList.remove('drop-hover');
+  if (d.src) d.src.classList.remove('pg-dragging');
+  if (!d.moved) return;
+  pgJustDragged = Date.now(); // swallow the click that follows
+  if (!cancel && d.over) movePageInto(d.id, d.over.dataset.dropPage || null);
+}
+document.addEventListener('pointerup', e => endPgDrag(e, false));
+document.addEventListener('pointercancel', e => endPgDrag(e, true));
+// Tapping ⠿ (or the click right after a drag) must not open the page.
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-drag-page]') || Date.now() - pgJustDragged < 400) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+
 function pageToText(page) {
   let n = 0;
   const lines = page.blocks.map(b => {
@@ -3390,6 +3486,7 @@ const extraActions = {
         <h2>${esc(page.icon)} ${esc(page.title || 'Untitled')}</h2>
         <div style="display:grid;gap:10px">
           <button type="button" class="btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>
+          <button type="button" class="btn" data-action="earn-move-pick">📁 Kisi folder me daalo</button>
           <button type="button" class="btn" data-action="earn-copy">📋 Saara text copy karo</button>
           <button type="button" class="btn danger" data-action="earn-delete-page">🗑️ Ye page delete karo</button>
           <button type="button" class="btn" data-action="earn-creds">🔑 Earning ID / password badlo</button>
@@ -3399,6 +3496,29 @@ const extraActions = {
       </div>`;
     sheet.showModal();
   },
+
+  'earn-move-pick'() {
+    const page = curPage();
+    if (!page) return;
+    const bad = new Set([page.id, ...pageDescendants(page.id).map(p => p.id)]);
+    const label = p => [...pageAncestors(p), p].map(x => esc(x.icon) + ' ' + esc(x.title || 'Untitled')).join(' › ');
+    const options = earn.pages.filter(p => !bad.has(p.id) && p.id !== page.parentId)
+      .sort((a, b) => label(a).localeCompare(label(b)));
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `
+      <div class="sheet-inner">
+        <h2>📁 "${esc(page.title || 'Untitled')}" kahan daalein?</h2>
+        <div style="display:grid;gap:8px;max-height:60vh;overflow:auto">
+          ${page.parentId && findPage(page.parentId) ? '<button type="button" class="btn" data-action="earn-move-to" data-value="">💰 Bahar — Earning ki main list me</button>' : ''}
+          ${options.map(p => `<button type="button" class="btn" style="justify-content:flex-start;text-align:left" data-action="earn-move-to" data-value="${p.id}">${label(p)}</button>`).join('')
+            || '<p class="muted">Koi aur page nahi hai. Pehle ek page banao.</p>'}
+        </div>
+        <button type="button" class="btn block" data-action="close-sheet" style="margin-top:10px">Close</button>
+      </div>`;
+    sheet.showModal();
+  },
+
+  'earn-move-to'(el) { const page = curPage(); closeSheet(); if (page) movePageInto(page.id, el.dataset.value || null); },
 
   'earn-copy'() { const page = curPage(); if (page) { closeSheet(); copyText(pageToText(page)); } },
 
@@ -4387,7 +4507,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-30c';
+const APP_VERSION = '2026-10-30d';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
