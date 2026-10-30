@@ -1126,6 +1126,7 @@ function bottomNav(active) {
   return `
     <nav class="bottom-nav" aria-label="Main">
       <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
+      <a class="nav-item ${active === 'priority' ? 'active' : ''}" href="#/priority"><span class="ico">🔥</span>Priority<span class="nav-count">${priorityCount() || ''}</span></a>
       <a class="nav-item ${active === 'home' ? 'active' : ''}" href="#/"><span class="ico">🗂️</span>Ideas</a>
       <div class="nav-subs">${FOLDERS.map(f => `
         <a class="nav-sub ${active === 'home' && ui.folder === f.key ? 'active' : ''}" href="#/" data-action="folder" data-value="${f.key}">
@@ -1134,7 +1135,6 @@ function bottomNav(active) {
       </div>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
-      <a class="nav-item ${active === 'priority' ? 'active' : ''}" href="#/priority"><span class="ico">🔥</span>Priority<span class="nav-count">${priorityCount() || ''}</span></a>
       <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
       ${canEarn() ? `<a class="nav-item ${active === 'earn' ? 'active' : ''}" href="#/earn"><span class="ico">💰</span>Earning</a>` : ''}
     </nav>`;
@@ -4526,7 +4526,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-10-30g';
+const APP_VERSION = '2026-10-30h';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
