@@ -1290,6 +1290,7 @@ function todoRow(t) {
         ${all.length ? `<span class="todo-count" title="Andar ke kaam">☰ ${all.filter(x => x.done).length}/${all.length}</span>` : ''}
         ${t.by ? avatar(t.by) : ''}
         ${prioButton(t)}
+        ${canEarn() ? `<button class="icon-btn" data-action="todo-to-earn" data-id="${t.id}" aria-label="Earning me bhejo" title="💰 Earning me bhejo">📂</button>` : ''}
         <button class="icon-btn todo-sub" data-action="add-subtodo" data-id="${t.id}" aria-label="Iske andar task add karo" title="Andar task add karo">＋</button>
         <button class="icon-btn todo-del" data-action="delete-todo" data-id="${t.id}" aria-label="Delete">✕</button>
       </div>
@@ -3500,6 +3501,54 @@ const extraActions = {
     toast(msg);
   },
 
+  // Misc task (with its sub-tasks) → any Earning page, or a new page.
+  'todo-to-earn'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    const opt = (value, label, depth = 0) => `<button type="button" class="btn" data-action="todo-earn-to" data-id="${t.id}" data-value="${value}" style="padding-left:${10 + depth * 18}px">${label}</button>`;
+    const rows = [];
+    const walk = (p, depth) => { rows.push(opt(p.id, `${depth ? '↳ ' : ''}${esc(p.icon)} ${esc(p.title || 'Untitled')}`, depth)); childPages(p.id).forEach(c => walk(c, depth + 1)); };
+    topEarnPages().forEach(p => walk(p, 0));
+    const kids = descendantsOf(t.id).length;
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `
+      <div class="sheet-inner">
+        <h2>💰 Earning me kahan daalein?</h2>
+        <p class="small inbox-quote">${esc(t.text.slice(0, 200))}${kids ? ` <span class="muted">(+${kids} andar ke task)</span>` : ''}</p>
+        ${earnCloud.code
+          ? `<div class="move-list" style="display:grid;gap:6px">${opt('', '➕ Naya page banao')}${rows.join('')}</div>`
+          : '<p class="muted small">🔒 Pehle 💰 Earning unlock karo, phir yahan wapas aao.</p>'}
+        <button type="button" class="btn block" data-action="close-sheet" style="margin-top:16px">Cancel</button>
+      </div>`;
+    sheet.showModal();
+  },
+
+  'todo-earn-to'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t || !earnCloud.code) return;
+    const depthOf = x => { let d = 0, p = x; while (p.parentId && p.id !== t.id) { p = state.todos.find(y => y.id === p.parentId); if (!p) break; d++; } return d; };
+    const subs = descendantsOf(t.id);
+    const subBlocks = subs.map(x => ({ ...newBlock('todo', '  '.repeat(Math.max(0, depthOf(x) - 1)) + '↳ ' + x.text), checked: !!x.done }));
+    const target = el.dataset.value && findPage(el.dataset.value);
+    let msg;
+    if (target) {
+      target.blocks.push({ ...newBlock('todo', t.text), checked: !!t.done }, ...subBlocks);
+      target.updatedAt = Date.now();
+      msg = `🔒 ${target.icon} ${target.title || 'Untitled'} me chala gaya`;
+    } else {
+      const { title, rest } = splitNote(t.text);
+      earn.pages.push(normalizePage({ title, icon: '💰', blocks: [...notesToBlocks(rest), ...subBlocks], by: t.by || myRef() }));
+      msg = '🔒 Earning me naya page ban gaya';
+    }
+    saveEarn();
+    const now = Date.now();
+    [t, ...subs].forEach(x => { state.deleted[x.id] = now; });
+    const gone = new Set([t.id, ...subs.map(x => x.id)]);
+    state.todos = state.todos.filter(x => !gone.has(x.id));
+    saveState(); closeSheet(); render();
+    toast(msg);
+  },
+
   'toggle-prio'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
@@ -4608,7 +4657,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01b';
+const APP_VERSION = '2026-11-01c';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
