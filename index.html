@@ -252,7 +252,7 @@
   .todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .todo { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 10px; min-height: 52px;
     border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-  .todo-check { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--muted);
+  .todo-check { flex: none; width: 28px; height: 28px; border-radius: 7px; border: 2px solid var(--muted);
     background: transparent; color: #fff; font-weight: 800; cursor: pointer; display: grid; place-items: center; padding: 0; }
   .todo-check:hover { border-color: var(--success); }
   .todo.done .todo-check { background: var(--success); border-color: var(--success); }
@@ -3090,6 +3090,7 @@ function renderEarnPage(page) {
           <h3>📁 Andar ke pages${kids.length ? ` (${kids.length})` : ''}</h3>
           <button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Naya page</button>
         </div>
+        ${page.id.startsWith('ideas-folder-') && kids.some(k => !isFeatureList(k)) ? `<button class="btn block" data-action="earn-features-only" data-id="${page.id}" style="margin:6px 0 10px">🧹 Har idea page me sirf features rakho (baaki sab hatao)</button>` : ''}
         ${kids.map(k => {
           const n = pageDescendants(k.id).length;
           return `<a class="subpage" href="#/earn/${k.id}" data-drop-page="${k.id}"><span class="pg-drag" data-drag-page="${k.id}" title="Pakad ke kisi page pe chhodo" aria-label="Drag">⠿</span><span>${esc(k.icon)}</span><span class="name">${esc(k.title || 'Untitled')}</span><span class="muted small">${n ? '📄 ' + n + ' ' : ''}›</span></a>`;
@@ -3395,13 +3396,52 @@ function applyBlockType(id, type, fromSlash) {
   touchPage(page); redrawBlocks(b.id, -1);
 }
 
+// Pages inside the shifted Ideas folders are just a feature list (☐ / • lines).
+const inIdeasFolder = id => { let p = id && findPage(id); while (p) { if (p.id.startsWith('ideas-folder-')) return p; p = p.parentId && findPage(p.parentId); } return null; };
 function newEarnPage(parentId = null) {
-  const p = normalizePage({ parentId, icon: parentId ? '📄' : '💰', by: myRef() });
+  const folder = inIdeasFolder(parentId);
+  const p = normalizePage({ parentId, icon: folder ? folder.icon : parentId ? '📄' : '💰', by: myRef(), blocks: folder ? [newBlock('todo')] : [] });
   earn.pages.push(p);
   saveEarn();
   ui.focusTitle = true;
   location.hash = '#/earn/' + p.id;
   return p;
+}
+
+// A page that is only ☐ / • lines (no headings, text, links…).
+const isFeatureList = p => p.blocks.length > 0 && p.blocks.every(b => b.type === 'todo' || b.type === 'bullet');
+// Keep only the feature lines of an idea page: the "✨ Features" section if there is one.
+function featuresOnly(page) {
+  if (isFeatureList(page)) return page.blocks;
+  const at = page.blocks.findIndex(b => /^h[123]$/.test(b.type) && /feature/i.test(b.text));
+  let keep = [];
+  if (at >= 0) {
+    for (const b of page.blocks.slice(at + 1)) {
+      if (/^h[123]$/.test(b.type)) break;
+      if ((b.type === 'todo' || b.type === 'bullet') && b.text.trim()) keep.push(b);
+    }
+  }
+  return keep.length ? keep : [newBlock('todo')];
+}
+function earnBackup(name) {
+  const json = JSON.stringify({ app: 'app-ideas-earning', exportedAt: new Date().toISOString(), pages: earn.pages }, null, 2);
+  const fileName = `${name}-${todayStr()}.json`;
+  if (window.AndroidBridge) { AndroidBridge.saveFile(fileName, json); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function earnFeaturesOnly(folderId) {
+  const pages = pageDescendants(folderId).filter(p => !isFeatureList(p));
+  if (!pages.length) return toast('Sab pages pehle se sirf features wale hain');
+  if (!confirm(`${pages.length} idea pages me sirf features ki list rahegi.\nStatus, steps, notes, links, journal hat jayenge.\n\nPehle ek backup file download hogi.`)) return;
+  earnBackup('earning-backup');
+  const now = Date.now();
+  pages.forEach(p => { p.blocks = featuresOnly(p); p.updatedAt = now; });
+  saveEarn(); render();
+  toast(`✅ ${pages.length} pages me ab sirf features hain`);
 }
 
 // Put a page (with everything inside it) into another page. null = back to the main list.
@@ -3805,6 +3845,7 @@ const extraActions = {
   },
 
   'earn-new'(el) { closeSheet(); newEarnPage(el.dataset.parent || null); },
+  'earn-features-only'(el) { earnFeaturesOnly(el.dataset.id); },
   'earn-lock': lockEarning,
   'earn-slash'(el) { if (slash) applyBlockType(slash.blockId, el.dataset.value, true); },
 
@@ -5009,7 +5050,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01h';
+const APP_VERSION = '2026-11-01i';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
