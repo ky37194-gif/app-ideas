@@ -293,6 +293,12 @@
   .move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .move-grid .btn { min-height: 44px; font-size: .9rem; padding: 0 10px; justify-content: flex-start; text-align: left; }
   dialog.sheet { overflow-y: auto; }
+  .move-list { display: grid; gap: 6px; }
+  .move-list .btn { min-height: 44px; font-size: .9rem; justify-content: flex-start; text-align: left; padding: 0 10px 0 var(--d, 10px); }
+  .move-list .btn[hidden], .move-list .path-label { display: none; }
+  .move-list.searching .tree-label { display: none; }
+  .move-list.searching .path-label { display: inline; }
+  .move-list.searching .btn { padding-left: 10px; }
 
   /* 💰 Earning: Notion-style pages */
   .notion { max-width: 780px; }
@@ -3441,6 +3447,28 @@ document.addEventListener('paste', e => {
   if (el && el.tagName !== 'TEXTAREA') onBlockPaste(e, el);
 });
 
+// Earning page picker search: every word must be in the page's path ("Parent › Child").
+function filterEarnPick(q) {
+  const list = document.getElementById('earn-pick');
+  if (!list) return;
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  list.classList.toggle('searching', words.length > 0);
+  let shown = 0;
+  list.querySelectorAll('button[data-q]').forEach(b => {
+    const isNew = !b.dataset.value;
+    const ok = isNew || words.every(w => b.dataset.q.includes(w));
+    b.hidden = !ok;
+    if (ok && !isNew) shown++;
+  });
+  document.getElementById('earn-pick-none').hidden = !(words.length && !shown);
+}
+document.addEventListener('keydown', e => {
+  if (e.target.id !== 'earn-pick-search' || e.key !== 'Enter') return;
+  e.preventDefault();
+  const first = [...document.querySelectorAll('#earn-pick button[data-value]')].find(b => !b.hidden && b.dataset.value);
+  if (first && e.target.value.trim()) first.click();
+});
+
 /* ----- Buttons (merged into `actions` in Section 14) ----- */
 const extraActions = {
   'inbox-move'(el) {
@@ -3505,10 +3533,18 @@ const extraActions = {
   'todo-to-earn'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
-    const opt = (value, label, depth = 0) => `<button type="button" class="btn" data-action="todo-earn-to" data-id="${t.id}" data-value="${value}" style="padding-left:${10 + depth * 18}px">${label}</button>`;
+    const opt = (value, label, depth = 0, path = '') => `<button type="button" class="btn" data-action="todo-earn-to" data-id="${t.id}" data-value="${value}" data-q="${esc(path.toLowerCase())}" style="--d:${10 + depth * 18}px">
+      <span class="tree-label">${label}</span><span class="path-label">${esc(path)}</span></button>`;
     const rows = [];
-    const walk = (p, depth) => { rows.push(opt(p.id, `${depth ? '↳ ' : ''}${esc(p.icon)} ${esc(p.title || 'Untitled')}`, depth)); childPages(p.id).forEach(c => walk(c, depth + 1)); };
-    topEarnPages().forEach(p => walk(p, 0));
+    const seen = new Set();
+    const walk = (p, depth, trail) => {
+      if (seen.has(p.id)) return; seen.add(p.id);
+      const name = `${p.icon} ${p.title || 'Untitled'}`;
+      const path = trail ? `${trail} › ${name}` : name;
+      rows.push(opt(p.id, `${depth ? '↳ ' : ''}${esc(name)}`, depth, path));
+      childPages(p.id).forEach(c => walk(c, depth + 1, path));
+    };
+    topEarnPages().forEach(p => walk(p, 0, ''));
     const kids = descendantsOf(t.id).length;
     const sheet = document.getElementById('sheet');
     sheet.innerHTML = `
@@ -3516,11 +3552,15 @@ const extraActions = {
         <h2>💰 Earning me kahan daalein?</h2>
         <p class="small inbox-quote">${esc(t.text.slice(0, 200))}${kids ? ` <span class="muted">(+${kids} andar ke task)</span>` : ''}</p>
         ${earnCloud.code
-          ? `<div class="move-list" style="display:grid;gap:6px">${opt('', '➕ Naya page banao')}${rows.join('')}</div>`
+          ? `<input id="earn-pick-search" type="search" placeholder="🔍 Page ka naam likho… (Enter = pehle wale me bhejo)" aria-label="Earning page search" autocomplete="off" style="margin-bottom:10px">
+             <div id="earn-pick" class="move-list">${opt('', '➕ Naya page banao')}${rows.join('')}</div>
+             <p id="earn-pick-none" class="muted small" hidden>Koi page nahi mila. ➕ Naya page bana lo.</p>`
           : '<p class="muted small">🔒 Pehle 💰 Earning unlock karo, phir yahan wapas aao.</p>'}
         <button type="button" class="btn block" data-action="close-sheet" style="margin-top:16px">Cancel</button>
       </div>`;
     sheet.showModal();
+    const box = document.getElementById('earn-pick-search');
+    if (box) box.focus();
   },
 
   'todo-earn-to'(el) {
@@ -4602,6 +4642,7 @@ document.addEventListener('input', e => {
     ui.drawerSearch = e.target.value;
     document.getElementById('drawer-list').innerHTML = drawerList();
   }
+  if (e.target.id === 'earn-pick-search') filterEarnPick(e.target.value);
   if (e.target.dataset?.dupcheck) updateDupHint(e.target.value);
   if (e.target.classList?.contains('blk-text')) onBlockInput(e.target);
   if (e.target.id === 'pg-title') onTitleInput(e.target);
@@ -4657,7 +4698,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01c';
+const APP_VERSION = '2026-11-01d';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
