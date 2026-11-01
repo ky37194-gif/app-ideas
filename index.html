@@ -569,7 +569,7 @@
     .nav-subs { display: grid; gap: 2px; margin: -2px 0 6px 18px; padding-left: 10px; border-left: 2px solid var(--border); }
     .nav-sub { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 10px;
       color: var(--muted); text-decoration: none; font-size: .9rem; font-weight: 600; }
-    .nav-sub .name { flex: 1; }
+    .nav-sub .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .nav-sub .count { font-size: .75rem; opacity: .8; }
     .nav-sub:hover { background: var(--surface-2); color: var(--text); }
     .nav-sub.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--text); }
@@ -602,6 +602,80 @@
   .sm-frame { display: block; width: 100%; height: calc(100dvh - 64px); border: 0; background: var(--bg); }
   @media (max-width: 899px) { .sm-frame { height: calc(100dvh - 64px - 64px); } }
   .sm-card { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px; font: inherit; text-align: left; text-decoration: none; color: inherit; }
+
+  /* ---------- 18. Task side panel (tap a task's text) ---------- */
+  .todo-text { cursor: pointer; }
+  .todo-extra { margin-left: 6px; font-size: .75rem; opacity: .7; white-space: nowrap; }
+  .todo.selected { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+  .todo-check.on { background: var(--success); border-color: var(--success); }
+  .todo-panel {
+    position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+    background: var(--surface); color: var(--text);
+    padding: calc(10px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    animation: tp-in .18s ease-out;
+  }
+  @keyframes tp-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+  .tp-head { display: flex; align-items: center; gap: 6px; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .tp-place { flex: 1; min-width: 0; font-size: .85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tp-place a { color: var(--primary); text-decoration: none; }
+  .todo-panel textarea { width: 100%; border: 0; background: transparent; color: inherit; resize: none; padding: 6px 2px; box-shadow: none; outline: none; }
+  .todo-panel textarea:focus { background: var(--surface-2); border-radius: 8px; }
+  .tp-title { font-size: 1.3rem; font-weight: 700; line-height: 1.35; min-height: 0; }
+  .tp-desc { min-height: 120px; font-size: .98rem; line-height: 1.55; }
+  .tp-images { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .tp-img { position: relative; }
+  .tp-img img { width: 92px; height: 92px; object-fit: cover; border-radius: 10px; cursor: zoom-in; display: block; border: 1px solid var(--border); }
+  .tp-img-del { position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; border-radius: 50%; border: 0; padding: 0;
+    background: var(--text); color: var(--bg); font-size: .7rem; cursor: pointer; }
+  .tp-img-add { width: 92px; height: 92px; border: 2px dashed var(--border); border-radius: 10px; display: grid; place-items: center;
+    align-content: center; gap: 2px; cursor: pointer; color: var(--muted); font-size: 1.4rem; }
+  .tp-img-add span { font-size: .75rem; font-weight: 600; }
+  .tp-img-add:hover { border-color: var(--primary); color: var(--primary); }
+  .tp-subs { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 2px; }
+  .tp-subs li { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 2px 4px; border-radius: 8px; }
+  .tp-subs li:hover { background: var(--surface-2); }
+  .tp-subs .todo-check { width: 22px; height: 22px; border-radius: 5px; font-size: .8rem; }
+  .tp-subs a { flex: 1; color: inherit; text-decoration: none; word-break: break-word; }
+  .tp-subs li.done a { text-decoration: line-through; color: var(--muted); }
+  .tp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .tp-actions .btn { min-height: 40px; font-size: .88rem; }
+  @media (min-width: 900px) {
+    .todo-panel { left: auto; width: 420px; border-left: 1px solid var(--border); box-shadow: -10px 0 30px rgba(15, 23, 42, .08); padding-top: 16px; }
+  }
+  @media (min-width: 1300px) { body.panel-open { padding-right: 420px; } }
+  @media (min-width: 900px) { .bottom-nav, .bottom-nav.mobile-hidden { overflow-y: auto; } }
+
+  /* ---------- 19. ✔️ TickTick look (theme button cycles to it) ---------- */
+  :root[data-theme="tick"] {
+    --bg: #ffffff; --surface: #ffffff; --surface-2: #f3f4f6; --text: #191919; --muted: #8b8f97;
+    --border: #ececec; --primary: #4772fa; --primary-ink: #ffffff; --danger: #e5484d; --success: #4772fa; --warning: #f5a623;
+    --shadow: none; --radius: 10px; color-scheme: light;
+  }
+  [data-theme="tick"] body { font-size: 15px; }
+  [data-theme="tick"] .topbar { background: #fff; }
+  [data-theme="tick"] .todo-list { gap: 0; }
+  [data-theme="tick"] .todo-item { gap: 0; }
+  [data-theme="tick"] .todo { border: 0; border-bottom: 1px solid var(--border); border-radius: 6px; background: transparent; min-height: 44px; }
+  [data-theme="tick"] .todo:hover { background: #f7f8fa; }
+  [data-theme="tick"] .todo.selected { background: #edf1ff; box-shadow: none; }
+  [data-theme="tick"] .todo.prio { background: transparent; }
+  [data-theme="tick"] .todo.prio .todo-check { border-color: var(--danger); }
+  [data-theme="tick"] .todo-check { width: 18px; height: 18px; border-radius: 4px; border-width: 1.5px; border-color: #b8bcc4; font-size: .7rem; }
+  [data-theme="tick"] .todo.done .todo-check, [data-theme="tick"] .todo-check.on { background: #c3c7ce; border-color: #c3c7ce; }
+  [data-theme="tick"] .todo-children { border-left: 0; margin-left: 26px; padding-left: 0; }
+  [data-theme="tick"] .todo .icon-btn { opacity: 0; transition: opacity .12s; }
+  [data-theme="tick"] .todo:hover .icon-btn, [data-theme="tick"] .todo .prio-btn.on, [data-theme="tick"] .todo .today-btn.on { opacity: 1; }
+  @media (hover: none) { [data-theme="tick"] .todo .icon-btn { opacity: .8; } }
+  [data-theme="tick"] .todo-add input { border-radius: 8px; background: #f5f6f8; border-color: transparent; }
+  [data-theme="tick"] .card { border-radius: 10px; box-shadow: none; }
+  [data-theme="tick"] .btn { border-radius: 8px; }
+  @media (min-width: 900px) {
+    [data-theme="tick"] .bottom-nav, [data-theme="tick"] .bottom-nav.mobile-hidden { background: #f7f7f7; border-right-color: #ececec; }
+    [data-theme="tick"] .nav-item { min-height: 40px; border-radius: 8px; color: #4d4d4d; }
+    [data-theme="tick"] .nav-item.active { background: #e7ecfe; color: #191919; }
+    [data-theme="tick"] .nav-sub { min-height: 34px; }
+    [data-theme="tick"] .todo-panel { box-shadow: none; }
+  }
 </style>
 </head>
 
@@ -935,6 +1009,8 @@ function normalizeTodo(raw = {}) {
   return {
     id: raw.id || uid(),
     text: String(raw.text || ''),
+    desc: String(raw.desc || ''), // longer notes, written in the task's side panel
+    images: (Array.isArray(raw.images) ? raw.images : []).filter(s => typeof s === 'string' && s.startsWith('data:image/')).slice(0, 12),
     parentId: raw.parentId || null, // set = this task lives inside another task
     folder: raw.folder || null, // which Misc list: null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
     done: !!raw.done,
@@ -995,6 +1071,8 @@ function touch(idea) {
 
 // The app's whole saved state lives here.
 let state = loadState();
+// One time only: start on the ✔️ TickTick look (the theme button still changes it).
+try { if (!localStorage.getItem('app-ideas-tick-theme')) { localStorage.setItem('app-ideas-tick-theme', '1'); state.theme = 'tick'; saveState(true); } } catch { /* ignore */ }
 
 // Folders on Home. Every idea lives in exactly one.
 const FOLDERS = [
@@ -1080,7 +1158,7 @@ function weeklyActivity(idea) {
 /* =====================================================================
    SECTION 5: THEME (light / dark / system)
    ===================================================================== */
-const THEME_ICONS = { system: '🌓', light: '☀️', dark: '🌙' };
+const THEME_ICONS = { system: '🌓', light: '☀️', dark: '🌙', tick: '✔️' };
 
 function applyTheme() {
   const root = document.documentElement;
@@ -1089,11 +1167,11 @@ function applyTheme() {
 }
 
 function cycleTheme() {
-  const order = ['system', 'light', 'dark'];
+  const order = ['tick', 'system', 'light', 'dark'];
   state.theme = order[(order.indexOf(state.theme) + 1) % order.length];
   applyTheme();
   saveState();
-  toast({ system: '🌓 Theme: follow device', light: '☀️ Light mode', dark: '🌙 Dark mode' }[state.theme]);
+  toast({ system: '🌓 Theme: follow device', light: '☀️ Light mode', dark: '🌙 Dark mode', tick: '✔️ TickTick look' }[state.theme]);
   render();
 }
 
@@ -1153,13 +1231,30 @@ function bottomNav(active) {
       <a class="nav-item pc-only ${active === CURRENT ? 'active' : ''}" href="#/current" data-drop-list="current"><span class="ico">🎯</span>Current Project</a>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox" data-drop-list="inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
-      ${canEarn() ? `<a class="nav-item ${active === 'earn' ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>` : ''}
+      ${canEarn() ? `<a class="nav-item ${active === 'earn' && !parseRoute().id ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>${earnNavSubs()}` : ''}
+      ${canEarn() && earnCloud.code && findPage(APPS_PAGE) ? `<a class="nav-item pc-only ${inPageTree(APPS_PAGE) ? 'active' : ''}" href="#/earn/${APPS_PAGE}"><span class="ico">📱</span>Apps</a>` : ''}
+      ${canEarn() ? `<a class="nav-item pc-only ${parseRoute().page === 'sm' ? 'active' : ''}" href="#/sm"><span class="ico">📣</span>Social Media</a>` : ''}
       <a class="nav-item pc-only ${active === 'doubts' ? 'active' : ''}" href="#/doubts" data-drop-list="doubts"><span class="ico">❓</span>Doubts &amp; To Know<span class="nav-count">${openTodos(DOUBTS) || ''}</span></a>
       <a class="nav-item pc-only ${active === APPWORK ? 'active' : ''}" href="#/appwork" data-drop-list="appwork"><span class="ico">🛠️</span>Pending in this App<span class="nav-count">${openTodos(APPWORK) || ''}</span></a>
       <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc" data-drop-list="misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
     </nav>`;
 }
 
+
+// 💰 Earning's main folders, listed under Earning in the PC sidebar (only while unlocked).
+const APPS_PAGE = 'side-apps'; // 📱 Apps page inside the side-hustle folder
+function inPageTree(id) {
+  const { page, id: open } = parseRoute();
+  if (page !== 'earn' || !open) return false;
+  const p = findPage(open);
+  return !!p && (p.id === id || pageAncestors(p).some(a => a.id === id));
+}
+function earnNavSubs() {
+  if (!earnCloud.code) return '';
+  const tops = earn.pages.filter(p => !p.parentId || !findPage(p.parentId)).sort((a, b) => a.createdAt - b.createdAt);
+  if (!tops.length) return '';
+  return `<div class="nav-subs">${tops.map(p => `<a class="nav-sub ${inPageTree(p.id) ? 'active' : ''}" href="#/earn/${p.id}" title="${esc(p.title || 'Untitled')}"><span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>`).join('')}</div>`;
+}
 
 /* ----- Search: finds ideas in every folder, best matches first ----- */
 // Score: name starts with query > name has it > word match > other fields. 0 = no match.
@@ -1373,13 +1468,13 @@ function todoRow(t) {
   const adding = ui.addSubTo === t.id;
   return `
     <li class="todo-item">
-      <div class="todo ${t.done ? 'done' : ''}${t.priority && !t.done ? ' prio' : ''}">
+      <div class="todo ${t.done ? 'done' : ''}${t.priority && !t.done ? ' prio' : ''}${ui.openTodo === t.id ? ' selected' : ''}">
         <span class="pg-drag todo-drag" data-drag-todo="${t.id}" title="Pakad ke side wale section (Today, Doubts, Earning…) pe chhodo" aria-label="Drag">⠿</span>
         ${kids.length
           ? `<button class="todo-arrow ${isOpen ? 'open' : ''}" data-action="collapse-todo" data-id="${t.id}" aria-label="${isOpen ? 'Band karo' : 'Kholo'}">›</button>`
           : '<span class="todo-arrow-space"></span>'}
         <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
-        <span class="todo-text">${esc(t.text)}</span>
+        <span class="todo-text" data-action="open-todo" data-id="${t.id}" title="Kholo — edit, details, photos"><span class="tt">${esc(t.text)}</span>${t.desc || t.images.length ? `<span class="todo-extra">${t.desc ? '📝' : ''}${t.images.length ? '🖼️' + t.images.length : ''}</span>` : ''}</span>
         ${all.length ? `<span class="todo-count" title="Andar ke kaam">☰ ${all.filter(x => x.done).length}/${all.length}</span>` : ''}
         ${t.by ? avatar(t.by) : ''}
         ${prioButton(t)}${todayButton(t)}
@@ -1388,7 +1483,7 @@ function todoRow(t) {
         <button class="icon-btn todo-del" data-action="delete-todo" data-id="${t.id}" aria-label="Delete">✕</button>
       </div>
       ${(kids.length && isOpen) || adding ? `<ul class="todo-list todo-children">
-        ${isOpen ? kids.map(todoRow).join('') : ''}
+        ${isOpen ? [...kids].reverse().map(todoRow).join('') : ''}
         ${adding ? `<li><form id="subtodo-form" class="todo-add" data-parent="${t.id}" autocomplete="off">
           <input name="text" required maxlength="200" placeholder="Andar ka task… Enter dabao" aria-label="New sub-task">
           <button type="submit" class="btn primary">Add</button>
@@ -4444,7 +4539,7 @@ function searchEverything(q) {
   let out = '';
   // App sections
   const sections = [['#/dashboard', '📊 Dashboard'], ['#/priority', '🔥 Priority'], ['#/inbox', '📥 Inbox'], ['#/misc', '🧰 Misc'],
-    ...Object.entries(LISTS).map(([k, L]) => ['#/' + k, `${L.emoji} ${L.label}`]), ...(canEarn() ? [['#/earn', '💰 Earning'], ['#/sm', '📱 SM Planner']] : [])]
+    ...Object.entries(LISTS).map(([k, L]) => ['#/' + k, `${L.emoji} ${L.label}`]), ...(canEarn() ? [['#/earn', '💰 Earning'], ['#/sm', '📣 Social Media (SM Planner)'], ['#/earn/' + APPS_PAGE, '📱 Apps']] : [])]
     .filter(([, n]) => hit(n));
   if (sections.length) out += `<h3>📂 Sections</h3>` + sections.map(([h, n]) => item(h, hl(n, q), '')).join('');
   // Tasks (every list)
@@ -4509,7 +4604,8 @@ function drawerList() {
     <a class="drawer-item" href="#/inbox"><span class="name">📥 Inbox kholo</span></a>
     ${canEarn() ? `<h3>💰 Earning (private)</h3>` + (earnCloud.code
       ? topEarnPages().map(p => `<a class="drawer-item" href="#/earn/${p.id}"><span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>`).join('')
-        + '<a class="drawer-item" href="#/sm"><span>📱</span><span class="name">SM Planner</span></a>'
+        + (findPage(APPS_PAGE) ? `<a class="drawer-item" href="#/earn/${APPS_PAGE}"><span>📱</span><span class="name">Apps (phone, Meta, PC)</span></a>` : '')
+        + '<a class="drawer-item" href="#/sm"><span>📣</span><span class="name">Social Media (SM Planner)</span></a>'
         + '<a class="drawer-item" href="#/earn"><span class="name">💰 Saare earning methods</span></a>'
       : '<a class="drawer-item" href="#/earn"><span class="name">🔒 Earning kholo</span></a>') : ''}
     <div class="drawer-links">
@@ -4642,6 +4738,8 @@ const currentIdeaId = () => parseRoute().id;
 function render() {
   const app = document.getElementById('app');
   const { page, id } = parseRoute();
+  const panelScroll = document.getElementById('todo-panel')?.scrollTop || 0;
+  document.body.classList.remove('panel-open');
 
   if (!cloud.code) {
     // No code yet → the site stays locked until the right code is typed.
@@ -4694,11 +4792,13 @@ function render() {
   // PC sidebar on every screen (on phones it only shows on Home + Dashboard)
   mountGoogleButtons();
   if (!app.querySelector('.bottom-nav')) app.insertAdjacentHTML('beforeend', bottomNav('').replace('class="bottom-nav"', 'class="bottom-nav mobile-hidden"'));
+  mountTodoPanel(panelScroll);
   document.title = page === 'idea' && findIdea(id) ? `${findIdea(id).name} · App Ideas` : page === 'earn' ? '💰 Earning' : page === 'sm' ? '📱 SM Planner' : LISTS[page] ? LISTS[page].title : 'App Ideas Tracker';
   animateBars();
 }
 
 window.addEventListener('hashchange', () => {
+  ui.openTodo = null;
   hideSlash();
   flushEarn();
   closeSheet();
@@ -4992,6 +5092,260 @@ const actions = {
 
 Object.assign(actions, extraActions); // Inbox + Earning buttons (Section 11A/11B)
 
+/* =====================================================================
+   SECTION 13B: TASK SIDE PANEL (TickTick style)
+   Tap a task's text → a panel opens on the side (full screen on phones):
+   edit the name, write a description, add photos, see / add sub-tasks,
+   and move the task inside any other task.
+   ===================================================================== */
+const LIST_NAMES = () => ({ '': '🧰 Misc', [INBOX]: '📥 Inbox', ...Object.fromEntries(Object.entries(LISTS).map(([k, L]) => [k, `${L.emoji} ${L.label}`])),
+  ...Object.fromEntries(FOLDERS.map(f => [f.key, `${f.emoji} ${f.label} · Misc`])) });
+const listName = folder => LIST_NAMES()[folder || ''] || '🧰 Misc';
+const panelPage = () => { const { page } = parseRoute(); return page === 'misc' || !!LISTS[page]; };
+
+function renderTodoPanel() {
+  const t = ui.openTodo && state.todos.find(x => x.id === ui.openTodo);
+  if (!t || !panelPage()) return '';
+  const parent = t.parentId && state.todos.find(x => x.id === t.parentId);
+  const kids = [...childrenOf(t.id)].reverse();
+  const when = d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  return `
+    <aside id="todo-panel" class="todo-panel" aria-label="Task details">
+      <div class="tp-head">
+        <button class="todo-check${t.done ? ' on' : ''}" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
+        <span class="tp-place">${parent ? `<a href="#" data-action="open-todo" data-id="${parent.id}">‹ ${esc(parent.text.slice(0, 30))}</a>` : esc(listName(t.folder))}</span>
+        ${prioButton(t)}${todayButton(t)}
+        <button class="icon-btn" data-action="close-todo" aria-label="Band karo" title="Band karo (Esc)">✕</button>
+      </div>
+      <textarea id="tp-title" class="tp-title" data-id="${t.id}" rows="1" maxlength="500" aria-label="Task ka naam">${esc(t.text)}</textarea>
+      <textarea id="tp-desc" class="tp-desc" data-id="${t.id}" placeholder="📝 Description / notes likho…  (photo paste bhi kar sakte ho)" aria-label="Description">${esc(t.desc)}</textarea>
+      <div class="tp-images">
+        ${t.images.map((src, i) => `<div class="tp-img"><img src="${src}" alt="Photo ${i + 1}" data-action="tp-view-img" data-i="${i}"><button class="tp-img-del" data-action="tp-del-img" data-i="${i}" aria-label="Photo hatao">✕</button></div>`).join('')}
+        <label class="tp-img-add" title="Photo daalo"><input id="tp-img-input" type="file" accept="image/*" multiple hidden>🖼️<span>Photo</span></label>
+      </div>
+      <h3 class="sheet-sub">Andar ke kaam (${kids.length})</h3>
+      <ul class="tp-subs">${kids.map(k => `
+        <li class="${k.done ? 'done' : ''}">
+          <button class="todo-check${k.done ? ' on' : ''}" data-action="toggle-todo" data-id="${k.id}" aria-label="Mark done">${k.done ? '✓' : ''}</button>
+          <a href="#" data-action="open-todo" data-id="${k.id}">${esc(k.text)}${childrenOf(k.id).length ? ` <span class="muted small">☰ ${childrenOf(k.id).length}</span>` : ''}</a>
+        </li>`).join('')}</ul>
+      <form id="tp-sub-form" class="todo-add" data-parent="${t.id}" autocomplete="off">
+        <input name="text" required maxlength="200" placeholder="＋ Andar ka task… Enter" aria-label="New sub-task">
+      </form>
+      <div class="tp-actions">
+        <button class="btn" data-action="todo-move-into" data-id="${t.id}">↪️ Kisi aur task / list me daalo</button>
+        ${canEarn() ? `<button class="btn" data-action="todo-to-earn" data-id="${t.id}">📂 Earning page me</button>` : ''}
+        <button class="btn danger" data-action="delete-todo" data-id="${t.id}">🗑️ Delete</button>
+      </div>
+      <p class="muted small" style="margin:10px 2px 0">Banaya ${when(t.createdAt)} · badla ${when(t.updatedAt)}${t.doneAt ? ' · ✓ ' + when(t.doneAt) : ''}</p>
+    </aside>`;
+}
+
+function mountTodoPanel(scroll) {
+  document.body.classList.remove('panel-open');
+  const html = renderTodoPanel();
+  if (!html) return;
+  document.getElementById('app').insertAdjacentHTML('beforeend', html);
+  document.body.classList.add('panel-open');
+  const panel = document.getElementById('todo-panel');
+  if (scroll) panel.scrollTop = scroll;
+  autoGrow(document.getElementById('tp-title'));
+  autoGrow(document.getElementById('tp-desc'));
+}
+function autoGrow(el) { if (!el) return; el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; }
+
+// Photos are shrunk (max 1000px, JPEG) so the synced list stays small.
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 1000 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+    img.src = url;
+  });
+}
+const imagesBytes = () => state.todos.reduce((n, t) => n + t.images.reduce((m, s) => m + s.length, 0), 0);
+async function addTodoImages(id, files) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t) return;
+  let added = 0;
+  for (const f of [...files].filter(f => f.type.startsWith('image/'))) {
+    if (t.images.length >= 12) { toast('Ek task me 12 photo tak'); break; }
+    if (imagesBytes() > 2.8 * 1024 * 1024) { toast('⚠️ Photos ki jagah bhar gayi — purani photos hatao'); break; }
+    try { t.images.push(await shrinkImage(f)); added++; } catch { toast('Ye photo nahi khuli'); }
+  }
+  if (!added) return;
+  t.updatedAt = Date.now();
+  saveState(); render();
+  toast(`🖼️ ${added} photo add ho gayi`);
+}
+
+// Move a task (with everything inside it) under another task, or to the top of a list.
+function moveTodoInto(id, value) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t) return;
+  const group = [t, ...descendantsOf(t.id)];
+  const before = group.map(x => ({ x, folder: x.folder, parentId: x.parentId }));
+  let folder, parentId = null, label;
+  if (value.startsWith('list:')) { folder = value.slice(5) || null; label = listName(folder); }
+  else {
+    const target = state.todos.find(x => x.id === value);
+    if (!target) return;
+    folder = target.folder; parentId = target.id; label = `"${target.text.slice(0, 30)}" ke andar`;
+    collapsed.delete(target.id); saveCollapsed();
+  }
+  const now = Date.now();
+  group.forEach(x => { x.folder = folder; x.updatedAt = now; });
+  t.parentId = parentId;
+  // Open work inside a done task re-opens it.
+  if (!t.done) for (let p = state.todos.find(x => x.id === parentId); p && p.done; p = state.todos.find(x => x.id === p.parentId)) {
+    p.done = false; p.doneAt = null; p.doneBy = null; p.updatedAt = now;
+  }
+  closeSheet(); saveState(); render();
+  toast(`✅ ${label} shift ho gaya`, () => {
+    const t2 = Date.now();
+    before.forEach(b => Object.assign(b.x, { folder: b.folder, parentId: b.parentId, updatedAt: t2 }));
+    saveState(); render();
+  });
+}
+function openMoveInto(id) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t) return;
+  const skip = new Set([t.id, ...descendantsOf(t.id).map(x => x.id)]);
+  const ids = new Set(state.todos.map(x => x.id));
+  const opt = (value, label, depth, path) => `<button type="button" class="btn" data-action="todo-move-pick" data-value="${esc(value)}" data-q="${esc(path.toLowerCase())}" style="--d:${10 + depth * 18}px">
+    <span class="tree-label">${label}</span><span class="path-label">${esc(path)}</span></button>`;
+  const folders = [...new Set(['', TODAY, CURRENT, APPWORK, DOUBTS, INBOX, ...state.todos.map(x => x.folder || '')])];
+  const rows = [];
+  folders.forEach(f => {
+    const name = listName(f);
+    rows.push(opt('list:' + f, `<b>${esc(name)}</b> <span class="muted small">— seedha list me</span>`, 0, name));
+    const walk = (x, depth, trail) => {
+      if (skip.has(x.id)) return;
+      const path = `${trail} › ${x.text.slice(0, 50)}`;
+      rows.push(opt(x.id, `${x.done ? '✓ ' : '↳ '}${esc(x.text.slice(0, 70))}`, depth, path));
+      [...childrenOf(x.id)].reverse().forEach(c => walk(c, depth + 1, path));
+    };
+    state.todos.filter(x => (x.folder || '') === f && isTopTodo(x, ids)).sort((a, b) => (a.done - b.done) || (b.createdAt - a.createdAt)).forEach(x => walk(x, 1, name));
+  });
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <div class="sheet-inner">
+      <h2>↪️ Kahan daalna hai?</h2>
+      <p class="small inbox-quote">${esc(t.text)}</p>
+      <input id="move-pick-search" type="search" placeholder="🔍 Task ya list ka naam… (Enter = pehle wale me)" aria-label="Search" autocomplete="off" style="margin-bottom:10px">
+      <div id="move-pick" class="move-list">${rows.join('')}</div>
+      ${canEarn() ? `<button type="button" class="btn block" data-action="todo-to-earn" data-id="${t.id}" style="margin-top:12px">📂 💰 Earning ke kisi page me</button>` : ''}
+      <button type="button" class="btn block" data-action="close-sheet" style="margin-top:8px">Cancel</button>
+    </div>`;
+  sheet.dataset.moveId = t.id;
+  if (!sheet.open) sheet.showModal();
+  document.getElementById('move-pick-search')?.focus();
+}
+function filterMovePick(q) {
+  const list = document.getElementById('move-pick');
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  list.classList.toggle('searching', words.length > 0);
+  list.querySelectorAll('button[data-q]').forEach(b => { b.hidden = !words.every(w => b.dataset.q.includes(w)); });
+}
+
+let tpSaveTimer = null;
+const panelActions = {
+  'open-todo'(el) {
+    if (window.getSelection && String(window.getSelection()).length) return; // selecting text, not opening
+    ui.openTodo = ui.openTodo === el.dataset.id && el.classList.contains('todo-text') ? null : el.dataset.id;
+    render();
+  },
+  'close-todo'() { ui.openTodo = null; render(); },
+  'tp-del-img'(el) {
+    const t = state.todos.find(x => x.id === ui.openTodo);
+    if (!t) return;
+    const i = Number(el.dataset.i);
+    const [gone] = t.images.splice(i, 1);
+    t.updatedAt = Date.now(); saveState(); render();
+    toast('🗑️ Photo hata di', () => { t.images.splice(i, 0, gone); t.updatedAt = Date.now(); saveState(); render(); });
+  },
+  'tp-view-img'(el) {
+    const t = state.todos.find(x => x.id === ui.openTodo);
+    if (!t) return;
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `<div class="sheet-inner"><img src="${t.images[Number(el.dataset.i)]}" alt="" style="width:100%;border-radius:12px;display:block">
+      <button type="button" class="btn block" data-action="close-sheet" style="margin-top:12px">Band karo</button></div>`;
+    sheet.showModal();
+  },
+  'todo-move-into'(el) { openMoveInto(el.dataset.id); },
+  'todo-move-pick'(el) { moveTodoInto(document.getElementById('sheet').dataset.moveId, el.dataset.value); },
+};
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.id === 'move-pick-search') { filterMovePick(el.value); return; }
+  if (el.id !== 'tp-title' && el.id !== 'tp-desc') return;
+  const t = state.todos.find(x => x.id === el.dataset.id);
+  if (!t) return;
+  autoGrow(el);
+  if (el.id === 'tp-title') {
+    const v = el.value.replace(/\n/g, ' ');
+    if (!v.trim()) return; // never save an empty name
+    t.text = v;
+    const row = document.querySelector(`.todo-text[data-id="${t.id}"] .tt`);
+    if (row) row.textContent = v;
+  } else t.desc = el.value;
+  t.updatedAt = Date.now();
+  clearTimeout(tpSaveTimer);
+  tpSaveTimer = setTimeout(() => saveState(), 500);
+});
+document.addEventListener('keydown', e => {
+  if (e.target.id === 'tp-title' && e.key === 'Enter' && !e.isComposing) { e.preventDefault(); e.target.blur(); }
+  if (e.target.id === 'move-pick-search' && e.key === 'Enter') {
+    e.preventDefault();
+    if (e.target.value.trim()) [...document.querySelectorAll('#move-pick button')].find(b => !b.hidden)?.click();
+  }
+  if (e.key === 'Escape' && ui.openTodo && !document.getElementById('sheet').open && !document.getElementById('drawer').classList.contains('open')) { ui.openTodo = null; render(); }
+});
+// Leaving a field: save now; if the name was emptied, show the saved one again.
+document.addEventListener('focusout', e => {
+  if (e.target.id !== 'tp-title' && e.target.id !== 'tp-desc') return;
+  clearTimeout(tpSaveTimer);
+  saveState();
+  const t = state.todos.find(x => x.id === e.target.dataset.id);
+  if (t && e.target.id === 'tp-title' && !e.target.value.trim()) e.target.value = t.text;
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'tp-img-input' && e.target.files.length) { addTodoImages(ui.openTodo, e.target.files); e.target.value = ''; }
+});
+document.addEventListener('paste', e => {
+  if (e.target.id !== 'tp-desc' && e.target.id !== 'tp-title') return;
+  const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  addTodoImages(ui.openTodo, files);
+});
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'tp-sub-form') return;
+  e.preventDefault();
+  const form = e.target;
+  const text = form.elements.text.value.trim();
+  const parent = state.todos.find(t => t.id === form.dataset.parent);
+  if (!text || !parent) return;
+  state.todos.push(normalizeTodo({ text, parentId: parent.id, folder: parent.folder, by: myRef() }));
+  for (let p = parent; p && p.done; p = state.todos.find(t => t.id === p.parentId)) {
+    p.done = false; p.doneAt = null; p.doneBy = null; p.updatedAt = Date.now();
+  }
+  collapsed.delete(parent.id); saveCollapsed();
+  saveState(); render();
+  document.querySelector('#tp-sub-form input')?.focus();
+});
+Object.assign(actions, panelActions);
+
+
 // Clicks
 document.addEventListener('click', e => {
   if (slash && !e.target.closest('#slash')) hideSlash();
@@ -5177,7 +5531,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01l';
+const APP_VERSION = '2026-11-01m';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {

@@ -12,3 +12,6 @@ backup-before-pwa.json
 
 # copied SM planner source (has secrets) — the app uses sm/ instead
 sm planning/
+
+# private Earning backups
+backup-earning-*.json
