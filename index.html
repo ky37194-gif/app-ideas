@@ -323,6 +323,7 @@
   .blk-h3 .blk-text { font-size: 1.1rem; font-weight: 700; }
   .blk-h1 { margin-top: 16px; } .blk-h2 { margin-top: 12px; } .blk-h3 { margin-top: 8px; }
   .blk-h1 .blk-handle, .blk-h2 .blk-handle { height: 40px; }
+  .blk-handle { display: none; } /* hidden — right-click a line for its menu */
   .blk-mark { flex: none; min-width: 20px; padding-top: 4px; text-align: center; color: var(--muted); font-weight: 700; }
   .blk-bullet .blk-mark { font-size: 1.2rem; line-height: 1.2; }
   .blk-check { flex: none; width: 20px; height: 20px; margin: 6px 4px 0 0; padding: 0; border: 2px solid var(--muted); border-radius: 5px;
@@ -3105,6 +3106,14 @@ function blocksHTML(page) {
   return page.blocks.map(b => { n = b.type === 'num' ? n + 1 : 0; return blockHTML(b, n); }).join('');
 }
 
+// Right-click (or long-press) a line in an Earning page → its menu (type, move, delete, send to page).
+document.addEventListener('contextmenu', e => {
+  const blk = e.target.closest?.('#blocks .blk[data-id]');
+  if (!blk) return;
+  e.preventDefault();
+  extraActions['earn-block-menu']({ dataset: { id: blk.dataset.id } });
+});
+
 function blockHTML(b, n) {
   const handle = `<button class="blk-handle" data-action="earn-block-menu" data-id="${b.id}" aria-label="Block options" tabindex="-1">⋮⋮</button>`;
   if (b.type === 'divider') return `<div class="blk blk-divider" data-id="${b.id}">${handle}<hr></div>`;
@@ -5168,7 +5177,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01k';
+const APP_VERSION = '2026-11-01l';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
