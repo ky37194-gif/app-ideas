@@ -354,6 +354,12 @@
   .slash button.sel, .slash button:hover { background: var(--surface-2); }
   .slash .ico { width: 28px; text-align: center; font-weight: 800; color: var(--muted); }
   @media (max-width: 899px) { .pc-only { display: none !important; } }
+  @media (min-width: 900px) { .phone-only { display: none !important; } }
+  .nav-search { order: -2; display: flex; align-items: center; gap: 8px; min-height: 42px; margin: 0 0 10px; padding: 0 12px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--muted); font: inherit; font-size: .9rem; cursor: pointer; text-align: left; }
+  .nav-search span { flex: 1; }
+  .nav-search kbd { font-size: .7rem; padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; }
+  .nav-search:hover { color: var(--text); }
 
   /* ---------- 10. Home: search + sort ---------- */
   .search { position: relative; }
@@ -580,6 +586,8 @@
     color: var(--muted); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; font-size: 1.1rem; }
   .pg-drag:hover { background: rgba(127, 127, 127, .15); color: var(--text); }
   .pg-dragging { opacity: .35; }
+  .todo-drag { width: 26px; height: 32px; margin-right: -4px; font-size: 1rem; }
+  body.todo-drag-on [data-drop-list] { outline: 1px dashed var(--border); outline-offset: -2px; }
   .drop-hover { outline: 2px dashed var(--primary); outline-offset: 2px; }
   .drag-ghost { position: fixed; z-index: 1000; pointer-events: none; padding: 8px 14px; border-radius: 12px; background: var(--primary); color: var(--primary-ink, #fff);
     font-weight: 600; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); transform: translate(-50%, -140%); white-space: nowrap; max-width: 70vw; overflow: hidden; text-overflow: ellipsis; }
@@ -1122,6 +1130,7 @@ function topBar(title, { back = '', actions = '' } = {}) {
     <header class="topbar${back ? ' has-back' : ''}">
       ${back ? `<a class="icon-btn" href="${back}" aria-label="Back">←</a>` : ''}
       <button class="icon-btn" data-action="open-drawer" aria-label="All ideas list">☰</button>
+      <button class="icon-btn phone-only" data-action="open-search" aria-label="Search everything">🔍</button>
       <h1 class="topbar-title">${title}</h1>
       ${actions}
       ${syncButton()}
@@ -1132,15 +1141,16 @@ function topBar(title, { back = '', actions = '' } = {}) {
 function bottomNav(active) {
   return `
     <nav class="bottom-nav" aria-label="Main">
+      <button type="button" class="nav-search pc-only" data-action="open-search">🔍 <span>Search…</span><kbd>Ctrl K</kbd></button>
       <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
-      <a class="nav-item ${active === 'priority' ? 'active' : ''}" href="#/priority"><span class="ico">🔥</span>Priority<span class="nav-count">${priorityCount() || ''}</span></a>
-      <a class="nav-item ${active === TODAY ? 'active' : ''}" href="#/today"><span class="ico">📅</span>Today<span class="nav-count">${todayCount() || ''}</span></a>
-      <a class="nav-item pc-only ${active === CURRENT ? 'active' : ''}" href="#/current"><span class="ico">🎯</span>Current Project</a>
+      <a class="nav-item ${active === 'priority' ? 'active' : ''}" href="#/priority" data-drop-list="priority"><span class="ico">🔥</span>Priority<span class="nav-count">${priorityCount() || ''}</span></a>
+      <a class="nav-item ${active === TODAY ? 'active' : ''}" href="#/today" data-drop-list="today"><span class="ico">📅</span>Today<span class="nav-count">${todayCount() || ''}</span></a>
+      <a class="nav-item pc-only ${active === CURRENT ? 'active' : ''}" href="#/current" data-drop-list="current"><span class="ico">🎯</span>Current Project</a>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
-      <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
-      ${canEarn() ? `<a class="nav-item ${active === 'earn' ? 'active' : ''}" href="#/earn"><span class="ico">💰</span>Earning</a>` : ''}
-      <a class="nav-item pc-only ${active === 'doubts' ? 'active' : ''}" href="#/doubts"><span class="ico">❓</span>Doubts &amp; To Know<span class="nav-count">${openTodos(DOUBTS) || ''}</span></a>
-      <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
+      <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox" data-drop-list="inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
+      ${canEarn() ? `<a class="nav-item ${active === 'earn' ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>` : ''}
+      <a class="nav-item pc-only ${active === 'doubts' ? 'active' : ''}" href="#/doubts" data-drop-list="doubts"><span class="ico">❓</span>Doubts &amp; To Know<span class="nav-count">${openTodos(DOUBTS) || ''}</span></a>
+      <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc" data-drop-list="misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
     </nav>`;
 }
 
@@ -1354,6 +1364,7 @@ function todoRow(t) {
   return `
     <li class="todo-item">
       <div class="todo ${t.done ? 'done' : ''}${t.priority && !t.done ? ' prio' : ''}">
+        <span class="pg-drag todo-drag" data-drag-todo="${t.id}" title="Pakad ke side wale section (Today, Doubts, Earning…) pe chhodo" aria-label="Drag">⠿</span>
         ${kids.length
           ? `<button class="todo-arrow ${isOpen ? 'open' : ''}" data-action="collapse-todo" data-id="${t.id}" aria-label="${isOpen ? 'Band karo' : 'Kholo'}">›</button>`
           : '<span class="todo-arrow-space"></span>'}
@@ -3467,6 +3478,86 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-drag-page]') || Date.now() - pgJustDragged < 400) { e.preventDefault(); e.stopPropagation(); }
 }, true);
 
+/* ----- Drag a task (⠿) onto a sidebar / bottom-bar section to move it there ----- */
+let tdDrag = null;
+let tdJustDragged = 0;
+const DROP_NAMES = { priority: '🔥 Priority', today: '📅 Today', current: '🎯 Current Project', inbox: '📥 Inbox', doubts: '❓ Doubts & To Know', misc: '🧰 Misc' };
+function moveTodoTo(id, target) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t) return;
+  if (target === 'earn') { extraActions['todo-to-earn']({ dataset: { id } }); return; }
+  const group = [t, ...descendantsOf(t.id)];
+  const before = group.map(x => ({ x, folder: x.folder, parentId: x.parentId, priority: x.priority, today: x.today, updatedAt: x.updatedAt }));
+  const now = Date.now();
+  if (target === 'priority') { if (t.priority) return toast('Ye pehle se 🔥 Priority me hai'); t.priority = true; t.updatedAt = now; }
+  else if (target === 'today' && t.folder !== TODAY) { if (t.today) return toast('Ye pehle se 📅 Today me dikh raha hai'); t.today = true; t.updatedAt = now; }
+  else {
+    const folder = target === 'misc' ? null : target;
+    if (t.folder === folder && !t.parentId) return toast(`Ye pehle se ${DROP_NAMES[target]} me hai`);
+    group.forEach(x => { x.folder = folder; x.updatedAt = now; });
+    t.parentId = null;
+  }
+  saveState(); render();
+  const what = target === 'today' ? 'Today me bhi dikhega (apni list me bhi rahega)' : target === 'priority' ? 'Priority bana diya' : `${DROP_NAMES[target]} me shift ho gaya`;
+  toast(`✅ ${what}`, () => {
+    const t2 = Date.now();
+    before.forEach(b => Object.assign(b.x, { folder: b.folder, parentId: b.parentId, priority: b.priority, today: b.today, updatedAt: t2 }));
+    saveState(); render();
+  });
+}
+function tdDropTarget(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return (el && el.closest('[data-drop-list]')) || null;
+}
+document.addEventListener('pointerdown', e => {
+  const h = e.target.closest('[data-drag-todo]');
+  if (!h || e.button > 0) return;
+  e.preventDefault();
+  const t = state.todos.find(x => x.id === h.dataset.dragTodo);
+  if (!t) return;
+  tdDrag = { id: t.id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false, src: h.closest('.todo'), ghost: null, over: null, title: t.text.slice(0, 60) };
+  try { h.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+});
+document.addEventListener('pointermove', e => {
+  if (!tdDrag || e.pointerId !== tdDrag.pointerId) return;
+  e.preventDefault();
+  if (!tdDrag.moved) {
+    if (Math.hypot(e.clientX - tdDrag.x, e.clientY - tdDrag.y) < 6) return;
+    tdDrag.moved = true;
+    tdDrag.ghost = document.createElement('div');
+    tdDrag.ghost.className = 'drag-ghost';
+    tdDrag.ghost.textContent = tdDrag.title;
+    document.body.appendChild(tdDrag.ghost);
+    document.body.classList.add('todo-drag-on');
+    if (tdDrag.src) tdDrag.src.classList.add('pg-dragging');
+  }
+  tdDrag.ghost.style.left = e.clientX + 'px';
+  tdDrag.ghost.style.top = e.clientY + 'px';
+  const t = tdDropTarget(e.clientX, e.clientY);
+  if (t !== tdDrag.over) {
+    if (tdDrag.over) tdDrag.over.classList.remove('drop-hover');
+    tdDrag.over = t;
+    if (t) t.classList.add('drop-hover');
+  }
+});
+function endTdDrag(e, cancel) {
+  if (!tdDrag || e.pointerId !== tdDrag.pointerId) return;
+  const d = tdDrag;
+  tdDrag = null;
+  document.body.classList.remove('todo-drag-on');
+  if (d.ghost) d.ghost.remove();
+  if (d.over) d.over.classList.remove('drop-hover');
+  if (d.src) d.src.classList.remove('pg-dragging');
+  if (!d.moved) return;
+  tdJustDragged = Date.now();
+  if (!cancel && d.over) moveTodoTo(d.id, d.over.dataset.dropList);
+}
+document.addEventListener('pointerup', e => endTdDrag(e, false));
+document.addEventListener('pointercancel', e => endTdDrag(e, true));
+document.addEventListener('click', e => {
+  if (Date.now() - tdJustDragged < 400) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+
 function pageToText(page) {
   let n = 0;
   const lines = page.blocks.map(b => {
@@ -4081,9 +4172,44 @@ Object.assign(extraActions, {
    ===================================================================== */
 function renderDrawer() {
   return `
-    <h2>💡 Saare ideas (${state.ideas.length})</h2>
-    <div class="search drawer-search"><input id="drawer-search" type="search" placeholder="Idea dhoondho…" value="${esc(ui.drawerSearch || '')}" aria-label="Search ideas" autocomplete="off"></div>
+    <h2>🔍 Poore app me dhoondho</h2>
+    <div class="search drawer-search"><input id="drawer-search" type="search" placeholder="Task, doubt, Earning page, idea… kuch bhi" value="${esc(ui.drawerSearch || '')}" aria-label="Search everything" autocomplete="off"></div>
     <div id="drawer-list">${drawerList()}</div>`;
+}
+
+// Whole-app search: app sections, tasks in every list, Earning pages (when unlocked). Ideas are added by drawerList.
+const plain = t => String(t || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ');
+function searchEverything(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hit = text => { const t = text.toLowerCase(); return words.every(w => t.includes(w)); };
+  const item = (href, name, meta) => `<a class="drawer-item" href="${href}"><span class="name">${name}</span><span class="meta">${meta}</span></a>`;
+  let out = '';
+  // App sections
+  const sections = [['#/dashboard', '📊 Dashboard'], ['#/priority', '🔥 Priority'], ['#/inbox', '📥 Inbox'], ['#/misc', '🧰 Misc'],
+    ...Object.entries(LISTS).map(([k, L]) => ['#/' + k, `${L.emoji} ${L.label}`]), ...(canEarn() ? [['#/earn', '💰 Earning'], ['#/sm', '📱 SM Planner']] : [])]
+    .filter(([, n]) => hit(n));
+  if (sections.length) out += `<h3>📂 Sections</h3>` + sections.map(([h, n]) => item(h, hl(n, q), '')).join('');
+  // Tasks (every list)
+  const tasks = state.todos.filter(t => hit(t.text)).sort((a, b) => (a.done - b.done) || (b.updatedAt - a.updatedAt));
+  out += `<h3>✅ Tasks (${tasks.length})</h3>` + (tasks.length
+    ? tasks.slice(0, 40).map(t => item(todoLink(t), (t.done ? '✓ ' : '') + hl(t.text, q), esc(todoPlace(t).slice(0, 28)))).join('')
+    : '<p class="muted small" style="margin:4px 8px">Koi task nahi mila.</p>');
+  // Earning pages: title or anything written inside
+  if (canEarn()) {
+    if (!earnCloud.code) out += `<h3>💰 Earning</h3><p class="muted small" style="margin:4px 8px">🔒 Earning unlock karo to uske pages bhi search honge.</p>`;
+    else {
+      const pages = earn.pages.map(p => {
+        const title = p.title || 'Untitled';
+        if (hit(title)) return { p, score: 2, snip: '' };
+        const b = p.blocks.find(b => hit(plain(b.text)));
+        return b ? { p, score: 1, snip: plain(b.text).trim().slice(0, 60) } : null;
+      }).filter(Boolean).sort((a, b) => (b.score - a.score) || (b.p.updatedAt - a.p.updatedAt));
+      out += `<h3>💰 Earning pages (${pages.length})</h3>` + (pages.length
+        ? pages.slice(0, 30).map(({ p, snip }) => item('#/earn/' + p.id, `${esc(p.icon)} ${hl(p.title || 'Untitled', q)}${snip ? `<br><span class="muted small">${hl(snip, q)}</span>` : ''}`, '')).join('')
+        : '<p class="muted small" style="margin:4px 8px">Koi page nahi mila.</p>');
+    }
+  }
+  return out;
 }
 
 function drawerList() {
@@ -4091,7 +4217,8 @@ function drawerList() {
   const current = parseRoute().id;
   if (q) {
     const found = searchIdeas(q);
-    return `<h3>🔎 ${found.length} mile</h3>` + (found.length ? found.map(i => `
+    const all = searchEverything(q);
+    return all + `<h3>💡 Ideas (${found.length})</h3>` + (found.length ? found.map(i => `
       <a class="drawer-item ${i.id === current ? 'active' : ''}" href="#/idea/${i.id}">
         ${avatar(i.owner)}
         <span class="name">${hl(i.name, q)}</span>
@@ -4559,6 +4686,7 @@ const actions = {
   export: exportJSON,
 
   'open-drawer': openDrawer,
+  'open-search'() { openDrawer(true); },
   'close-drawer': closeDrawer,
 
   async invite() {
@@ -4788,7 +4916,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01e';
+const APP_VERSION = '2026-11-01f';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
