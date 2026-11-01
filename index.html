@@ -1150,6 +1150,7 @@ function bottomNav(active) {
       <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox" data-drop-list="inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
       ${canEarn() ? `<a class="nav-item ${active === 'earn' ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>` : ''}
       <a class="nav-item pc-only ${active === 'doubts' ? 'active' : ''}" href="#/doubts" data-drop-list="doubts"><span class="ico">❓</span>Doubts &amp; To Know<span class="nav-count">${openTodos(DOUBTS) || ''}</span></a>
+      <a class="nav-item pc-only ${active === APPWORK ? 'active' : ''}" href="#/appwork" data-drop-list="appwork"><span class="ico">🛠️</span>Pending in this App<span class="nav-count">${openTodos(APPWORK) || ''}</span></a>
       <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc" data-drop-list="misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
     </nav>`;
 }
@@ -1278,7 +1279,7 @@ function renderMisc(folder = null) {
 }
 
 /* ----- Extra lists (same as Misc, stored as todos with their own folder) ----- */
-const DOUBTS = 'doubts', CURRENT = 'current', TODAY = 'today';
+const DOUBTS = 'doubts', CURRENT = 'current', TODAY = 'today', APPWORK = 'appwork';
 const LISTS = {
   [TODAY]: { emoji: '📅', label: 'Today', title: '📅 Today — aaj ke kaam',
     add: 'Aaj kya karna hai? Likho aur Enter dabao…',
@@ -1286,6 +1287,9 @@ const LISTS = {
   [CURRENT]: { emoji: '🎯', label: 'Current Project', title: '🎯 Current Project — abhi kya chal raha hai',
     add: 'Kaun sa project / kaam abhi chal raha hai? Likho aur Enter dabao…',
     empty: 'Abhi jis project pe kaam kar rahe ho, upar likho. Uske ＋ se steps daalo.', allDone: 'Sab khatam! 🎉 Naya project upar likho.' },
+  [APPWORK]: { emoji: '🛠️', label: 'Pending in this App', title: '🛠️ Is app me pending kaam',
+    add: 'Is app me kya banana / theek karna baaki hai? Likho aur Enter dabao…',
+    empty: 'Is app me jo feature ya fix baaki hai, upar likho. Ban jaye to tick karo.', allDone: 'App ka saara pending kaam ho gaya! 🎉' },
   [DOUBTS]: { emoji: '❓', label: 'Doubts & To Know', title: '❓ Doubts & To Know',
     add: 'Kya doubt hai / kya jaanna hai? Likho aur Enter dabao…',
     empty: 'Jo doubt hai ya jo jaanna hai, upar ek line me likho. Samajh aa jaye to tick karo.', allDone: 'Saare doubts clear! 🎉 Naya doubt upar likho.' },
@@ -3481,7 +3485,7 @@ document.addEventListener('click', e => {
 /* ----- Drag a task (⠿) onto a sidebar / bottom-bar section to move it there ----- */
 let tdDrag = null;
 let tdJustDragged = 0;
-const DROP_NAMES = { priority: '🔥 Priority', today: '📅 Today', current: '🎯 Current Project', inbox: '📥 Inbox', doubts: '❓ Doubts & To Know', misc: '🧰 Misc' };
+const DROP_NAMES = { priority: '🔥 Priority', today: '📅 Today', current: '🎯 Current Project', inbox: '📥 Inbox', doubts: '❓ Doubts & To Know', appwork: '🛠️ Pending in this App', misc: '🧰 Misc' };
 function moveTodoTo(id, target) {
   const t = state.todos.find(x => x.id === id);
   if (!t) return;
@@ -3651,7 +3655,7 @@ const extraActions = {
         <h3 class="sheet-sub">💡 Naya idea banao</h3>
         <div class="move-grid">${FOLDERS.map(f => opt('idea:' + f.key, `${f.emoji} ${f.label}`)).join('')}</div>
         <h3 class="sheet-sub">🧰 Misc list me (to-do)</h3>
-        <div class="move-grid">${opt('misc:today', '📅 Today')}${opt('misc:current', '🎯 Current Project')}${opt('misc:doubts', '❓ Doubts &amp; To Know')}${opt('misc:', '🧰 Main Misc')}${FOLDERS.map(f => opt('misc:' + f.key, `${f.emoji} ${f.label} · Misc`)).join('')}</div>
+        <div class="move-grid">${opt('misc:today', '📅 Today')}${opt('misc:current', '🎯 Current Project')}${opt('misc:doubts', '❓ Doubts &amp; To Know')}${opt('misc:appwork', '🛠️ Pending in this App')}${opt('misc:', '🧰 Main Misc')}${FOLDERS.map(f => opt('misc:' + f.key, `${f.emoji} ${f.label} · Misc`)).join('')}</div>
         ${earnPart}
         <button type="button" class="btn block" data-action="close-sheet" style="margin-top:16px">Cancel</button>
       </div>`;
@@ -4240,6 +4244,7 @@ function drawerList() {
     <h3>📋 Lists</h3>
     <a class="drawer-item" href="#/today"><span class="name">📅 Today</span><span class="meta">${todayCount() || ''}</span></a>
     <a class="drawer-item" href="#/current"><span class="name">🎯 Current Project</span><span class="meta">${esc(currentFocus()?.text.slice(0, 22) || '')}</span></a>
+    <a class="drawer-item" href="#/appwork"><span class="name">🛠️ Pending in this App</span><span class="meta">${openTodos(APPWORK) || ''}</span></a>
     <a class="drawer-item" href="#/doubts"><span class="name">❓ Doubts &amp; To Know</span><span class="meta">${openTodos(DOUBTS) || ''}</span></a>
     <h3>🧰 Misc to-do (${openTodos()} baaki)</h3>
     <a class="drawer-item" href="#/misc"><span class="name">🧰 To-do list kholo</span></a>
@@ -4916,7 +4921,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01f';
+const APP_VERSION = '2026-11-01g';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
