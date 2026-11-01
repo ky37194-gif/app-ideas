@@ -3056,7 +3056,7 @@ function renderEarnHome() {
     ${topBar('💰 Earning', { actions: '<button class="icon-btn" data-action="earn-creds" aria-label="ID / password" title="ID / password badlo">🔑</button><button class="icon-btn" data-action="earn-lock" aria-label="Lock karo" title="Lock karo">🔒</button>' })}
     <main class="page">
       ${earnCloud.id ? '' : '<button class="card inbox-banner" data-action="earn-creds" style="width:100%;font:inherit;text-align:left;cursor:pointer"><span class="big">🔑</span><span style="flex:1"><b>Earning ka ID + password set karo</b><br><span class="muted small">Abhi sirf password hai — ID add karke aur secure karo</span></span><span class="muted">›</span></button>'}
-      <div class="row-between" style="margin:0 0 8px"><span class="muted small">🔒 Private — sirf aap</span><button class="btn" data-action="earn-creds">🔑 Password badlo</button></div>
+      <div class="row-between" style="margin:0 0 8px"><span class="muted small">🔒 Private — sirf aap</span><span class="btn-row"><button class="btn" data-action="earn-auto-emoji" title="Har page ke naam ke hisaab se emoji lagao">✨ Auto emoji</button><button class="btn" data-action="earn-creds">🔑 Password badlo</button></span></div>
       <p class="muted small" style="margin:0 0 12px"> Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
       ${state.ideas.length ? `<button class="card sm-card" data-action="ideas-to-earn" style="cursor:pointer;border-color:var(--primary)"><span class="big" style="font-size:1.8rem">💡</span><span style="flex:1"><b>Saare ideas (${state.ideas.length}) yahan shift karo</b><br><span class="muted small">Har folder Earning me folder banega — phir ⠿ se jahan chaho daalo</span></span><span class="muted">›</span></button>` : ''}
       <a class="card sm-card" href="#/sm"><span class="big" style="font-size:1.8rem">📱</span><span style="flex:1"><b>SM — Content Planner</b><br><span class="muted small">Social media ke saare ideas, posts aur plan</span></span><span class="muted">›</span></a>
@@ -3398,6 +3398,76 @@ function applyBlockType(id, type, fromSlash) {
 
 // Pages inside the shifted Ideas folders are just a feature list (☐ / • lines).
 const inIdeasFolder = id => { let p = id && findPage(id); while (p) { if (p.id.startsWith('ideas-folder-')) return p; p = p.parentId && findPage(p.parentId); } return null; };
+/* ----- ✨ Auto emoji: pick an icon from the page's title (then its text) ----- */
+// [emoji, words]. First match in the title wins; if the title has none, the page's text is checked.
+const EMOJI_RULES = [
+  ['🥽', 'vr quest oculus metaverse virtual reality xr'],
+  ['💊', 'pharma pharmacy medicine medical dawai dawa drug tablet chemist b.pharm bpharm'],
+  ['🩺', 'health doctor hospital clinic patient sehat'],
+  ['💪', 'gym fitness workout exercise yoga diet'],
+  ['🍔', 'food recipe restaurant khana cook kitchen meal tiffin'],
+  ['🏠', 'flat room rent house home ghar pg hostel property real estate'],
+  ['🎓', 'college university school exam student rater admission'],
+  ['📚', 'study learn course notes padhai book library flashcard anki quiz'],
+  ['📶', 'bluetooth blue wifi network'],
+  ['🔄', 'sync backup transfer share'],
+  ['🎮', 'game gaming play khel'],
+  ['🎵', 'music song audio podcast gaana'],
+  ['🎬', 'video movie film reel'],
+  ['📺', 'youtube channel stream'],
+  ['📱', 'instagram social media sm content reels post'],
+  ['📷', 'photo camera image picture gallery'],
+  ['🤖', 'ai gpt claude chatbot bot automation agent'],
+  ['💬', 'chat message whatsapp telegram'],
+  ['🛒', 'shop store ecommerce sell buy dukaan market'],
+  ['💸', 'money finance expense budget kharcha loan bank upi payment'],
+  ['💰', 'earning earn income paisa business profit'],
+  ['📈', 'stock trading invest crypto share market'],
+  ['✈️', 'travel trip tour flight hotel yatra'],
+  ['🚗', 'car bike vehicle ride cab parking'],
+  ['📍', 'map location gps nearby finder city chandigarh delhi'],
+  ['📅', 'calendar schedule planner event reminder date'],
+  ['⏰', 'alarm timer clock time pomodoro'],
+  ['✅', 'todo task habit tracker checklist'],
+  ['📝', 'note notes diary journal writing blog'],
+  ['💻', 'pc computer laptop desktop windows software website web'],
+  ['🔍', 'search reverse engineering rea'],
+  ['🔒', 'password security lock privacy vault'],
+  ['👔', 'job career resume interview naukri'],
+  ['❤️', 'dating love relationship'],
+  ['🐶', 'pet dog cat animal'],
+  ['🌱', 'plant garden farming kheti'],
+  ['👕', 'fashion clothes kapde'],
+  ['📖', 'story novel reading'],
+  ['🗣️', 'language english speaking translate'],
+  ['🎨', 'design art drawing logo'],
+  ['🔧', 'tool repair fix utility'],
+];
+function guessEmoji(text) {
+  const t = ' ' + String(text || '').toLowerCase().replace(/[^a-z0-9.\u0900-\u097f]+/g, ' ') + ' ';
+  for (const [emo, words] of EMOJI_RULES) {
+    if (words.split(' ').some(w => (w.length <= 3 ? t.includes(' ' + w + ' ') : t.includes(w)))) return emo;
+  }
+  return null;
+}
+function earnAutoEmoji() {
+  const changed = [];
+  earn.pages.forEach(p => {
+    if (p.id.startsWith('ideas-folder-')) return; // keep the folder icons (💡 🥽 🖥️ 🔍)
+    const emo = guessEmoji(p.title) || guessEmoji(p.blocks.map(b => plain(b.text)).join(' ').slice(0, 2000));
+    if (emo && emo !== p.icon) changed.push({ p, old: p.icon, emo });
+  });
+  if (!changed.length) return toast('Sab pages pe pehle se sahi emoji hai');
+  const now = Date.now();
+  changed.forEach(c => { c.p.icon = c.emo; c.p.updatedAt = now; });
+  saveEarn(); render();
+  toast(`✨ ${changed.length} pages ke emoji badal gaye`, () => {
+    const t = Date.now();
+    changed.forEach(c => { c.p.icon = c.old; c.p.updatedAt = t; });
+    saveEarn(); render();
+  });
+}
+
 function newEarnPage(parentId = null) {
   const folder = inIdeasFolder(parentId);
   const p = normalizePage({ parentId, icon: folder ? folder.icon : parentId ? '📄' : '💰', by: myRef(), blocks: folder ? [newBlock('todo')] : [] });
@@ -3871,6 +3941,7 @@ const extraActions = {
 
   'earn-new'(el) { closeSheet(); newEarnPage(el.dataset.parent || null); },
   'earn-features-only'(el) { earnFeaturesOnly(el.dataset.id); },
+  'earn-auto-emoji'() { earnAutoEmoji(); },
   'earn-lock': lockEarning,
   'earn-slash'(el) { if (slash) applyBlockType(slash.blockId, el.dataset.value, true); },
 
@@ -5097,7 +5168,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01j';
+const APP_VERSION = '2026-11-01k';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
