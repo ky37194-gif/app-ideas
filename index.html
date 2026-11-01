@@ -3662,6 +3662,71 @@ document.addEventListener('paste', e => {
   if (el && el.tagName !== 'TEXTAREA') onBlockPaste(e, el);
 });
 
+/* ----- Searchable Earning page picker (used by tasks, Inbox notes, lines and pages) ----- */
+let earnPickCb = null;
+function openEarnPicker({ heading, quote = '', extra = [], exclude = new Set(), onPick }) {
+  const opt = (value, label, depth = 0, path = '') => `<button type="button" class="btn" data-action="earn-pick" data-value="${value}" data-q="${esc(path.toLowerCase())}" style="--d:${10 + depth * 18}px">
+    <span class="tree-label">${label}</span><span class="path-label">${esc(path)}</span></button>`;
+  const rows = [];
+  const seen = new Set();
+  const walk = (p, depth, trail) => {
+    if (seen.has(p.id)) return; seen.add(p.id);
+    const name = `${p.icon} ${p.title || 'Untitled'}`;
+    const path = trail ? `${trail} › ${name}` : name;
+    if (!exclude.has(p.id)) rows.push(opt(p.id, `${depth ? '↳ ' : ''}${esc(name)}`, depth, path));
+    childPages(p.id).forEach(c => walk(c, depth + 1, path));
+  };
+  topEarnPages().forEach(p => walk(p, 0, ''));
+  earnPickCb = onPick;
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <div class="sheet-inner">
+      <h2>${heading}</h2>
+      ${quote ? `<p class="small inbox-quote">${esc(quote)}</p>` : ''}
+      ${earnCloud.code
+        ? `<input id="earn-pick-search" type="search" placeholder="🔍 Page ka naam likho… (Enter = pehle wale me bhejo)" aria-label="Earning page search" autocomplete="off" style="margin-bottom:10px">
+           <div id="earn-pick" class="move-list">${extra.map(([v, l]) => opt(v, l)).join('')}${rows.join('')}</div>
+           <p id="earn-pick-none" class="muted small" hidden>Koi page nahi mila.</p>`
+        : '<p class="muted small">🔒 Pehle 💰 Earning unlock karo, phir yahan wapas aao.</p>'}
+      <button type="button" class="btn block" data-action="close-sheet" style="margin-top:16px">Cancel</button>
+    </div>`;
+  if (!sheet.open) sheet.showModal();
+  document.getElementById('earn-pick-search')?.focus();
+}
+// Add lines to the end of a page as ☐ features (an empty last line gets filled first).
+function addFeatureBlocks(page, blocks) {
+  while (page.blocks.length && !page.blocks[page.blocks.length - 1].text.trim() && page.blocks[page.blocks.length - 1].type !== 'divider') page.blocks.pop();
+  page.blocks.push(...blocks);
+  page.updatedAt = Date.now();
+}
+const asFeature = b => (['p', 'bullet', 'num', 'quote', 'callout'].includes(b.type) ? { ...b, type: 'todo' } : b);
+function moveTodoToEarn(id, pageId) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t || !earnCloud.code) return;
+  const depthOf = x => { let d = 0, p = x; while (p.parentId && p.id !== t.id) { p = state.todos.find(y => y.id === p.parentId); if (!p) break; d++; } return d; };
+  const subs = descendantsOf(t.id);
+  const subBlocks = subs.map(x => ({ ...newBlock('todo', '  '.repeat(Math.max(0, depthOf(x) - 1)) + '↳ ' + x.text), checked: !!x.done }));
+  const target = pageId && findPage(pageId);
+  let msg;
+  if (target) {
+    const lines = t.text.split(/\r?\n/).filter(l => l.trim());
+    const main = lines.map((l, i) => ({ ...newBlock('todo', l.trim()), checked: i === 0 && !!t.done }));
+    addFeatureBlocks(target, [...main, ...subBlocks]);
+    msg = `✅ ${target.icon} ${target.title || 'Untitled'} me feature ban gaya`;
+  } else {
+    const { title, rest } = splitNote(t.text);
+    earn.pages.push(normalizePage({ title, icon: '💰', blocks: [...notesToBlocks(rest), ...subBlocks], by: t.by || myRef() }));
+    msg = '🔒 Earning me naya page ban gaya';
+  }
+  saveEarn();
+  const now = Date.now();
+  [t, ...subs].forEach(x => { state.deleted[x.id] = now; });
+  const gone = new Set([t.id, ...subs.map(x => x.id)]);
+  state.todos = state.todos.filter(x => !gone.has(x.id));
+  saveState(); render();
+  toast(msg);
+}
+
 // Earning page picker search: every word must be in the page's path ("Parent › Child").
 function filterEarnPick(q) {
   const list = document.getElementById('earn-pick');
@@ -3691,7 +3756,7 @@ const extraActions = {
     if (!t) return;
     const opt = (value, label) => `<button type="button" class="btn" data-action="inbox-to" data-id="${t.id}" data-value="${value}">${label}</button>`;
     const earnPart = !canEarn() ? '' : `<h3 class="sheet-sub">🔒 Private</h3>` + (earnCloud.code
-      ? `<div class="move-grid">${opt('earn:', '💰 Earning — naya page')}${topEarnPages().slice(0, 9).map(p => opt('earn:' + p.id, `↳ ${esc(p.icon)} ${esc(p.title || 'Untitled')}`)).join('')}</div>`
+      ? `<button type="button" class="btn block primary" data-action="todo-to-earn" data-id="${t.id}">🔍 Kisi bhi Earning page me daalo (search karo)</button>`
       : '<p class="muted small" style="margin:0">💰 Earning me daalne ke liye pehle Earning unlock karo.</p>');
     const sheet = document.getElementById('sheet');
     sheet.innerHTML = `
@@ -3744,64 +3809,24 @@ const extraActions = {
     toast(msg);
   },
 
-  // Misc task (with its sub-tasks) → any Earning page, or a new page.
+  // Any task / Inbox note (with its sub-tasks) → any Earning page (as ☐ features), or a new page.
   'todo-to-earn'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
-    const opt = (value, label, depth = 0, path = '') => `<button type="button" class="btn" data-action="todo-earn-to" data-id="${t.id}" data-value="${value}" data-q="${esc(path.toLowerCase())}" style="--d:${10 + depth * 18}px">
-      <span class="tree-label">${label}</span><span class="path-label">${esc(path)}</span></button>`;
-    const rows = [];
-    const seen = new Set();
-    const walk = (p, depth, trail) => {
-      if (seen.has(p.id)) return; seen.add(p.id);
-      const name = `${p.icon} ${p.title || 'Untitled'}`;
-      const path = trail ? `${trail} › ${name}` : name;
-      rows.push(opt(p.id, `${depth ? '↳ ' : ''}${esc(name)}`, depth, path));
-      childPages(p.id).forEach(c => walk(c, depth + 1, path));
-    };
-    topEarnPages().forEach(p => walk(p, 0, ''));
     const kids = descendantsOf(t.id).length;
-    const sheet = document.getElementById('sheet');
-    sheet.innerHTML = `
-      <div class="sheet-inner">
-        <h2>💰 Earning me kahan daalein?</h2>
-        <p class="small inbox-quote">${esc(t.text.slice(0, 200))}${kids ? ` <span class="muted">(+${kids} andar ke task)</span>` : ''}</p>
-        ${earnCloud.code
-          ? `<input id="earn-pick-search" type="search" placeholder="🔍 Page ka naam likho… (Enter = pehle wale me bhejo)" aria-label="Earning page search" autocomplete="off" style="margin-bottom:10px">
-             <div id="earn-pick" class="move-list">${opt('', '➕ Naya page banao')}${rows.join('')}</div>
-             <p id="earn-pick-none" class="muted small" hidden>Koi page nahi mila. ➕ Naya page bana lo.</p>`
-          : '<p class="muted small">🔒 Pehle 💰 Earning unlock karo, phir yahan wapas aao.</p>'}
-        <button type="button" class="btn block" data-action="close-sheet" style="margin-top:16px">Cancel</button>
-      </div>`;
-    sheet.showModal();
-    const box = document.getElementById('earn-pick-search');
-    if (box) box.focus();
+    openEarnPicker({
+      heading: '💰 Kis page me daalein?',
+      quote: t.text.slice(0, 200) + (kids ? ` (+${kids} andar ke task)` : ''),
+      extra: [['', '➕ Naya page banao']],
+      onPick: v => moveTodoToEarn(t.id, v),
+    });
   },
 
-  'todo-earn-to'(el) {
-    const t = state.todos.find(x => x.id === el.dataset.id);
-    if (!t || !earnCloud.code) return;
-    const depthOf = x => { let d = 0, p = x; while (p.parentId && p.id !== t.id) { p = state.todos.find(y => y.id === p.parentId); if (!p) break; d++; } return d; };
-    const subs = descendantsOf(t.id);
-    const subBlocks = subs.map(x => ({ ...newBlock('todo', '  '.repeat(Math.max(0, depthOf(x) - 1)) + '↳ ' + x.text), checked: !!x.done }));
-    const target = el.dataset.value && findPage(el.dataset.value);
-    let msg;
-    if (target) {
-      target.blocks.push({ ...newBlock('todo', t.text), checked: !!t.done }, ...subBlocks);
-      target.updatedAt = Date.now();
-      msg = `🔒 ${target.icon} ${target.title || 'Untitled'} me chala gaya`;
-    } else {
-      const { title, rest } = splitNote(t.text);
-      earn.pages.push(normalizePage({ title, icon: '💰', blocks: [...notesToBlocks(rest), ...subBlocks], by: t.by || myRef() }));
-      msg = '🔒 Earning me naya page ban gaya';
-    }
-    saveEarn();
-    const now = Date.now();
-    [t, ...subs].forEach(x => { state.deleted[x.id] = now; });
-    const gone = new Set([t.id, ...subs.map(x => x.id)]);
-    state.todos = state.todos.filter(x => !gone.has(x.id));
-    saveState(); closeSheet(); render();
-    toast(msg);
+  'earn-pick'(el) {
+    const cb = earnPickCb;
+    earnPickCb = null;
+    closeSheet();
+    if (cb) cb(el.dataset.value || '');
   },
 
   'toggle-today'(el) {
@@ -3908,22 +3933,13 @@ const extraActions = {
   'earn-move-pick'() {
     const page = curPage();
     if (!page) return;
-    const bad = new Set([page.id, ...pageDescendants(page.id).map(p => p.id)]);
-    const label = p => [...pageAncestors(p), p].map(x => esc(x.icon) + ' ' + esc(x.title || 'Untitled')).join(' › ');
-    const options = earn.pages.filter(p => !bad.has(p.id) && p.id !== page.parentId)
-      .sort((a, b) => label(a).localeCompare(label(b)));
-    const sheet = document.getElementById('sheet');
-    sheet.innerHTML = `
-      <div class="sheet-inner">
-        <h2>📁 "${esc(page.title || 'Untitled')}" kahan daalein?</h2>
-        <div style="display:grid;gap:8px;max-height:60vh;overflow:auto">
-          ${page.parentId && findPage(page.parentId) ? '<button type="button" class="btn" data-action="earn-move-to" data-value="">💰 Bahar — Earning ki main list me</button>' : ''}
-          ${options.map(p => `<button type="button" class="btn" style="justify-content:flex-start;text-align:left" data-action="earn-move-to" data-value="${p.id}">${label(p)}</button>`).join('')
-            || '<p class="muted">Koi aur page nahi hai. Pehle ek page banao.</p>'}
-        </div>
-        <button type="button" class="btn block" data-action="close-sheet" style="margin-top:10px">Close</button>
-      </div>`;
-    sheet.showModal();
+    const exclude = new Set([page.id, page.parentId, ...pageDescendants(page.id).map(p => p.id)]);
+    openEarnPicker({
+      heading: `📁 "${esc(page.title || 'Untitled')}" kis page ke andar daalein?`,
+      extra: page.parentId && findPage(page.parentId) ? [['__root', '💰 Bahar — Earning ki main list me']] : [],
+      exclude,
+      onPick: v => movePageInto(page.id, v === '__root' ? null : v),
+    });
   },
 
   'earn-move-to'(el) { const page = curPage(); closeSheet(); if (page) movePageInto(page.id, el.dataset.value || null); },
@@ -3964,9 +3980,40 @@ const extraActions = {
           <button type="button" class="btn" data-action="earn-move" data-id="${id}" data-value="1">⬇️ Neeche</button>
           <button type="button" class="btn danger" data-action="earn-del-block" data-id="${id}">🗑️ Delete</button>
         </div>
+        <button type="button" class="btn block" data-action="earn-send-block" data-id="${id}" style="margin-top:10px">📤 Kisi aur page me bhejo (feature banke)</button>
         <button type="button" class="btn block" data-action="close-sheet" style="margin-top:10px">Close</button>
       </div>`;
     sheet.showModal();
+  },
+
+  'earn-send-block'(el) {
+    const page = curPage();
+    const b = page && page.blocks.find(x => x.id === el.dataset.id);
+    if (!b) return;
+    const from = page.id;
+    openEarnPicker({
+      heading: '📤 Ye line kis page me bhejein?',
+      quote: plain(b.text).slice(0, 200),
+      exclude: new Set([from]),
+      onPick: v => {
+        const src = findPage(from), target = findPage(v);
+        if (!src || !target) return;
+        const i = src.blocks.findIndex(x => x.id === b.id);
+        if (i < 0) return;
+        const [moved] = src.blocks.splice(i, 1);
+        if (!src.blocks.length) src.blocks.push(newBlock(isFeatureList(target) ? 'todo' : 'p'));
+        src.updatedAt = Date.now();
+        const copy = { ...asFeature(moved), id: uid() };
+        addFeatureBlocks(target, [copy]);
+        saveEarn(); render();
+        toast(`✅ ${target.icon} ${target.title || 'Untitled'} me chala gaya`, () => {
+          const s2 = findPage(from), t2 = findPage(v);
+          if (t2) { t2.blocks = t2.blocks.filter(x => x.id !== copy.id); t2.updatedAt = Date.now(); }
+          if (s2) { s2.blocks.splice(Math.min(i, s2.blocks.length), 0, moved); s2.updatedAt = Date.now(); }
+          saveEarn(); render();
+        });
+      },
+    });
   },
 
   'earn-turn'(el) { closeSheet(); applyBlockType(el.dataset.id, el.dataset.value, false); },
@@ -5050,7 +5097,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01i';
+const APP_VERSION = '2026-11-01j';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
