@@ -3,7 +3,10 @@
    See _accounts.js for how passwords are protected. The accounts file is a
    PRIVATE Vercel Blob and can't be reached through /api/sync. */
 import { get, put } from '@vercel/blob';
-import { accountAction } from './_accounts.js';
+import { accountAction, makeGoogleVerifier } from './_accounts.js';
+import { GOOGLE_CLIENT_ID } from './_google.js';
+
+const verifyGoogle = makeGoogleVerifier(process.env.GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID);
 
 const strongEtag = tag => (tag ? String(tag).replace(/^W\//, '') : tag);
 
@@ -34,7 +37,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const [status, json] = await accountAction(body || {}, store);
+    const [status, json] = await accountAction(body || {}, store, verifyGoogle);
     return res.status(status).json(json);
   } catch (err) {
     console.error(err);

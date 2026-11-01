@@ -358,6 +358,10 @@
   .nav-search { order: -2; display: flex; align-items: center; gap: 8px; min-height: 42px; margin: 0 0 10px; padding: 0 12px;
     border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--muted); font: inherit; font-size: .9rem; cursor: pointer; text-align: left; }
   .nav-search span { flex: 1; }
+  .g-wrap { display: grid; justify-items: center; }
+  .g-btn { min-height: 44px; }
+  .or-line { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .85rem; }
+  .or-line::before, .or-line::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
   .nav-search kbd { font-size: .7rem; padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; }
   .nav-search:hover { color: var(--text); }
 
@@ -1244,6 +1248,7 @@ function renderJoin() {
         <div style="font-size:3rem">👋</div>
         <h2 style="margin:0">Namaste${me.name ? ' ' + esc(fullName(me.name)) : ''}!</h2>
         ${!me.name ? `<p class="small" style="margin:0">Aap kaun ho?</p><div class="btn-row" style="justify-content:center">${whoAmIButtons()}</div>` : ''}
+        ${GOOGLE_CLIENT_ID ? `<div class="g-wrap"><div class="g-btn" data-gtext="signin_with"></div><p class="muted small" style="margin:6px 0 0">Naya phone/PC? Google se login karo — saara data wapas aa jayega.</p></div><div class="or-line">ya</div>` : ''}
         ${ui.codeLogin ? `
           <p class="muted" style="margin:0">🔒 Site kholne ke liye <b>code</b> daalo (Kuldeep se pucho).</p>
           <div style="text-align:left">${passwordForm()}</div>
@@ -2069,7 +2074,7 @@ function renderDashboard() {
 
       <h2 class="section-title">☁️ Sync & aap kaun ho</h2>
       ${renderSyncCard()}
-      ${cloud.code ? `<div class="card" style="margin-top:12px">${accountSection()}</div>` : ''}
+      ${cloud.code ? `<div class="card" style="margin-top:12px">${googleSection()}</div><div class="card" style="margin-top:12px">${accountSection()}</div>` : ''}
 
       <h2 class="section-title">💾 Backup</h2>
       <div class="card">
@@ -2873,6 +2878,7 @@ async function unlockEarning(form) {
     }
     earnCloud = { code, id: eid };
     writeJSON(EARN_CLOUD_KEY, earnCloud);
+    googleSetEarn();
     earn = mergeEarn({ pages: [], deleted: {} }, earnFromCloud(data));
     saveEarn(true);
     ui.earnNew = false;
@@ -3997,6 +4003,85 @@ async function loginWithId(form) {
   }
 }
 
+/* ----- 🔐 Google login: lose the device, sign in with Google, get everything back -----
+   Dashboard → "Google se jodo" links your Google account to this list (and to Earning, if unlocked).
+   Login screen → "Sign in with Google" gets the list code (+ Earning) back from the server. */
+const GOOGLE_CLIENT_ID = ''; // same as api/_google.js
+let gsiLoading = null;
+function loadGsi() {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  return gsiLoading || (gsiLoading = new Promise((ok, fail) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client';
+    sc.async = true;
+    sc.onload = () => ok();
+    sc.onerror = () => { gsiLoading = null; fail(new Error('Google load nahi hua (internet?)')); };
+    document.head.appendChild(sc);
+  }));
+}
+async function mountGoogleButtons() {
+  const slots = [...document.querySelectorAll('.g-btn:not([data-done])')];
+  if (!GOOGLE_CLIENT_ID || !slots.length) return;
+  slots.forEach(el => { el.dataset.done = '1'; });
+  try { await loadGsi(); } catch (err) { slots.forEach(el => { el.innerHTML = `<p class="muted small">${esc(err.message)}</p>`; }); return; }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential, auto_select: false, ux_mode: 'popup' });
+  slots.forEach(el => google.accounts.id.renderButton(el, {
+    theme: 'outline', size: 'large', shape: 'pill', text: el.dataset.gtext || 'continue_with',
+    width: Math.min(320, el.parentElement.clientWidth || 320),
+  }));
+}
+const earnLink = () => (earnCloud.code && earnCloud.id ? { code: earnCloud.code, id: earnCloud.id } : null);
+async function onGoogleCredential(resp) {
+  const credential = resp && resp.credential;
+  if (!credential) return;
+  try {
+    if (!cloud.code) {
+      // Login on a new device
+      toast('⏳ Google se login ho raha hai…');
+      const r = await accountRequest({ action: 'google-login', credential }).catch(() => null);
+      if (!r) return toast('❌ Internet nahi hai, phir try karo');
+      if (!r.ok) return toast('❌ ' + (r.data.error || 'Login nahi hua'));
+      cloud = { code: r.data.space, verified: true, account: r.data.email, google: r.data.email, googleEarn: !!r.data.earn };
+      writeJSON(CLOUD_KEY, cloud);
+      if (r.data.earn && canEarn()) { earnCloud = { code: r.data.earn.code, id: r.data.earn.id }; writeJSON(EARN_CLOUD_KEY, earnCloud); }
+      ui.person = 'all';
+      try { localStorage.setItem(PERSON_KEY, 'all'); } catch { /* ignore */ }
+      await syncNow();
+      if (earnCloud.code) await earnSyncNow();
+      toast(`✅ Welcome back! Saara data aa gaya${earnCloud.code ? ' (💰 Earning bhi)' : ''}`);
+      if (parseRoute().page === 'join') location.hash = '#/'; else render();
+    } else {
+      // Link this list (+ Earning) to the Google account
+      const r = await accountRequest({ action: 'google-link', credential, space: cloud.code, earn: earnLink() }).catch(() => null);
+      if (!r) return toast('❌ Internet nahi hai, phir try karo');
+      if (!r.ok) return toast('❌ ' + (r.data.error || 'Nahi juda'));
+      cloud.google = r.data.email;
+      cloud.googleEarn = !!r.data.earn;
+      writeJSON(CLOUD_KEY, cloud);
+      toast(`✅ ${r.data.email} se jud gaya${r.data.earn ? ' (💰 Earning bhi)' : ''}`);
+      render();
+    }
+  } catch (err) { console.error(err); toast('❌ ' + err.message); }
+}
+// Earning got unlocked / its ID+password changed → keep the Google link pointing at it.
+async function googleSetEarn() {
+  if (!cloud.google || !cloud.code) return;
+  const r = await accountRequest({ action: 'google-set-earn', space: cloud.code, earn: earnLink() }).catch(() => null);
+  if (r && r.ok && r.data.linked) { cloud.googleEarn = !!earnLink(); writeJSON(CLOUD_KEY, cloud); }
+}
+function googleSection() {
+  if (!GOOGLE_CLIENT_ID) return `<div class="label">🔐 Google se jodo</div><p class="muted small" style="margin:0">Google login abhi set nahi hua (Client ID baaki hai).</p>`;
+  const earnNote = !canEarn() ? '' : earnCloud.code
+    ? (cloud.google && cloud.googleEarn ? '💰 Earning bhi juda hai.' : '💰 Earning abhi juda nahi — neeche button se dobara jodo.')
+    : '💰 Earning bhi jodna hai to pehle Earning unlock karo, phir yahan dobara jodo.';
+  return `
+    <div class="label">🔐 Google account se backup</div>
+    ${cloud.google
+      ? `<p style="margin:0 0 6px">✅ Juda hai: <b>${esc(cloud.google)}</b></p><p class="muted small" style="margin:0 0 10px">Phone/PC kho jaye to naye device pe bas <b>Sign in with Google</b> karo — saara data wapas. ${earnNote}</p>`
+      : `<p class="muted small" style="margin:0 0 10px">Ek baar Google se jod do. Phir device kho jaye to bhi naye device pe Google se login karte hi saara data wapas aa jayega. ${earnNote}</p>`}
+    <div class="g-btn" data-gtext="${cloud.google ? 'continue_with' : 'signup_with'}"></div>`;
+}
+
 // Dashboard: your login ID + "make an ID" form.
 function accountSection() {
   const mine = cloud.account ? `
@@ -4152,6 +4237,7 @@ async function saveEarnCreds(form) {
     await moveEarnData(oldCode, newCode, earn);
     earnCloud = { code: newCode, id: newId, lastSync: Date.now() };
     writeJSON(EARN_CLOUD_KEY, earnCloud);
+    googleSetEarn();
     closeSheet();
     toast('✅ Earning ka naya ID + password set ho gaya');
     render();
@@ -4393,6 +4479,7 @@ function render() {
     // No code yet → the site stays locked until the right code is typed.
     app.innerHTML = renderJoin();
     document.querySelector('#password-form input[name="password"]')?.focus();
+    mountGoogleButtons();
     return;
   }
   if (page === 'join') {
@@ -4437,6 +4524,7 @@ function render() {
     updateIdeaList();
   }
   // PC sidebar on every screen (on phones it only shows on Home + Dashboard)
+  mountGoogleButtons();
   if (!app.querySelector('.bottom-nav')) app.insertAdjacentHTML('beforeend', bottomNav('').replace('class="bottom-nav"', 'class="bottom-nav mobile-hidden"'));
   document.title = page === 'idea' && findIdea(id) ? `${findIdea(id).name} · App Ideas` : page === 'earn' ? '💰 Earning' : page === 'sm' ? '📱 SM Planner' : LISTS[page] ? LISTS[page].title : 'App Ideas Tracker';
   animateBars();
@@ -4921,7 +5009,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01g';
+const APP_VERSION = '2026-11-01h';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
