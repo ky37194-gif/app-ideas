@@ -639,6 +639,8 @@
   .tp-subs li.done a { text-decoration: line-through; color: var(--muted); }
   .tp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
   .tp-actions .btn { min-height: 40px; font-size: .88rem; }
+  .qa-lists { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 10px; }
+  .qa-lists .chip { min-height: 34px; padding: 0 12px; font-size: .85rem; }
   @media (min-width: 900px) {
     .todo-panel { left: auto; width: 420px; border-left: 1px solid var(--border); box-shadow: -10px 0 30px rgba(15, 23, 42, .08); padding-top: 16px; }
   }
@@ -1216,6 +1218,7 @@ function topBar(title, { back = '', actions = '' } = {}) {
       <button class="icon-btn phone-only" data-action="open-search" aria-label="Search everything">🔍</button>
       <h1 class="topbar-title">${title}</h1>
       ${actions}
+      <button class="icon-btn" data-action="quick-add" aria-label="Jaldi task add karo" title="⚡ Jaldi task add karo (N / Q)">⚡</button>
       ${syncButton()}
       <button class="icon-btn" data-action="theme" aria-label="Change theme" title="Change theme">${THEME_ICONS[state.theme]}</button>
     </header>`;
@@ -5345,6 +5348,65 @@ document.addEventListener('submit', e => {
 });
 Object.assign(actions, panelActions);
 
+/* ----- ⚡ Quick add (like TickTick): press N / Q anywhere, or the ⚡ button in the top bar ----- */
+const QA_LISTS = () => [[INBOX, '📥 Inbox'], [TODAY, '📅 Today'], [CURRENT, '🎯 Current'], [APPWORK, '🛠️ Is App'], [DOUBTS, '❓ Doubt'], ['', '🧰 Misc']];
+function openQuickAdd() {
+  const { page } = parseRoute();
+  const here = page === 'misc' ? '' : LISTS[page] || page === INBOX ? page : null;
+  ui.qaList = here ?? ui.qaList ?? INBOX;
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <form id="qa-form" class="sheet-inner" autocomplete="off">
+      <h2>⚡ Jaldi task add karo</h2>
+      <input name="text" required maxlength="200" placeholder="Kya karna hai? Enter = add  (end me ! = 🔥 priority)" aria-label="New task">
+      <div class="qa-lists" role="radiogroup" aria-label="Kis list me">
+        ${QA_LISTS().map(([k, l]) => `<button type="button" class="chip ${ui.qaList === k ? 'active' : ''}" data-action="qa-list" data-value="${k}" role="radio" aria-checked="${ui.qaList === k}">${l}</button>`).join('')}
+      </div>
+      <label class="check"><input type="checkbox" name="today"${ui.qaList === TODAY ? ' disabled' : ''}> ☀️ Aaj bhi dikhao</label>
+      <p id="qa-added" class="muted small" style="margin:8px 0 0"></p>
+      <div class="btn-row" style="margin-top:12px">
+        <button type="button" class="btn" data-action="close-sheet">Band karo</button>
+        <button type="submit" class="btn primary">+ Add</button>
+      </div>
+      <p class="muted small" style="margin:10px 0 0">PC: kahin bhi <b>N</b> ya <b>Q</b> dabao → ye khulega.</p>
+    </form>`;
+  if (!sheet.open) sheet.showModal();
+  sheet.querySelector('input[name="text"]').focus();
+}
+actions['quick-add'] = () => openQuickAdd();
+actions['qa-list'] = el => {
+  ui.qaList = el.dataset.value;
+  document.querySelectorAll('.qa-lists .chip').forEach(c => { c.classList.toggle('active', c === el); c.setAttribute('aria-checked', c === el); });
+  const today = document.querySelector('#qa-form input[name="today"]');
+  if (today) today.disabled = ui.qaList === TODAY;
+  document.querySelector('#qa-form input[name="text"]')?.focus();
+};
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'qa-form') return;
+  e.preventDefault();
+  const form = e.target;
+  let text = form.elements.text.value.trim();
+  if (!text) return;
+  const priority = /!\s*$/.test(text);
+  if (priority) text = text.replace(/!+\s*$/, '').trim() || text;
+  const folder = ui.qaList || null;
+  state.todos.push(normalizeTodo({ text, folder, priority, today: form.elements.today.checked && folder !== TODAY, by: myRef() }));
+  saveState();
+  render(); // list behind updates; the sheet stays open for the next task
+  form.elements.text.value = '';
+  form.elements.text.focus();
+  document.getElementById('qa-added').textContent = `✅ "${text.slice(0, 40)}" → ${listName(folder)}${priority ? ' 🔥' : ''}`;
+});
+document.addEventListener('keydown', e => {
+  const typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable;
+  if (typing || e.ctrlKey || e.metaKey || e.altKey || !cloud.code) return;
+  if ((e.key === 'n' || e.key === 'q' || e.key === 'N' || e.key === 'Q') && !document.getElementById('sheet').open) {
+    e.preventDefault();
+    openQuickAdd();
+  }
+});
+
+
 
 // Clicks
 document.addEventListener('click', e => {
@@ -5531,7 +5593,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01m';
+const APP_VERSION = '2026-11-01n';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
