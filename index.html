@@ -735,6 +735,8 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  .dash-cur-head .todo-drag { width: 20px; height: 24px; margin: 0 -4px 0 -6px; }
+  .upnext-item[data-rank] { position: relative; }
   .dash-cur-row { display: grid; gap: 6px; }
   .dash-cur-head { display: flex; align-items: center; gap: 10px; }
   .dash-cur-head .todo-check, .dash-steps .todo-check { width: 22px; height: 22px; border-radius: 6px; flex: none; }
@@ -1185,6 +1187,7 @@ function normalizeTodo(raw = {}) {
     folder: !raw.folder || raw.folder === 'today' || ['apps', 'vr', 'pc', 'rea', 'feature', 'misc'].includes(raw.folder) ? 'inbox' : raw.folder, // Misc + 📅 Today were merged into the 📥 Inbox: null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
     prevFolder: raw.prevFolder === undefined ? undefined : raw.prevFolder, // where a 🎯 task came from (so un-🎯 sends it back)
     prevParent: raw.prevParent || null, // …and which task it sat inside
+    order: Number.isFinite(raw.order) ? raw.order : null, // your own position among its neighbours (set by dragging)
     done: !!raw.done,
     priority: !!raw.priority, // 🔥 = shows on the Priority page
     today: false, // the 📅 Today section was removed
@@ -1792,11 +1795,44 @@ const weekActions = {
   },
 };
 
+/* ----- Your own order (drag) for tasks; unordered ones follow in their usual order ----- */
+const ordered = (arr, fallback) => [...arr].sort((a, b) => ((a.order ?? 1e15) - (b.order ?? 1e15)) || fallback(a, b));
+const projectSort = (a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt);
+const stepSort = (a, b) => a.createdAt - b.createdAt;
+const upNextSort = (a, b) => b.createdAt - a.createdAt;
+// Neighbours a task is ordered among: same parent, or the top level of its list.
+function orderSiblings(t) {
+  const ids = new Set(state.todos.map(x => x.id));
+  if (t.parentId && ids.has(t.parentId)) return ordered(state.todos.filter(x => x.parentId === t.parentId && !x.done), t.parentId === UP_NEXT ? upNextSort : stepSort);
+  return ordered(state.todos.filter(x => x.folder === t.folder && !x.done && isTopTodo(x, ids) && x.id !== UP_NEXT), projectSort);
+}
+// Put task `id` just before / after `targetId` (it joins the target's list / parent), then number them all.
+function reorderTodo(id, targetId, where) {
+  const t = state.todos.find(x => x.id === id), target = state.todos.find(x => x.id === targetId);
+  if (!t || !target || t === target) return;
+  if (descendantsOf(t.id).some(x => x.id === target.id)) { toast('❌ Task ko uske apne andar nahi daal sakte'); return; }
+  const group = [t, ...descendantsOf(t.id)];
+  const before = state.todos.map(x => ({ x, order: x.order, parentId: x.parentId, folder: x.folder }));
+  rememberOrigin(t, target.folder);
+  const now = Date.now();
+  group.forEach(x => { if (x.folder !== target.folder) { x.folder = target.folder; x.updatedAt = now; } });
+  t.parentId = target.parentId || null;
+  const list = orderSiblings(target).filter(x => x !== t);
+  list.splice(list.indexOf(target) + (where === 'after' ? 1 : 0), 0, t);
+  list.forEach((x, i) => { if (x.order !== i || x === t) { x.order = i; x.updatedAt = now; } });
+  saveState(); render();
+  toast(`↕️ "${t.text.slice(0, 30)}" ab #${list.indexOf(t) + 1} pe`, () => {
+    const t2 = Date.now();
+    before.forEach(b => { if (b.x.order !== b.order || b.x.parentId !== b.parentId || b.x.folder !== b.folder) Object.assign(b.x, { order: b.order, parentId: b.parentId, folder: b.folder, updatedAt: t2 }); });
+    saveState(); render();
+  });
+}
+
 /* ----- ⚡ Abhi kar raha hoon: one task you're doing right now + the next one ----- */
 const nowTask = () => state.todos.filter(t => t.now && !t.done).sort((a, b) => b.now - a.now)[0] || null;
 function dashNowCard(upNext) {
   const t = nowTask();
-  const next = [...upNext].reverse().find(x => !t || x.id !== t.id) || null;
+  const next = upNext.find(x => !t || x.id !== t.id) || null;
   const where = t && t.parentId && state.todos.find(x => x.id === t.parentId);
   return `<section class="card dash-now" data-drop-now="1" title="Koi bhi task yahan chhodo = abhi yahi kar raha hoon">
       <span class="dash-cur-label">⚡ Abhi kar raha hoon</span>
@@ -1877,18 +1913,17 @@ const nowActions = {
 // Dashboard: what you're working on now (every open 🎯 Current Project task, with % done and next step).
 function dashCurrentCard() {
   const ids = new Set(state.todos.map(t => t.id));
-  const upNext = childrenOf(UP_NEXT).filter(x => !x.done);
-  const list = state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids))
-    .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
+  const upNext = ordered(childrenOf(UP_NEXT).filter(x => !x.done), upNextSort);
+  const list = ordered(state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids)), projectSort);
   // Each project (and the ⏭️ Up next box) is a drop target: drag a task's ⠿ from the Inbox onto it.
   // A line with a tick box: ⠿ drag · ☐ done · text (tap = details) · ▶️ abhi yahi.
-  const line = (x, cls = '') => `<li class="upnext-item ${cls}"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button><button class="now-play" data-action="send-back" data-id="${x.id}" title="Yahan se hatao — jahan se aaya tha wahin wapas">↩️</button></li>`;
+  const line = (x, cls = '') => `<li class="upnext-item ${cls}" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button><button class="now-play" data-action="send-back" data-id="${x.id}" title="Yahan se hatao — jahan se aaya tha wahin wapas">↩️</button></li>`;
   const addBox = (parent, placeholder, folder = '') => `<form class="dash-add-form" data-parent="${parent}" data-folder="${folder}" autocomplete="off"><input name="text" maxlength="300" required placeholder="${placeholder}" aria-label="${placeholder}"></form>`;
   const rows = list.map((t, i) => {
     const steps = descendantsOf(t.id);
-    const open = childrenOf(t.id).filter(x => !x.done);
-    return `<div class="dash-cur-row${i === 0 ? ' main' : ''}" data-drop-todo="${t.id}" title="Task yahan chhodo = is project ka step">
-      <div class="dash-cur-head"><button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Project ho gaya"></button>
+    const open = ordered(childrenOf(t.id).filter(x => !x.done), stepSort);
+    return `<div class="dash-cur-row${i === 0 ? ' main' : ''}" data-drop-todo="${t.id}" data-rank title="Task yahan chhodo = is project ka step · upar/neeche chhodo = order">
+      <div class="dash-cur-head"><span class="pg-drag todo-drag" data-drag-todo="${t.id}" title="Pakad ke kisi project ke upar / neeche chhodo = order badlo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Project ho gaya"></button>
         <span class="dash-cur-name" data-action="open-todo" data-id="${t.id}">${esc(t.text)}</span>
         <button class="now-play" data-action="set-now" data-id="${(open[0] || t).id}" title="Abhi yahi kar raha hoon">▶️</button>
         <button class="now-play" data-action="send-back" data-id="${t.id}" title="Current Project se hatao — jahan se aaya tha wahin wapas">↩️</button></div>
@@ -1905,7 +1940,7 @@ function dashCurrentCard() {
     </section>
     <section class="card dash-upnext-box" data-drop-todo="${UP_NEXT}">
       <div class="row-between"><span class="dash-cur-label">⏭️ Up next${upNext.length ? ` · ${upNext.length}` : ''}</span><a class="muted small" href="#/current">Kholo ›</a></div>
-      ${upNext.length ? `<ul class="upnext-list">${[...upNext].reverse().map(x => line(x)).join('')}</ul>` : ''}
+      ${upNext.length ? `<ul class="upnext-list">${upNext.map(x => line(x)).join('')}</ul>` : ''}
       ${addBox(UP_NEXT, '＋ Up next me likho… Enter')}
       <div class="upnext-drop">⠿ Inbox se task yahan chhodo → Up next · Up next ka ⠿ upar Current Project pe chhodo → wahi current ban jayega</div>
     </section>
@@ -4577,6 +4612,14 @@ function tdDropTarget(x, y) {
     if (skip.has(t.dataset.dropTodo)) return null;
   }
   if (t.dataset.dropPage && !(canEarn() && earnCloud.code && findPage(t.dataset.dropPage))) return null;
+  // Rows marked data-rank: top / bottom edge = put before / after it (order); middle = inside it.
+  tdDrag.where = 'into';
+  if (t.dataset.dropTodo && t.hasAttribute('data-rank')) {
+    const r = t.getBoundingClientRect();
+    const edge = Math.min(r.height * 0.3, 16);
+    if (y < r.top + edge) tdDrag.where = 'before';
+    else if (y > r.bottom - edge) tdDrag.where = 'after';
+  }
   return t;
 }
 document.addEventListener('pointerdown', e => {
@@ -4607,8 +4650,9 @@ document.addEventListener('pointermove', e => {
   if (t !== tdDrag.over) {
     if (tdDrag.over) tdDrag.over.classList.remove('drop-hover');
     tdDrag.over = t;
-    if (t) t.classList.add('drop-hover');
   }
+  if (t) t.classList.toggle('drop-hover', tdDrag.where === 'into');
+  markDrop(t, tdDrag.where || 'into');
 });
 function endTdDrag(e, cancel) {
   if (!tdDrag || e.pointerId !== tdDrag.pointerId) return;
@@ -4617,11 +4661,13 @@ function endTdDrag(e, cancel) {
   document.body.classList.remove('todo-drag-on');
   if (d.ghost) d.ghost.remove();
   if (d.over) d.over.classList.remove('drop-hover');
+  markDrop(null);
   if (d.src) d.src.classList.remove('pg-dragging');
   if (!d.moved) return;
   tdJustDragged = Date.now();
   if (cancel || !d.over) return;
   if (d.over.dataset.dropNow) setNow(d.id); // → ⚡ abhi yahi kar raha hoon
+  else if (d.over.dataset.dropTodo && d.where && d.where !== 'into') reorderTodo(d.id, d.over.dataset.dropTodo, d.where); // ↕️ order
   else if (d.over.dataset.dropTodo) moveTodoInto(d.id, d.over.dataset.dropTodo); // → sub-task of that task
   else if (d.over.dataset.dropPage) moveTodoToEarn(d.id, d.over.dataset.dropPage); // → into that Earning page
   else moveTodoTo(d.id, d.over.dataset.dropList);
@@ -6740,7 +6786,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12e';
+const APP_VERSION = '2026-11-12f';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
