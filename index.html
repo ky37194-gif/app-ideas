@@ -729,6 +729,13 @@
   .pop input { min-height: 46px; font-size: 1.05rem; }
   .pop textarea { resize: none; font-size: .9rem; min-height: 58px; }
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
+  .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
+  .done-toggle:hover { color: var(--text); }
+  /* Earning page: pages inside = cards (like the Earning home) */
+  .earn-kids { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); margin-bottom: 18px; }
+  .earn-kids .idea-card { margin: 0; }
+  .planner-cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); margin: 12px 0 4px; }
+  .planner-cards .sm-card { margin: 0; }
   /* Dashboard: 🎯 Current Project card */
   .dash-current { display: grid; gap: 4px; margin-bottom: 14px; border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
     background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), var(--surface)); }
@@ -739,6 +746,46 @@
   .dash-cur-name { font-weight: 700; font-size: 1rem; }
   .dash-cur-row.main .dash-cur-name { font-size: 1.3rem; font-weight: 800; }
   .dash-cur-row:hover .dash-cur-name { color: var(--primary); }
+  /* ---------- 21. 🗓️ YT & IG Hafta plan ---------- */
+  .field-label { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); margin: 6px 0 6px; }
+  .chip-check { position: relative; }
+  .chip-check input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip-check span { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border);
+    background: var(--surface); font-size: .85rem; font-weight: 600; cursor: pointer; user-select: none; }
+  .chip-check input:checked + span { background: var(--primary); border-color: var(--primary); color: var(--primary-ink, #fff); }
+  .chip-check input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .wk-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .wk-add { margin-left: auto; min-height: 40px; }
+  .wk-today { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
+  .wk-today-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .wk-targets { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .wk-target { border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; background: var(--surface); }
+  .wk-target-head { font-weight: 800; font-size: .9rem; margin-bottom: 6px; }
+  .wk-target ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .wk-target li { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; }
+  .wk-target li b { color: var(--warning, #f59e0b); }
+  .wk-target li b.ok { color: var(--success); }
+  .wk-grid { display: grid; gap: 8px; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .wk-day { display: flex; flex-direction: column; gap: 6px; min-height: 140px; padding: 8px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
+  .wk-day.today { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+  .wk-day-head { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: .9rem; padding: 0 2px; }
+  .wk-day-head .icon-btn { width: 30px; height: 30px; min-height: 30px; font-size: 1rem; color: var(--primary); }
+  .wk-empty { color: var(--muted); text-align: center; padding: 14px 0; font-size: .85rem; }
+  .wk-slot { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 10px; background: var(--surface-2); border-left: 3px solid var(--border); }
+  .wk-slot.youtube { border-left-color: #ef4444; }
+  .wk-slot.instagram { border-left-color: #ec4899; }
+  .wk-slot.live { box-shadow: 0 0 0 2px var(--primary); }
+  .wk-slot.done { opacity: .55; }
+  .wk-slot.done .wk-what { text-decoration: line-through; }
+  .wk-slot .todo-check { width: 22px; height: 22px; border-radius: 6px; flex: none; margin-top: 1px; }
+  .wk-slot .todo-check.on { background: var(--success); border-color: var(--success); }
+  .wk-slot-body { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+  .wk-time { font-size: .72rem; font-weight: 800; color: var(--muted); }
+  .wk-now { color: var(--primary); }
+  .wk-what { font-size: .86rem; font-weight: 600; line-height: 1.3; word-break: break-word; }
+  .wk-acc { font-size: .7rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 1100px) { .wk-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .wk-grid { grid-template-columns: 1fr; } .wk-day { min-height: 0; } .wk-add { margin-left: 0; width: 100%; } }
 </style>
 </head>
 
@@ -1075,7 +1122,7 @@ function normalizeTodo(raw = {}) {
     desc: String(raw.desc || ''), // longer notes, written in the task's side panel
     images: (Array.isArray(raw.images) ? raw.images : []).filter(s => typeof s === 'string' && s.startsWith('data:image/')).slice(0, 12),
     parentId: raw.parentId || null, // set = this task lives inside another task
-    folder: raw.folder === 'today' ? 'inbox' : raw.folder || null, // which Misc list (old 📅 Today tasks now live in the Inbox): null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
+    folder: !raw.folder || raw.folder === 'today' || ['apps', 'vr', 'pc', 'rea', 'feature', 'misc'].includes(raw.folder) ? 'inbox' : raw.folder, // Misc + 📅 Today were merged into the 📥 Inbox: null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
     prevFolder: raw.prevFolder === undefined ? undefined : raw.prevFolder, // where a 🎯 task came from (so un-🎯 sends it back)
     done: !!raw.done,
     priority: !!raw.priority, // 🔥 = shows on the Priority page
@@ -1100,6 +1147,7 @@ function loadState() {
       return {
         ideas: Array.isArray(data.ideas) ? data.ideas.map(normalizeIdea) : [],
         todos: Array.isArray(data.todos) ? data.todos.map(normalizeTodo) : [],
+        week: Array.isArray(data.week) ? data.week.map(normalizeSlot) : [], // 🗓️ YT & IG weekly time-table
         // ids of deleted ideas -> when they were deleted (so deletes also sync)
         deleted: data.deleted && typeof data.deleted === 'object' ? data.deleted : {},
         theme: data.theme || 'system',
@@ -1109,7 +1157,7 @@ function loadState() {
   } catch (err) {
     console.error('Could not load saved data', err);
   }
-  return { ideas: [], todos: [], deleted: {}, theme: 'system', sort: 'updated' };
+  return { ideas: [], todos: [], week: [], deleted: {}, theme: 'system', sort: 'updated' };
 }
 
 // fromSync = true when the sync code itself is saving (so it doesn't trigger another sync).
@@ -1287,15 +1335,15 @@ function bottomNav(active) {
   return `
     <nav class="bottom-nav" aria-label="Main">
       <button type="button" class="nav-search pc-only" data-action="open-search">🔍 <span>Search…</span><kbd>Ctrl K</kbd></button>
-      <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
+      <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard" data-drop-list="inbox"><span class="ico">📊</span>Dashboard + Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
       <a class="nav-item pc-only ${active === CURRENT ? 'active' : ''}" href="#/current" data-drop-list="current"><span class="ico">🎯</span>Current Project</a>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
-      <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox" data-drop-list="inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
       ${canEarn() ? `<a class="nav-item ${active === 'earn' && !parseRoute().id ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>${earnNavSubs()}` : ''}
+      ${earnCloud.code && findPage(CAT_PASSION) ? '' /* both live under ❤️ Passion + Earning in the Earning list */ : `
       ${canEarn() ? `<a class="nav-item pc-only ${parseRoute().page === 'sm' ? 'active' : ''}" href="#/sm"><span class="ico">📣</span>Social Media</a>` : ''}
+      <a class="nav-item pc-only ${active === 'week' ? 'active' : ''}" href="#/week"><span class="ico">🗓️</span>YT &amp; IG plan</a>`}
       <a class="nav-item pc-only ${active === 'doubts' ? 'active' : ''}" href="#/doubts" data-drop-list="doubts"><span class="ico">❓</span>Doubts &amp; To Know<span class="nav-count">${openTodos(DOUBTS) || ''}</span></a>
       <a class="nav-item pc-only ${active === APPWORK ? 'active' : ''}" href="#/appwork" data-drop-list="appwork"><span class="ico">🛠️</span>Pending in this App<span class="nav-count">${openTodos(APPWORK) || ''}</span></a>
-      <a class="nav-item ${active === 'misc' ? 'active' : ''}" href="#/misc" data-drop-list="misc"><span class="ico">🧰</span>Misc<span class="nav-count">${openTodos() || ''}</span></a>
     </nav>`;
 }
 
@@ -1316,12 +1364,15 @@ function earnNavSubs() {
   const tops = earn.pages.filter(isTopPage).sort(byRank((a, b) => a.createdAt - b.createdAt));
   if (!tops.length) return '';
   const row = (p, depth) => {
-    const kids = depth < 2 ? childPages(p.id) : [];
+    const kids = []; // sidebar = only the main folders; open one to see what's inside (as cards)
     const open = kids.length && !navClosed.has(p.id);
     return `<a class="nav-sub ${inPageTree(p.id) ? 'active' : ''}" href="#/earn/${p.id}" title="${esc(p.title || 'Untitled')}" data-drop-page="${p.id}" data-rank style="--d:${depth}">
         ${kids.length ? `<button type="button" class="nav-sub-arrow ${open ? 'open' : ''}" data-action="nav-sub-toggle" data-id="${p.id}" aria-label="${open ? 'Band karo' : 'Kholo'}">›</button>` : '<span class="nav-sub-arrow"></span>'}
         <span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>
-      ${open ? kids.map(k => row(k, depth + 1)).join('') : ''}`;
+      ${open ? kids.map(k => row(k, depth + 1)).join('') : ''}
+      ${open && p.id === CAT_PASSION ? `
+        <a class="nav-sub ${parseRoute().page === 'week' ? 'active' : ''}" href="#/week" style="--d:${depth + 1}"><span class="nav-sub-arrow"></span><span>🗓️</span><span class="name">YT &amp; IG Hafta plan</span></a>
+        <a class="nav-sub ${parseRoute().page === 'sm' ? 'active' : ''}" href="#/sm" style="--d:${depth + 1}"><span class="nav-sub-arrow"></span><span>📣</span><span class="name">Content Planner</span></a>` : ''}`;
   };
   return `<div class="nav-subs">${tops.map(p => row(p, 0)).join('')}</div>`;
 }
@@ -1465,9 +1516,16 @@ const LISTS = {
 // The project you're on now = the first open one at the top of the list.
 function currentFocus() {
   const ids = new Set(state.todos.map(t => t.id));
-  const top = state.todos.filter(t => t.folder === CURRENT && !t.done && isTopTodo(t, ids))
+  const top = state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids))
     .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
   return top[0] || null;
+}
+const UP_NEXT = 'cur-upnext';
+// Make sure the ⏭️ Up next task exists (fixed id → every device shares the same one).
+function ensureUpNext() {
+  if (!cloud.code || state.todos.some(t => t.id === UP_NEXT) || state.deleted[UP_NEXT]) return;
+  state.todos.push(normalizeTodo({ id: UP_NEXT, text: '⏭️ Up next', desc: 'Iske ＋ se agle kaam daalo — current khatam hote hi inme se uthao.', folder: CURRENT, createdAt: 1, updatedAt: 1 }));
+  saveState();
 }
 function renderCurrentHero() {
   const t = currentFocus();
@@ -1483,10 +1541,198 @@ function renderCurrentHero() {
         : '<div class="muted small">Iske ＋ pe tap karke steps daalo.</div>'}
     </div>`;
 }
+/* =====================================================================
+   🗓️ YT & IG HAFTA PLAN — which day, which time, which channel, what work.
+   Channels + posting targets come from the 📣 Content Planner (same site → same storage);
+   the time-table itself is saved in this app's list (state.week) and syncs with it.
+   ===================================================================== */
+const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEK_DAYS_HI = ['Somvar', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani', 'Ravi'];
+const WORK_KINDS = [
+  ['script', '✍️', 'Script / idea'], ['shoot', '🎬', 'Shoot'], ['edit', '✂️', 'Edit'], ['thumb', '🖼️', 'Thumbnail'],
+  ['post', '📤', 'Upload / post'], ['story', '⭕', 'Story'], ['reply', '💬', 'Comments'], ['other', '📌', 'Kuch aur'],
+];
+const KIND = Object.fromEntries(WORK_KINDS.map(([k, ico, label]) => [k, { ico, label }]));
+const SM_FORMATS = {
+  'yt-long': '🎞️ Long video', 'yt-short': '⚡ Short', 'ig-reel': '🎬 Reel', 'ig-post': '🖼️ Post', 'ig-carousel': '🗂️ Carousel', 'ig-story': '⭕ Story',
+};
+// Your channels from the Content Planner (falls back to the 4 starting ones if it was never opened on this device).
+const SM_DEFAULT_ACCOUNTS = [
+  { id: 'yt1', name: 'Pharmsstrasse', platform: 'youtube', icon: '▶️' }, { id: 'ig1', name: 'Pharmsstrasse', platform: 'instagram', icon: '📸' },
+  { id: 'yt2', name: 'German learning mit JK', platform: 'youtube', icon: '🇩🇪' }, { id: 'ig2', name: 'German learning mit JK', platform: 'instagram', icon: '🇩🇪' },
+];
+function smData() { try { return JSON.parse(localStorage.getItem('contentPlanner.v1')) || null; } catch { return null; } }
+function smAccounts() {
+  const d = smData();
+  const list = d && Array.isArray(d.accounts) && d.accounts.length ? d.accounts : SM_DEFAULT_ACCOUNTS;
+  return list.map(a => ({ id: a.id, name: a.name || 'Account', platform: a.platform === 'youtube' ? 'youtube' : 'instagram', icon: a.icon || '⭐', targets: Array.isArray(a.targets) ? a.targets : [] }));
+}
+const platIco = p => (p === 'youtube' ? '▶️ YT' : '📸 IG');
+const accName = a => `${a.icon} ${a.name} · ${platIco(a.platform)}`;
+
+function normalizeSlot(raw = {}) {
+  const now = Date.now();
+  const days = (Array.isArray(raw.days) ? raw.days : []).map(Number).filter(d => d >= 0 && d <= 6);
+  return {
+    id: raw.id || uid(),
+    days: days.length ? [...new Set(days)].sort() : [0],
+    start: /^\d\d:\d\d$/.test(raw.start) ? raw.start : '19:00',
+    end: /^\d\d:\d\d$/.test(raw.end) ? raw.end : '',
+    accountId: String(raw.accountId || ''),
+    kind: KIND[raw.kind] ? raw.kind : 'other',
+    text: String(raw.text || '').slice(0, 300),
+    done: Array.isArray(raw.done) ? raw.done.filter(d => /^\d{4}-\d\d-\d\d$/.test(d)).slice(-60) : [], // dates it was ticked
+    updatedAt: Number(raw.updatedAt) || now,
+  };
+}
+const dayIdx = (d = new Date()) => (d.getDay() + 6) % 7; // Mon = 0
+const weekStart = (d = new Date()) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - dayIdx(x)); return x; };
+const slotDate = day => { const x = weekStart(); x.setDate(x.getDate() + day); return todayStr(x.getTime()); };
+const nowHM = () => new Date().toTimeString().slice(0, 5);
+const fmtT = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`; };
+const slotsOn = (day, acc = ui.weekAcc) => (state.week || []).filter(s => s.days.includes(day) && (!acc || s.accountId === acc)).sort((a, b) => a.start.localeCompare(b.start));
+
+// How many posts the Content Planner says are done this week, per account + format.
+function postedThisWeek(accountId, format) {
+  const d = smData();
+  if (!d || !Array.isArray(d.ideas)) return 0;
+  const from = todayStr(weekStart().getTime());
+  return d.ideas.filter(i => i.status === 'posted' && (i.postedAt || i.date || '') >= from && (i.accountIds || []).includes(accountId) && (i.formats || []).includes(format)).length;
+}
+
+function slotCard(s, day, accs) {
+  const a = accs.find(x => x.id === s.accountId);
+  const date = slotDate(day);
+  const done = s.done.includes(date);
+  const live = day === dayIdx() && s.start <= nowHM() && (!s.end || nowHM() < s.end);
+  return `<div class="wk-slot${done ? ' done' : ''}${live ? ' live' : ''}${a ? ' ' + a.platform : ''}">
+      <button class="todo-check${done ? ' on' : ''}" data-action="wk-done" data-id="${s.id}" data-date="${date}" aria-label="${done ? 'Ho gaya — undo' : 'Ho gaya'}">${done ? '✓' : ''}</button>
+      <button class="wk-slot-body" data-action="wk-edit" data-id="${s.id}" title="Badlo / hatao">
+        <span class="wk-time">${fmtT(s.start)}${s.end ? '–' + fmtT(s.end) : ''}${live ? ' <b class="wk-now">● Abhi</b>' : ''}</span>
+        <span class="wk-what">${KIND[s.kind].ico} ${esc(s.text || KIND[s.kind].label)}</span>
+        ${a ? `<span class="wk-acc">${esc(accName(a))}</span>` : ''}
+      </button>
+    </div>`;
+}
+
+function renderWeek() {
+  const accs = smAccounts();
+  if (ui.weekAcc && !accs.some(a => a.id === ui.weekAcc)) ui.weekAcc = '';
+  const today = dayIdx();
+  const todays = slotsOn(today);
+  const doneToday = todays.filter(s => s.done.includes(slotDate(today))).length;
+  const shown = ui.weekAcc ? accs.filter(a => a.id === ui.weekAcc) : accs;
+  const targets = shown.map(a => {
+    const rows = a.targets.filter(t => SM_FORMATS[t.format]).map(t => {
+      const per = t.per === 'week' ? t.count : t.count * (Array.isArray(t.days) && t.days.length ? t.days.length : 7);
+      const got = postedThisWeek(a.id, t.format);
+      const when = (Array.isArray(t.days) && t.days.length && t.days.length < 7 ? t.days.map(d => WEEK_DAYS[d]).join(', ') : 'roz') + (t.time ? ' · ' + fmtT(t.time) : '');
+      return `<li><span>${SM_FORMATS[t.format]} <span class="muted small">${t.per === 'week' ? `${t.count}/hafta` : `${t.count}/din`} · ${when}</span></span><b class="${got >= per ? 'ok' : ''}">${got}/${per}</b></li>`;
+    }).join('');
+    return rows ? `<div class="wk-target"><div class="wk-target-head">${esc(accName(a))}</div><ul>${rows}</ul></div>` : '';
+  }).join('');
+  return `
+    ${topBar('🗓️ YouTube & Instagram — Hafta plan')}
+    <main class="page wk-page">
+      <div class="wk-chips">
+        <button class="chip ${!ui.weekAcc ? 'active' : ''}" data-action="wk-acc" data-value="">Saare channels</button>
+        ${accs.map(a => `<button class="chip ${ui.weekAcc === a.id ? 'active' : ''}" data-action="wk-acc" data-value="${esc(a.id)}">${esc(accName(a))}</button>`).join('')}
+        <button class="btn primary wk-add" data-action="wk-new" data-day="${today}">＋ Kaam ka time daalo</button>
+      </div>
+
+      <section class="card wk-today">
+        <div class="row-between"><b>☀️ Aaj — ${WEEK_DAYS_HI[today]}</b><span class="muted small">${todays.length ? `${doneToday}/${todays.length} ho gaye` : ''}</span></div>
+        ${todays.length ? `<div class="wk-today-list">${todays.map(s => slotCard(s, today, accs)).join('')}</div>`
+          : `<p class="muted small" style="margin:8px 0 0">Aaj ke liye kuch plan nahi. <a href="#" data-action="wk-new" data-day="${today}">＋ Time daalo</a></p>`}
+      </section>
+
+      ${targets ? `<h2 class="section-title">🎯 Is hafte kitna post karna hai <span class="muted small" style="font-weight:500">(Content Planner ke targets · posted / chahiye)</span></h2>
+        <div class="wk-targets">${targets}</div>` : ''}
+
+      <h2 class="section-title">🗓️ Poora hafta</h2>
+      <div class="wk-grid">${WEEK_DAYS.map((d, i) => `
+        <div class="wk-day${i === today ? ' today' : ''}">
+          <div class="wk-day-head"><span>${d}<span class="muted small"> ${new Date(slotDate(i)).getDate()}</span></span>
+            <button class="icon-btn" data-action="wk-new" data-day="${i}" aria-label="${d} me time daalo" title="${d} me time daalo">＋</button></div>
+          ${slotsOn(i).map(s => slotCard(s, i, accs)).join('') || '<div class="wk-empty">—</div>'}
+        </div>`).join('')}
+      </div>
+      <p class="hint" style="margin-top:14px">💡 Ek baar daala time har hafte repeat hota hai. Tick sirf us din ke liye lagta hai. Channels aur posting targets <a href="#/sm">📣 Content Planner</a> me badlo.</p>
+    </main>
+    ${bottomNav('week')}`;
+}
+
+function openSlotSheet(slot, day) {
+  const accs = smAccounts();
+  const s = slot || normalizeSlot({ days: [Number(day) || 0], accountId: ui.weekAcc || '', kind: 'shoot' });
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <form id="wk-form" class="sheet-inner" data-id="${slot ? s.id : ''}" autocomplete="off">
+      <h2>${slot ? '✏️ Time badlo' : '🗓️ Kaam ka time daalo'}</h2>
+      <label class="field-label">Kis din? <span class="muted small">(kai din chun sakte ho)</span></label>
+      <div class="chip-group wk-days">${WEEK_DAYS.map((d, i) => `<label class="chip-check"><input type="checkbox" name="days" value="${i}"${s.days.includes(i) ? ' checked' : ''}><span>${d}</span></label>`).join('')}</div>
+      <div class="row" style="gap:10px;margin-top:12px">
+        <label style="flex:1"><span class="field-label">Kab se</span><input type="time" name="start" value="${s.start}" required></label>
+        <label style="flex:1"><span class="field-label">Kab tak</span><input type="time" name="end" value="${s.end}"></label>
+      </div>
+      <label class="field-label" style="margin-top:12px">Kaun sa channel?</label>
+      <select name="accountId"><option value="">— Koi bhi / sab —</option>${accs.map(a => `<option value="${esc(a.id)}"${a.id === s.accountId ? ' selected' : ''}>${esc(accName(a))}</option>`).join('')}</select>
+      <label class="field-label" style="margin-top:12px">Kya kaam?</label>
+      <div class="chip-group">${WORK_KINDS.map(([k, ico, label]) => `<label class="chip-check"><input type="radio" name="kind" value="${k}"${s.kind === k ? ' checked' : ''}><span>${ico} ${label}</span></label>`).join('')}</div>
+      <input name="text" maxlength="300" value="${esc(s.text)}" placeholder="Details (jaise: German Short ka edit, 2 stories)" style="margin-top:12px">
+      <div class="btn-row" style="margin-top:16px">
+        ${slot ? `<button type="button" class="btn danger" data-action="wk-del" data-id="${s.id}">🗑️ Hatao</button>` : ''}
+        <button type="button" class="btn" data-action="close-sheet">Cancel</button>
+        <button type="submit" class="btn primary">✓ Save</button>
+      </div>
+    </form>`;
+  if (!sheet.open) sheet.showModal();
+}
+
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'wk-form') return;
+  e.preventDefault();
+  const f = e.target;
+  const days = [...f.querySelectorAll('input[name="days"]:checked')].map(x => Number(x.value));
+  if (!days.length) { toast('Kam se kam ek din chuno'); return; }
+  const old = f.dataset.id && state.week.find(x => x.id === f.dataset.id);
+  const slot = normalizeSlot({
+    ...(old || {}), days, start: f.elements.start.value, end: f.elements.end.value,
+    accountId: f.elements.accountId.value, kind: f.elements.kind.value, text: f.elements.text.value.trim(), updatedAt: Date.now(),
+  });
+  if (slot.end && slot.end <= slot.start) { toast('"Kab tak" wala time "Kab se" ke baad ka hona chahiye'); return; }
+  state.week = [...state.week.filter(x => x.id !== slot.id), slot];
+  saveState(); closeSheet(); render();
+  toast(old ? '✅ Badal diya' : `✅ ${days.map(d => WEEK_DAYS[d]).join(', ')} ${fmtT(slot.start)} — har hafte`);
+});
+
+const weekActions = {
+  'wk-acc'(el) { ui.weekAcc = el.dataset.value; render(); },
+  'wk-new'(el) { openSlotSheet(null, el.dataset.day); },
+  'wk-edit'(el) { const s = state.week.find(x => x.id === el.dataset.id); if (s) openSlotSheet(s); },
+  'wk-del'(el) {
+    const s = state.week.find(x => x.id === el.dataset.id);
+    if (!s) return;
+    state.week = state.week.filter(x => x !== s);
+    state.deleted[s.id] = Date.now();
+    saveState(); closeSheet(); render();
+    toast('🗑️ Hata diya', () => { delete state.deleted[s.id]; s.updatedAt = Date.now(); state.week.push(s); saveState(); render(); });
+  },
+  'wk-done'(el) {
+    const s = state.week.find(x => x.id === el.dataset.id);
+    if (!s) return;
+    const d = el.dataset.date;
+    s.done = s.done.includes(d) ? s.done.filter(x => x !== d) : [...s.done, d];
+    s.updatedAt = Date.now();
+    saveState(); render();
+  },
+};
+
 // Dashboard: what you're working on now (every open 🎯 Current Project task, with % done and next step).
 function dashCurrentCard() {
   const ids = new Set(state.todos.map(t => t.id));
-  const list = state.todos.filter(t => t.folder === CURRENT && !t.done && isTopTodo(t, ids))
+  const upNext = childrenOf(UP_NEXT).filter(x => !x.done);
+  const list = state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids))
     .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
   if (!list.length) {
     return `<a class="card dash-current empty-cur" href="#/current"><span class="big">🎯</span><span style="flex:1"><b>Abhi koi Current Project nahi</b><br>
@@ -1504,6 +1750,7 @@ function dashCurrentCard() {
   return `<section class="card dash-current">
       <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
       ${rows}
+      ${upNext.length ? `<div class="dash-upnext"><span class="muted small"><b>⏭️ Up next:</b> ${upNext.slice(-3).reverse().map(x => esc(x.text)).join(' · ')}${upNext.length > 3 ? ` +${upNext.length - 3}` : ''}</span></div>` : ''}
     </section>`;
 }
 
@@ -1566,7 +1813,7 @@ function todoRow(t) {
   const adding = ui.addSubTo === t.id;
   return `
     <li class="todo-item">
-      <div class="todo ${t.done ? 'done' : ''}${t.priority && !t.done ? ' prio' : ''}${ui.openTodo === t.id ? ' selected' : ''}">
+      <div class="todo ${t.done ? 'done' : ''}${t.priority && !t.done ? ' prio' : ''}${ui.openTodo === t.id ? ' selected' : ''}" data-drop-todo="${t.id}">
         <span class="pg-drag todo-drag" data-drag-todo="${t.id}" title="Pakad ke side wale section (Today, Doubts, Earning…) pe chhodo" aria-label="Drag">⠿</span>
         ${kids.length
           ? `<button class="todo-arrow ${isOpen ? 'open' : ''}" data-action="collapse-todo" data-id="${t.id}" aria-label="${isOpen ? 'Band karo' : 'Kholo'}">›</button>`
@@ -1574,8 +1821,8 @@ function todoRow(t) {
         <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
         <span class="todo-text" data-action="open-todo" data-id="${t.id}" title="Kholo — description, photos, andar ke kaam"><span class="tt-row"><span class="tt">${esc(t.text)}</span>${t.images.length ? `<span class="todo-extra">🖼️${t.images.length}</span>` : ''}</span>${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}${all.length ? progressLine(all) : ''}</span>
         ${t.by ? avatar(t.by) : ''}
-        ${prioButton(t)}${todayButton(t)}${currentButton(t)}
-        ${t.folder === INBOX && !t.parentId
+        ${t.id === UP_NEXT ? '' : prioButton(t) + todayButton(t) + currentButton(t)}
+        ${t.id === UP_NEXT ? '' : t.folder === INBOX && !t.parentId
           ? `<button class="icon-btn" data-action="inbox-move" data-id="${t.id}" aria-label="Folder me daalo" title="📂 Kisi folder / list / Earning page me daalo">📂</button>`
           : canEarn() ? `<button class="icon-btn" data-action="todo-to-earn" data-id="${t.id}" aria-label="Earning me bhejo" title="💰 Earning me bhejo">📂</button>` : ''}
         <button class="icon-btn todo-sub" data-action="add-subtodo" data-id="${t.id}" aria-label="Iske andar task add karo" title="Andar task add karo">＋</button>
@@ -1601,18 +1848,20 @@ function renderTodos(folder = null) {
       <input name="text" required maxlength="${folder === INBOX ? 5000 : 200}" placeholder="${LISTS[folder] ? LISTS[folder].add : folder === INBOX ? 'Jaldi kuch likho… Enter dabao' : 'Kya karna hai? Likho aur Enter dabao…'}" aria-label="New to-do">
       <button type="submit" class="btn primary">+ Add</button>
     </form>
-    <p class="muted small" style="margin:-4px 2px 10px">Kisi task ke andar aur task chahiye? Uske <b>＋</b> pe tap karo.</p>
+    <p class="muted small" style="margin:-4px 2px 10px">Kisi task ke andar aur task chahiye? Uske <b>＋</b> pe tap karo. <b>⠿</b> pakad ke kisi bhi task, list ya Earning page pe chhodo = wahan shift.</p>
     ${open.length ? `<ul class="todo-list">${open.map(todoRow).join('')}</ul>`
       : `<div class="card empty"><div class="big">${LISTS[folder] ? LISTS[folder].emoji : '🧰'}</div><p class="muted">${LISTS[folder]
         ? (done.length ? LISTS[folder].allDone : LISTS[folder].empty)
         : (done.length ? 'Sab ho gaya! 🎉 Naya kaam upar likho.' : 'Jo bhi karna hai, upar ek line me likho. Ho jaye to tick karo.')}</p></div>`}
     ${done.length ? `
       <div class="row-between" style="margin:18px 2px 8px">
-        <b class="muted small">✓ Ho gaye (${done.length})</b>
+        <button class="done-toggle" data-action="toggle-done-list" data-folder="${folder || ''}">${showDone.has(folder || '') ? '▾' : '▸'} ✓ Ho gaye (${done.length})</button>
         <button class="btn" data-action="clear-done-todos" data-folder="${folder || ''}" style="min-height:34px;padding:0 12px;font-size:.85rem">Clear done</button>
       </div>
-      ${folder === CURRENT ? '' : `<ul class="todo-list">${done.map(todoRow).join('')}</ul>`}` : ''}`;
+      ${showDone.has(folder || '') ? `<ul class="todo-list">${done.map(todoRow).join('')}</ul>` : ''}` : ''}`;
 }
+// Done tasks sit at the bottom, folded away; ▸ opens them (remembered per device until reload).
+const showDone = new Set();
 
 // Only re-draw the list (so typing in the search box doesn't lose focus).
 function updateIdeaList() {
@@ -1683,6 +1932,9 @@ function updateIdeaList() {
 
 // The folder's own Misc list, shown as a folder card first in the grid.
 function miscFolderCard() {
+  return ''; // Misc lists were merged into the Inbox
+}
+function oldMiscFolderCard() {
   const f = folderOf(ui.folder);
   const open = state.todos.filter(t => t.folder === f.key && !t.done && !t.parentId).sort((a, b) => b.createdAt - a.createdAt);
   const left = openTodos(f.key);
@@ -1886,7 +2138,55 @@ function saveIdeaForm(form) {
    SECTION 9: SCREEN — IDEA DETAIL (features, journal, info)
    ===================================================================== */
 
+// Idea page = just what to build + a checklist of things to do (tick / add / remove).
 function renderDetail(idea) {
+  const points = idea.features;
+  const done = points.filter(f => f.status === 'done').length;
+  // Newest point on top; done ones go to the bottom, folded away.
+  const openPts = points.filter(f => f.status !== 'done').reverse();
+  const donePts = points.filter(f => f.status === 'done').reverse();
+  const pointRow = f => ui.editPoint === f.id
+    ? `<li><form id="point-edit-form" class="todo-add" data-id="${f.id}" autocomplete="off" style="margin:0">
+        <input name="title" maxlength="200" required value="${esc(f.title)}" aria-label="Point badlo">
+        <button type="submit" class="btn primary">✓ Save</button><button type="button" class="btn" data-action="point-edit" data-id="">✕</button></form></li>`
+    : `<li><div class="todo ${f.status === 'done' ? 'done' : ''}">
+        <button class="todo-check" data-action="point-check" data-id="${f.id}" aria-label="${f.status === 'done' ? 'Done. Tap to undo' : 'Mark done'}">${f.status === 'done' ? '✓' : ''}</button>
+        <span class="todo-text" data-action="point-edit" data-id="${f.id}" title="Tap = badlo"><span class="tt">${esc(f.title)}</span>${f.desc ? `<span class="todo-desc">${esc(f.desc)}</span>` : ''}</span>
+        <button class="icon-btn" data-action="point-edit" data-id="${f.id}" aria-label="Badlo" title="Badlo">✏️</button>
+        <button class="icon-btn todo-del" data-action="point-del" data-id="${f.id}" aria-label="Hatao">✕</button>
+      </div></li>`;
+  const actions = `<a class="icon-btn" href="#/edit/${idea.id}" aria-label="Edit idea" title="Naam / details badlo">✏️</a>`;
+  return `
+    ${topBar(esc(idea.name), { back: '#/', actions })}
+    <main class="page" style="max-width:820px">
+      <section class="card hero">
+        <h1 style="margin-top:0">${esc(idea.name)}</h1>
+        <span class="field-label" style="margin:0 0 4px">🎯 Kya banana hai</span>
+        ${idea.desc ? `<p style="margin:0;white-space:pre-line">${esc(idea.desc)}</p>` : `<a class="muted" href="#/edit/${idea.id}">＋ Likho ki kya banana hai…</a>`}
+      </section>
+      <div class="row-between" style="margin:18px 2px 8px">
+        <b>☑️ Kya-kya karna hai</b>
+        ${points.length ? `<span class="muted small">${done}/${points.length} ho gaye</span>` : ''}
+      </div>
+      <form id="point-form" class="todo-add" autocomplete="off">
+        <input name="title" maxlength="200" required placeholder="Kya karna hai? Likho aur Enter dabao…" aria-label="New point">
+        <button type="submit" class="btn primary">+ Add</button>
+      </form>
+      ${points.length ? `
+        <ul class="todo-list">${openPts.map(pointRow).join('')}</ul>
+        ${!openPts.length ? '<p class="muted small" style="margin:4px 2px">Sab ho gaya! 🎉</p>' : ''}
+        ${donePts.length ? `<button class="done-toggle" data-action="toggle-done-list" data-folder="idea:${idea.id}" style="margin:14px 2px 8px">${showDone.has('idea:' + idea.id) ? '▾' : '▸'} ✓ Ho gaye (${donePts.length})</button>
+          ${showDone.has('idea:' + idea.id) ? `<ul class="todo-list">${donePts.map(pointRow).join('')}</ul>` : ''}` : ''}`
+        : '<p class="muted small" style="margin:4px 2px">Upar ek-ek point likho. Ho jaye to tick karo.</p>'}
+      <div class="btn-row" style="margin-top:28px">
+        <button class="btn" data-action="copy-idea">📋 Copy as text</button>
+        <button class="btn danger" data-action="delete-idea">🗑️ Delete idea</button>
+      </div>
+    </main>`;
+}
+
+// Old idea page (steps, status, progress, tabs) — kept only for reference, not shown anymore.
+function renderDetailOld(idea) {
   const pct = progressOf(idea);
   const mvp = mvpProgressOf(idea);
   const s = statusOf(idea.status);
@@ -2242,28 +2542,11 @@ function renderDashboard() {
   }).join('');
 
   return `
-    ${topBar('📊 Dashboard')}
+    ${topBar('📊 Dashboard + 📥 Inbox')}
     <main class="page">
       ${dashCurrentCard()}
-      <div class="stats">
-        <div class="card stat"><div class="num">${total}</div><div class="lbl">Total ideas</div></div>
-        <div class="card stat"><div class="num">${avg}%</div><div class="lbl">Overall progress (avg)</div></div>
-        <div class="card stat"><div class="num">${featuresDone}<span class="muted" style="font-size:1rem">/${allFeatures.length}</span></div><div class="lbl">Features done</div></div>
-        <div class="card stat"><div class="num">${entriesThisWeek}</div><div class="lbl">Journal entries (7 days)</div></div>
-      </div>
-
-      <div class="card" style="margin-top:12px">
-        ${progressBar('dash-overall', avg, null, true)}
-      </div>
-
-      <h2 class="section-title">🔥 Most active this week</h2>
-      ${mostActive ? `
-        <a class="card active-idea" href="#/idea/${mostActive.id}">
-          <div class="card-top"><h3>${esc(mostActive.name)}</h3>${statusBadge(mostActive.status)}</div>
-          <p class="muted small" style="margin:6px 0 10px">${best} update${best === 1 ? '' : 's'} in the last 7 days · ${progressOf(mostActive)}% done</p>
-          ${progressBar('dash-active', progressOf(mostActive), statusOf(mostActive.status).color)}
-        </a>`
-      : `<div class="card"><p class="muted" style="margin:0">No activity this week yet. Kisi idea pe thoda kaam karo! 💪</p></div>`}
+      <h2 class="section-title" style="margin-top:6px">📥 Inbox <span class="muted small" style="font-weight:500">— line pe tap = description, photo, andar ke kaam · 🎯 = Current Project · 📂 = folder / Earning me · PC pe kahin bhi Alt+I</span></h2>
+      ${renderTodos(INBOX)}
 
       <h2 class="section-title">☁️ Sync</h2>
       ${renderSyncCard()}
@@ -2503,6 +2786,8 @@ async function cloudRequest(method, body, code = cloud.code) {
 
 /* ----- Merge helpers ----- */
 // Newer idea wins; a delete wins if it is newer than the idea.
+const syncData = () => ({ ideas: state.ideas, todos: state.todos, week: state.week || [], deleted: state.deleted });
+
 function mergeData(a, b) {
   const deleted = { ...a.deleted };
   Object.entries(b.deleted || {}).forEach(([id, t]) => { deleted[id] = Math.max(deleted[id] || 0, t); });
@@ -2521,7 +2806,13 @@ function mergeData(a, b) {
     if (!current || t.updatedAt > current.updatedAt) todoById.set(t.id, t);
   });
   const todos = [...todoById.values()].filter(t => !(deleted[t.id] && deleted[t.id] >= t.updatedAt));
-  return { ideas, todos, deleted };
+  const slotById = new Map();
+  [...(a.week || []), ...(b.week || [])].forEach(x => {
+    const current = slotById.get(x.id);
+    if (!current || x.updatedAt > current.updatedAt) slotById.set(x.id, x);
+  });
+  const week = [...slotById.values()].filter(x => !(deleted[x.id] && deleted[x.id] >= x.updatedAt));
+  return { ideas, todos, week, deleted };
 }
 
 // A stable text version of the data, used to check "did anything change?"
@@ -2529,7 +2820,8 @@ function fingerprint(data) {
   const ideas = [...data.ideas].sort((x, y) => (x.id < y.id ? -1 : 1));
   const deleted = Object.keys(data.deleted).sort().map(k => [k, data.deleted[k]]);
   const todos = [...(data.todos || [])].sort((x, y) => (x.id < y.id ? -1 : 1));
-  return JSON.stringify([ideas, deleted, todos]);
+  const week = [...(data.week || [])].sort((x, y) => (x.id < y.id ? -1 : 1));
+  return JSON.stringify(week.length ? [ideas, deleted, todos, week] : [ideas, deleted, todos]);
 }
 
 /* ----- Sync ----- */
@@ -2560,9 +2852,9 @@ async function syncNow() {
         cloud.verified = true; writeJSON(CLOUD_KEY, cloud);
       }
       const remote = got.data.data
-        ? { ideas: (got.data.data.ideas || []).map(normalizeIdea), todos: (got.data.data.todos || []).map(normalizeTodo), deleted: got.data.data.deleted || {} }
-        : { ideas: [], todos: [], deleted: {} };
-      const merged = mergeData({ ideas: state.ideas, todos: state.todos, deleted: state.deleted }, remote);
+        ? { ideas: (got.data.data.ideas || []).map(normalizeIdea), todos: (got.data.data.todos || []).map(normalizeTodo), week: (got.data.data.week || []).map(normalizeSlot), deleted: got.data.data.deleted || {} }
+        : { ideas: [], todos: [], week: [], deleted: {} };
+      const merged = mergeData(syncData(), remote);
 
       if (!got.data.data || got.data.data.space !== 'K' || fingerprint(merged) !== fingerprint(remote)) {
         const saved = await cloudRequest('PUT', { data: { ...merged, space: 'K', savedAt: Date.now() }, etag: got.data.etag });
@@ -2571,11 +2863,12 @@ async function syncNow() {
       }
 
       // Apply to this device (merge again in case you edited while we waited).
-      const current = { ideas: state.ideas, todos: state.todos, deleted: state.deleted };
+      const current = syncData();
       const latest = mergeData(current, merged);
       if (fingerprint(latest) !== fingerprint(current)) {
         state.ideas = latest.ideas;
         state.todos = latest.todos;
+        state.week = latest.week;
         state.deleted = latest.deleted;
         saveState(true);
         refreshAfterSync();
@@ -2816,9 +3109,9 @@ document.addEventListener('keydown', e => {
 window.addEventListener('storage', e => {
   if (e.key !== STORAGE_KEY || parseRoute().page === 'pop') return;
   const fresh = loadState();
-  const merged = mergeData({ ideas: state.ideas, todos: state.todos, deleted: state.deleted }, fresh);
-  if (fingerprint(merged) === fingerprint({ ideas: state.ideas, todos: state.todos, deleted: state.deleted })) return;
-  Object.assign(state, { ideas: merged.ideas, todos: merged.todos, deleted: merged.deleted });
+  const merged = mergeData(syncData(), fresh);
+  if (fingerprint(merged) === fingerprint(syncData())) return;
+  Object.assign(state, { ideas: merged.ideas, todos: merged.todos, week: merged.week, deleted: merged.deleted });
   refreshAfterSync();
 });
 
@@ -2877,7 +3170,7 @@ function todoPlace(t) {
   const f = t.folder && FOLDERS.find(x => x.key === t.folder);
   return (f ? `${f.emoji} ${f.label} · Misc` : '🧰 Misc') + (parent ? ` › ${parent.text.slice(0, 24)}` : '');
 }
-const todoLink = t => (t.folder === INBOX ? '#/inbox' : LISTS[t.folder] ? '#/' + t.folder : t.folder ? '#/misc/' + t.folder : '#/misc');
+const todoLink = t => (LISTS[t.folder] ? '#/' + t.folder : '#/dashboard');
 
 function renderPriority() {
   const todos = prioTodos();
@@ -3090,6 +3383,7 @@ async function earnSyncNow() {
       earnCloud.lastSync = Date.now();
       writeJSON(EARN_CLOUD_KEY, earnCloud);
       earnSync.error = '';
+      if (!earnSyncedOnce) { earnSyncedOnce = true; earnCategorize(); } // only on fresh, synced data
       return;
     }
     throw new Error('Busy, will retry');
@@ -3339,6 +3633,16 @@ function renderEarnHome() {
     ${bottomNav('earn')}`;
 }
 
+// ❤️ Passion pages (YouTube / Instagram / channels) open the YT & IG planners right from here.
+function plannerCards(page) {
+  const passion = page.id === CAT_PASSION || pageAncestors(page).some(a => a.id === CAT_PASSION);
+  if (!passion) return '';
+  return `<div class="planner-cards">
+      <a class="card sm-card" href="#/week"><span class="big" style="font-size:1.6rem">🗓️</span><span style="flex:1"><b>YT &amp; IG Hafta plan</b><br><span class="muted small">Kis din, kis time, kis channel pe kya kaam</span></span><span class="muted">›</span></a>
+      <a class="card sm-card" href="#/sm"><span class="big" style="font-size:1.6rem">📣</span><span style="flex:1"><b>Content Planner</b><br><span class="muted small">Video / reel / story ideas, targets, calendar</span></span><span class="muted">›</span></a>
+    </div>`;
+}
+
 function renderEarnPage(page) {
   const parent = findPage(page.parentId);
   const crumbs = pageAncestors(page).map(p => `<a href="#/earn/${p.id}" data-drop-page="${p.id}">${esc(p.icon)} ${esc(p.title || 'Untitled')}</a><span>›</span>`).join('');
@@ -3353,6 +3657,11 @@ function renderEarnPage(page) {
       <button class="pg-icon" data-action="earn-icon" aria-label="Icon badlo" title="Icon badlo">${esc(page.icon)}</button>
       <div id="pg-title" class="pg-title" contenteditable="${CE}" data-ph="Untitled" role="textbox" aria-label="Page title">${esc(page.title)}</div>
       <div class="muted small">${page.by ? avatar(page.by) + ' ' : ''}Last edit ${timeAgo(page.updatedAt)}</div>
+      ${plannerCards(page)}
+      ${kids.length ? `
+        <div class="row-between" style="margin:14px 0 8px"><h3 style="margin:0">📁 Andar (${kids.length})</h3>
+          <button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Naya page</button></div>
+        <div class="earn-kids">${kids.map(earnCard).join('')}</div>` : ''}
       <div id="blocks" class="blocks">${blocksHTML(page)}</div>
       <div class="row" style="gap:6px;flex-wrap:wrap">
         <button class="add-block" data-action="earn-add-block" style="flex:1">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
@@ -3360,15 +3669,8 @@ function renderEarnPage(page) {
       </div>
       <section class="subpages">
         <div class="drop-root" ${page.parentId && findPage(page.parentId) ? `data-drop-page="${page.parentId}"` : 'data-drop-root'}>⬆️ Yahan chhodo — is folder se bahar nikalo</div>
-        <div class="row-between">
-          <h3>📁 Andar ke pages${kids.length ? ` (${kids.length})` : ''}</h3>
-          <button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Naya page</button>
-        </div>
+        ${kids.length ? '' : `<button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>`}
         ${page.id.startsWith('ideas-folder-') && kids.some(k => !isFeatureList(k)) ? `<button class="btn block" data-action="earn-features-only" data-id="${page.id}" style="margin:6px 0 10px">🧹 Har idea page me sirf features rakho (baaki sab hatao)</button>` : ''}
-        ${kids.map(k => {
-          const n = pageDescendants(k.id).length;
-          return `<a class="subpage" href="#/earn/${k.id}" data-drop-page="${k.id}" data-rank><span class="pg-drag" data-drag-page="${k.id}" title="Pakad ke kisi page ke upar / neeche chhodo = rank badlo · beech me chhodo = andar daalo" aria-label="Drag">⠿</span>${rankBadge(k)}<span>${esc(k.icon)}</span><span class="name">${esc(k.title || 'Untitled')}</span><span class="muted small">${n ? '📄 ' + n + ' ' : ''}›</span></a>`;
-        }).join('')}
       </section>
       <p class="hint" style="margin-top:22px">Shortcut: <b>#</b> heading · <b>-</b> list · <b>1.</b> number · <b>[]</b> checkbox · <b>&gt;</b> quote · <b>---</b> line · <b>/</b> sab options · <b>⋮⋮</b> se block badlo / hatao</p>
     </main>`;
@@ -3967,7 +4269,7 @@ function moveTodoTo(id, target) {
   if (target === 'priority') { if (t.priority) return toast('Ye pehle se 🔥 Priority me hai'); t.priority = true; t.updatedAt = now; }
   else if (target === 'today' && t.folder !== TODAY) { if (t.today) return toast('Ye pehle se 📅 Today me dikh raha hai'); t.today = true; t.updatedAt = now; }
   else {
-    const folder = target === 'misc' ? null : target;
+    const folder = target === 'misc' ? INBOX : target;
     if (t.folder === folder && !t.parentId) return toast(`Ye pehle se ${DROP_NAMES[target]} me hai`);
     group.forEach(x => { x.folder = folder; x.updatedAt = now; });
     t.parentId = null;
@@ -3980,9 +4282,17 @@ function moveTodoTo(id, target) {
     saveState(); render();
   });
 }
+// Where a dragged task can land: a list (sidebar), another task (→ inside it), or an Earning page (sidebar / cards).
 function tdDropTarget(x, y) {
   const el = document.elementFromPoint(x, y);
-  return (el && el.closest('[data-drop-list]')) || null;
+  const t = el && el.closest('[data-drop-list],[data-drop-todo],[data-drop-page]');
+  if (!t || !tdDrag) return null;
+  if (t.dataset.dropTodo) { // not onto itself or anything inside it
+    const skip = new Set([tdDrag.id, ...descendantsOf(tdDrag.id).map(x => x.id)]);
+    if (skip.has(t.dataset.dropTodo)) return null;
+  }
+  if (t.dataset.dropPage && !(canEarn() && earnCloud.code && findPage(t.dataset.dropPage))) return null;
+  return t;
 }
 document.addEventListener('pointerdown', e => {
   const h = e.target.closest('[data-drag-todo]');
@@ -4025,7 +4335,10 @@ function endTdDrag(e, cancel) {
   if (d.src) d.src.classList.remove('pg-dragging');
   if (!d.moved) return;
   tdJustDragged = Date.now();
-  if (!cancel && d.over) moveTodoTo(d.id, d.over.dataset.dropList);
+  if (cancel || !d.over) return;
+  if (d.over.dataset.dropTodo) moveTodoInto(d.id, d.over.dataset.dropTodo); // → sub-task of that task
+  else if (d.over.dataset.dropPage) moveTodoToEarn(d.id, d.over.dataset.dropPage); // → into that Earning page
+  else moveTodoTo(d.id, d.over.dataset.dropList);
 }
 document.addEventListener('pointerup', e => endTdDrag(e, false));
 document.addEventListener('pointercancel', e => endTdDrag(e, true));
@@ -4849,7 +5162,7 @@ function searchEverything(q) {
   const item = (href, name, meta) => `<a class="drawer-item" href="${href}"><span class="name">${name}</span><span class="meta">${meta}</span></a>`;
   let out = '';
   // App sections
-  const sections = [['#/dashboard', '📊 Dashboard'], ['#/inbox', '📥 Inbox'], ['#/misc', '🧰 Misc'],
+  const sections = [['#/dashboard', '📊 Dashboard'], ['#/inbox', '📥 Inbox'],
     ...Object.entries(LISTS).map(([k, L]) => ['#/' + k, `${L.emoji} ${L.label}`]), ...(canEarn() ? [['#/earn', '💰 Earning'], ['#/sm', '📣 Social Media (SM Planner)'], ['#/earn/' + APPS_PAGE, '📱 Apps']] : [])]
     .filter(([, n]) => hit(n));
   if (sections.length) out += `<h3>📂 Sections</h3>` + sections.map(([h, n]) => item(h, hl(n, q), '')).join('');
@@ -4906,11 +5219,11 @@ function drawerList() {
     <a class="drawer-item" href="#/appwork"><span class="name">🛠️ Pending in this App</span><span class="meta">${openTodos(APPWORK) || ''}</span></a>
     <a class="drawer-item" href="#/doubts"><span class="name">❓ Doubts &amp; To Know</span><span class="meta">${openTodos(DOUBTS) || ''}</span></a>
     <h3>🧰 Misc to-do (${openTodos()} baaki)</h3>
-    <a class="drawer-item" href="#/misc"><span class="name">🧰 To-do list kholo</span></a>
     <h3>🔥 Priority (${priorityCount()})</h3>
     <h3>📥 Inbox (${myInbox().length})</h3>
     <a class="drawer-item" href="#/quick"><span class="name">⚡ Jaldi likho</span></a>
     <a class="drawer-item" href="#/inbox"><span class="name">📥 Inbox kholo</span></a>
+    <a class="drawer-item" href="#/week"><span class="name">🗓️ YouTube &amp; Instagram — Hafta plan</span></a>
     ${canEarn() ? `<h3>💰 Earning (private)</h3>` + (earnCloud.code
       ? topEarnPages().map(p => `<a class="drawer-item" href="#/earn/${p.id}"><span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>`).join('')
         + (findPage(APPS_PAGE) ? `<a class="drawer-item" href="#/earn/${APPS_PAGE}"><span>📱</span><span class="name">Apps (phone, Meta, PC)</span></a>` : '')
@@ -5054,10 +5367,60 @@ function renameSideHustle() {
   saveEarn();
 }
 
+/* ----- 💸 Earning categories (one-time setup after the first Earning sync on a device) -----
+   💸 Earning: Meta / Android / iPhone apps, Websites, Extensions, PC apps, E-books, Notes, Pinterest
+   ❤️ Passion + Earning: 📺 YouTube (every channel) + 📸 Instagram (every page) + the YT/IG planners.
+   Fixed ids → two devices doing this at the same time end up with the same pages. */
+const CAT_EARN = 'cat-earn', CAT_PASSION = 'cat-passion';
+const EARN_CATS = [
+  ['cat-meta', '🥽', 'Meta apps', /\bmeta\b|quest|\bvr\b|oculus/i],
+  ['cat-android', '🤖', 'Android apps', /android|play ?store|playstore|app ideas?\b|\brea\b/i],
+  ['cat-iphone', '🍎', 'iPhone apps', /iphone|\bios\b|app ?store/i],
+  ['cat-web', '🌐', 'Websites', /website|\bsite\b|\bweb\b|adsense/i],
+  ['cat-ext', '🧩', 'Extensions', /extension/i],
+  ['cat-pc', '🖥️', 'PC apps', /\bpc\b|desktop|windows/i],
+  ['cat-ebooks', '📚', 'E-books', /e-?books?|\bbooks?\b/i],
+  ['cat-notes', '📝', 'Notes', /\bnotes?\b|template/i],
+  ['cat-pinterest', '📌', 'Pinterest', /pinter|pintrst|pintrest/i],
+];
+const PASSION_CATS = [['cat-yt', '📺', 'YouTube', /youtube|\byt\b/i], ['cat-ig', '📸', 'Instagram', /insta/i]];
+let earnSyncedOnce = false;
+function earnCategorize() {
+  if (!earnCloud.code || findPage(CAT_EARN)) return;
+  if (earn.pages.length) earnBackup('backup-earning-before-categories'); // safety copy first
+  const now = Date.now();
+  const make = (id, icon, title, parentId, order) => {
+    if (!findPage(id)) earn.pages.push(normalizePage({ id, icon, title, parentId, order, createdAt: now, updatedAt: now }));
+    return findPage(id);
+  };
+  make(CAT_EARN, '💸', 'Earning', null, 0);
+  make(CAT_PASSION, '❤️', 'Passion + Earning', null, 1);
+  EARN_CATS.forEach(([id, icon, title], i) => make(id, icon, title, CAT_EARN, i));
+  PASSION_CATS.forEach(([id, icon, title], i) => make(id, icon, title, CAT_PASSION, i));
+  // Every YT channel / IG page from the Content Planner gets its own page.
+  smAccounts().forEach((a, i) => make('ch-' + a.id, a.icon, a.name, a.platform === 'youtube' ? 'cat-yt' : 'cat-ig', i));
+  // Move old pages whose name clearly fits (only top-level ones and the old Digital Products folders).
+  const fixed = new Set([CAT_EARN, CAT_PASSION, ...EARN_CATS.map(c => c[0]), ...PASSION_CATS.map(c => c[0])]);
+  const oldFolders = new Set(['side-hustle', 'side-apps']);
+  const rules = [...PASSION_CATS, ...EARN_CATS];
+  earn.pages.filter(p => !fixed.has(p.id) && !p.id.startsWith('ch-') && (isTopPage(p) || oldFolders.has(p.parentId)) && !oldFolders.has(p.id)).forEach(p => {
+    const hit = rules.find(([, , , rx]) => rx.test(`${p.id === 'side-books' ? 'ebooks ' : ''}${p.id === 'side-pc' ? 'pc ' : ''}${p.title}`));
+    if (hit) { p.parentId = hit[0]; p.order = null; p.updatedAt = now; }
+  });
+  // The old "Digital Products" / "Apps & Games" folders go inside 💸 Earning with whatever is left in them.
+  ['side-hustle'].forEach(id => { const p = findPage(id); if (p && isTopPage(p)) { p.parentId = CAT_EARN; p.order = 99; p.updatedAt = now; } });
+  // Anything else still at the top → inside 💸 Earning (so the main list is just the 2 categories).
+  earn.pages.filter(p => isTopPage(p) && p.id !== CAT_EARN && p.id !== CAT_PASSION).forEach(p => { p.parentId = CAT_EARN; p.order = null; p.updatedAt = now; });
+  saveEarn();
+  render();
+  toast('💸 Earning ab 2 category me hai: Earning + ❤️ Passion. Galat jagah gaya page ⠿ se khiskao.');
+}
+
 function render() {
   const app = document.getElementById('app');
   const { page, id } = parseRoute();
   renameSideHustle();
+  ensureUpNext();
   const panelScroll = document.getElementById('todo-panel')?.scrollTop || 0;
   document.body.classList.remove('panel-open');
 
@@ -5068,7 +5431,7 @@ function render() {
     mountGoogleButtons();
     return;
   }
-  if (page === 'today') { location.hash = '#/inbox'; return; } // 📅 Today was merged into the Inbox
+  if (page === 'today' || page === 'inbox' || page === 'misc') { location.hash = '#/dashboard'; return; } // merged into Dashboard + Inbox // 📅 Today was merged into the Inbox
   document.body.classList.toggle('pop-mode', page === 'pop');
   if (page === 'pop') {
     // Tiny Alt+I window: type → Enter → straight into 📥 Inbox, then the window closes.
@@ -5101,6 +5464,8 @@ function render() {
     app.innerHTML = renderQuick();
     document.getElementById('quick-text')?.focus();
     try { window.AndroidBridge?.showKeyboard?.(); } catch { /* older app */ }
+  } else if (page === 'week') {
+    app.innerHTML = renderWeek();
   } else if (page === 'inbox') {
     app.innerHTML = renderInbox();
   } else if (page === 'priority') {
@@ -5419,7 +5784,37 @@ const actions = {
   },
 };
 
-Object.assign(actions, extraActions); // Inbox + Earning buttons (Section 11A/11B)
+Object.assign(actions, extraActions, weekActions); // Inbox + Earning buttons (Section 11A/11B)
+// Idea page checklist
+Object.assign(actions, {
+  'toggle-done-list'(el) {
+    const k = el.dataset.folder || '';
+    if (showDone.has(k)) showDone.delete(k); else showDone.add(k);
+    render();
+  },
+  'point-edit'(el) {
+    ui.editPoint = el.dataset.id || null;
+    render();
+    const input = document.querySelector('#point-edit-form input');
+    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  },
+  'point-check'(el) {
+    const idea = findIdea(currentIdeaId());
+    const f = idea && idea.features.find(x => x.id === el.dataset.id);
+    if (!f) return;
+    f.status = f.status === 'done' ? 'todo' : 'done';
+    touch(idea); saveState(); render();
+  },
+  'point-del'(el) {
+    const idea = findIdea(currentIdeaId());
+    if (!idea) return;
+    const i = idea.features.findIndex(x => x.id === el.dataset.id);
+    if (i < 0) return;
+    const [gone] = idea.features.splice(i, 1);
+    touch(idea); saveState(); render();
+    toast('🗑️ Hata diya', () => { idea.features.splice(i, 0, gone); touch(idea); saveState(); render(); });
+  },
+});
 
 /* =====================================================================
    SECTION 13B: TASK SIDE PANEL (TickTick style)
@@ -5430,7 +5825,7 @@ Object.assign(actions, extraActions); // Inbox + Earning buttons (Section 11A/11
 const LIST_NAMES = () => ({ '': '🧰 Misc', [INBOX]: '📥 Inbox', ...Object.fromEntries(Object.entries(LISTS).map(([k, L]) => [k, `${L.emoji} ${L.label}`])),
   ...Object.fromEntries(FOLDERS.map(f => [f.key, `${f.emoji} ${f.label} · Misc`])) });
 const listName = folder => LIST_NAMES()[folder || ''] || '🧰 Misc';
-const panelPage = () => { const { page } = parseRoute(); return page === 'misc' || page === 'inbox' || !!LISTS[page]; };
+const panelPage = () => { const { page } = parseRoute(); return page === 'misc' || page === 'inbox' || page === 'dashboard' || !!LISTS[page]; };
 
 function renderTodoPanel() {
   const t = ui.openTodo && state.todos.find(x => x.id === ui.openTodo);
@@ -5527,6 +5922,7 @@ function moveTodoInto(id, value) {
   else {
     const target = state.todos.find(x => x.id === value);
     if (!target) return;
+    if (target.id === t.id || descendantsOf(t.id).some(x => x.id === target.id)) { toast('❌ Task ko uske apne andar nahi daal sakte'); return; }
     folder = target.folder; parentId = target.id; label = `"${target.text.slice(0, 30)}" ke andar`;
     collapsed.delete(target.id); saveCollapsed();
   }
@@ -5675,10 +6071,10 @@ document.addEventListener('submit', e => {
 Object.assign(actions, panelActions);
 
 /* ----- ⚡ Quick add (like TickTick): press N / Q anywhere, or the ⚡ button in the top bar ----- */
-const QA_LISTS = () => [[INBOX, '📥 Inbox'], [CURRENT, '🎯 Current'], [APPWORK, '🛠️ Is App'], [DOUBTS, '❓ Doubt'], ['', '🧰 Misc']];
+const QA_LISTS = () => [[INBOX, '📥 Inbox'], [CURRENT, '🎯 Current'], [APPWORK, '🛠️ Is App'], [DOUBTS, '❓ Doubt']];
 function openQuickAdd() {
   const { page } = parseRoute();
-  const here = page === 'misc' ? '' : LISTS[page] || page === INBOX ? page : null;
+  const here = LISTS[page] ? page : INBOX;
   ui.qaList = here ?? ui.qaList ?? INBOX;
   const sheet = document.getElementById('sheet');
   sheet.innerHTML = `
@@ -5762,6 +6158,24 @@ document.addEventListener('submit', e => {
     connectWithPassword(form.elements.password.value).then(ok => {
       if (ok && parseRoute().page === 'join') location.hash = '#/'; else render();
     });
+  }
+
+  if (form.id === 'point-edit-form') {
+    const idea = findIdea(currentIdeaId());
+    const f = idea && idea.features.find(x => x.id === form.dataset.id);
+    const title = form.elements.title.value.trim();
+    if (f && title) { f.title = title; touch(idea); saveState(); }
+    ui.editPoint = null;
+    render();
+  }
+
+  if (form.id === 'point-form') {
+    const idea = findIdea(currentIdeaId());
+    const title = form.elements.title.value.trim();
+    if (!idea || !title) return;
+    idea.features.push({ id: uid(), title, desc: '', status: 'todo', mvp: true, by: myRef() });
+    touch(idea); saveState(); render();
+    document.querySelector('#point-form [name="title"]')?.focus();
   }
 
   if (form.id === 'feature-form') {
@@ -5918,7 +6332,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11e';
+const APP_VERSION = '2026-11-11k';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
