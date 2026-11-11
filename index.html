@@ -735,6 +735,9 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  .nav-drag { width: 22px; height: 26px; margin-left: auto; font-size: .9rem; opacity: 0; transition: opacity .12s; }
+  .nav-sub:hover .nav-drag, body.pg-drag-on .nav-drag { opacity: .8; }
+  @media (hover: none) { .nav-drag { opacity: .6; } }
   /* Professional finish: quieter cards, crisp borders, consistent focus ring */
   .card { box-shadow: var(--shadow); }
   .btn.primary { box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 1px 2px rgba(0,0,0,.18); }
@@ -1407,7 +1410,7 @@ function earnNavSubs() {
     const open = kids.length && !navClosed.has(p.id);
     return `<a class="nav-sub ${inPageTree(p.id) ? 'active' : ''}" href="#/earn/${p.id}" title="${esc(p.title || 'Untitled')}" data-drop-page="${p.id}" data-rank style="--d:${depth}">
         ${kids.length ? `<button type="button" class="nav-sub-arrow ${open ? 'open' : ''}" data-action="nav-sub-toggle" data-id="${p.id}" aria-label="${open ? 'Band karo' : 'Kholo'}">›</button>` : '<span class="nav-sub-arrow"></span>'}
-        <span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>
+        <span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span><span class="pg-drag nav-drag" data-drag-page="${p.id}" title="Pakad ke kisi aur naam ke upar / neeche chhodo = order badlo" aria-label="Order badlo">⠿</span></a>
       ${open ? kids.map(k => row(k, depth + 1)).join('') : ''}
       ${open && p.id === CAT_PASSION ? `
         <a class="nav-sub ${parseRoute().page === 'week' ? 'active' : ''}" href="#/week" style="--d:${depth + 1}"><span class="nav-sub-arrow"></span><span>🗓️</span><span class="name">YT &amp; IG Hafta plan</span></a>
@@ -3147,6 +3150,31 @@ function renderPop() {
       <div id="pop-msg" class="pop-msg"></div>
     </form>`;
 }
+/* ----- ⎋ Esc = back, everywhere -----
+   1st Esc closes what's open (sheet, menu, task panel) or stops typing; the next Esc goes one step back. */
+function escBackTarget() {
+  const { page, id } = parseRoute();
+  if (page === 'earn' && id) { const p = findPage(id); return p && p.parentId && findPage(p.parentId) ? '#/earn/' + p.parentId : '#/earn'; }
+  if (page === 'edit' && id) return '#/idea/' + id;
+  if (page === 'home' || page === 'dashboard') return null; // already at the start
+  return 'history';
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+  const { page } = parseRoute();
+  if (page === 'pop' || page === 'pcauth' || page === 'pclink' || !cloud.code) return; // the popup closes itself
+  // Something open? Let its own Esc handling close it.
+  if (document.getElementById('sheet')?.open || document.getElementById('drawer')?.classList.contains('open')
+    || ui.openTodo || slash || ui.editPoint || ui.addSubTo || document.getElementById('slash')) return;
+  const a = document.activeElement;
+  if (a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable)) { a.blur(); e.preventDefault(); return; } // stop typing first
+  const target = escBackTarget();
+  if (!target) return;
+  e.preventDefault();
+  if (target === 'history' && history.length > 1) history.back();
+  else location.hash = target === 'history' ? '#/dashboard' : target;
+});
+
 /* ----- ✂️ Cut / 📋 paste a task (with everything inside it) ----- */
 // Which list the current page shows (where a paste lands).
 function pageList() {
@@ -4782,6 +4810,17 @@ const extraActions = {
     render();
   },
 
+  // ⬆️ / ⬇️ in the page menu: swap with the page above / below in the same folder.
+  'earn-rank'(el) {
+    const page = curPage();
+    if (!page) return;
+    const sibs = siblingPages(page.parentId && findPage(page.parentId) ? page.parentId : null);
+    const i = sibs.indexOf(page), j = i + Number(el.dataset.value);
+    if (i < 0 || j < 0 || j >= sibs.length) { toast(j < 0 ? 'Ye pehle se sabse upar hai' : 'Ye pehle se sabse neeche hai'); return; }
+    closeSheet();
+    reorderPage(page.id, sibs[j].id, j < i ? 'before' : 'after');
+  },
+
   'earn-rename'() {
     closeSheet();
     const t = document.getElementById('pg-title');
@@ -4838,6 +4877,10 @@ const extraActions = {
       <div class="sheet-inner">
         <h2>${esc(page.icon)} ${esc(page.title || 'Untitled')}</h2>
         <div style="display:grid;gap:10px">
+          <div class="btn-row">
+            <button type="button" class="btn" data-action="earn-rank" data-value="-1" style="flex:1">⬆️ Upar karo</button>
+            <button type="button" class="btn" data-action="earn-rank" data-value="1" style="flex:1">⬇️ Neeche karo</button>
+          </div>
           <button type="button" class="btn" data-action="earn-rename">✏️ Naam badlo</button>
           <button type="button" class="btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>
           <button type="button" class="btn" data-action="earn-move-pick">📁 Kisi folder me daalo</button>
@@ -6579,7 +6622,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11y';
+const APP_VERSION = '2026-11-12a';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
