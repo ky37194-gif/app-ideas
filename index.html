@@ -756,6 +756,21 @@
   .dash-cur-name { font-weight: 700; font-size: 1rem; }
   .dash-cur-row.main .dash-cur-name { font-size: 1.3rem; font-weight: 800; }
   .dash-cur-row:hover .dash-cur-name { color: var(--primary); }
+  /* Dashboard: left = 🎯 Current + ⏭️ Up next, right = 📥 Inbox */
+  .dash-page { max-width: 1400px; }
+  .dash-split { display: grid; gap: 18px; align-items: start; }
+  @media (min-width: 1000px) {
+    .dash-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .dash-left { position: sticky; top: 76px; }
+  }
+  .dash-upnext-box { display: grid; gap: 8px; }
+  .upnext-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .upnext-list li { display: flex; align-items: center; gap: 10px; font-size: .92rem; }
+  .upnext-list .todo-check { width: 22px; height: 22px; border-radius: 6px; }
+  .upnext-drop { border: 1.5px dashed var(--border); border-radius: 10px; padding: 10px; text-align: center; font-size: .8rem; color: var(--muted); }
+  body.todo-drag-on .upnext-drop, body.todo-drag-on .dash-cur-row { border-color: var(--primary); }
+  .dash-upnext-box.drop-hover .upnext-drop { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--text); }
+  .dash-cur-row.drop-hover { outline: 2px dashed var(--primary); border-radius: 10px; }
   /* ---------- 21. 🗓️ YT & IG Hafta plan ---------- */
   .field-label { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); margin: 6px 0 6px; }
   .chip-check { position: relative; }
@@ -1745,14 +1760,11 @@ function dashCurrentCard() {
   const upNext = childrenOf(UP_NEXT).filter(x => !x.done);
   const list = state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids))
     .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
-  if (!list.length) {
-    return `<a class="card dash-current empty-cur" href="#/current"><span class="big">🎯</span><span style="flex:1"><b>Abhi koi Current Project nahi</b><br>
-      <span class="muted small">Kisi bhi task pe 🎯 dabao — wo yahan dikhega</span></span><span class="muted">›</span></a>`;
-  }
+  // Each project (and the ⏭️ Up next box) is a drop target: drag a task's ⠿ from the Inbox onto it.
   const rows = list.map((t, i) => {
     const steps = descendantsOf(t.id);
     const next = steps.find(x => !x.done);
-    return `<a class="dash-cur-row${i === 0 ? ' main' : ''}" href="#/current">
+    return `<a class="dash-cur-row${i === 0 ? ' main' : ''}" href="#/current" data-drop-todo="${t.id}" title="Inbox se task yahan chhodo = is project ka step">
       <span class="dash-cur-name">${esc(t.text)}</span>
       ${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}
       ${steps.length ? `${progressLine(steps)}${next ? `<span class="muted small">👉 Agla step: <b>${esc(next.text)}</b></span>` : ''}` : ''}
@@ -1760,8 +1772,12 @@ function dashCurrentCard() {
   }).join('');
   return `<section class="card dash-current">
       <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
-      ${rows}
-      ${upNext.length ? `<div class="dash-upnext"><span class="muted small"><b>⏭️ Up next:</b> ${upNext.slice(-3).reverse().map(x => esc(x.text)).join(' · ')}${upNext.length > 3 ? ` +${upNext.length - 3}` : ''}</span></div>` : ''}
+      ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Kisi task pe <b>🎯</b> dabao, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
+    </section>
+    <section class="card dash-upnext-box" data-drop-todo="${UP_NEXT}">
+      <div class="row-between"><span class="dash-cur-label">⏭️ Up next${upNext.length ? ` · ${upNext.length}` : ''}</span><a class="muted small" href="#/current">Kholo ›</a></div>
+      ${upNext.length ? `<ul class="upnext-list">${[...upNext].reverse().map(x => `<li><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span>${esc(x.text)}</span></li>`).join('')}</ul>` : ''}
+      <div class="upnext-drop">⠿ Inbox se koi bhi task pakad ke yahan chhodo → Up next me</div>
     </section>`;
 }
 
@@ -2555,14 +2571,14 @@ function renderDashboard() {
 
   return `
     ${topBar('📊 Dashboard + 📥 Inbox')}
-    <main class="page">
-      ${dashCurrentCard()}
-      <h2 class="section-title" style="margin-top:6px">📥 Inbox <span class="muted small" style="font-weight:500">— line pe tap = description, photo, andar ke kaam · 🎯 = Current Project · 📂 = folder / Earning me · PC pe kahin bhi Alt+I</span></h2>
-      ${renderTodos(INBOX)}
-
-      <h2 class="section-title">☁️ Sync</h2>
-      ${renderSyncCard()}
-      ${cloud.code && GOOGLE_CLIENT_ID ? `<div class="card" style="margin-top:12px">${googleSection()}</div>` : ''}
+    <main class="page dash-page">
+      <div class="dash-split">
+        <div class="dash-left">${dashCurrentCard()}</div>
+        <div class="dash-right">
+          <h2 class="section-title" style="margin-top:0">📥 Inbox <span class="muted small" style="font-weight:500">· tap = details · ⠿ = kahin bhi le jao · Alt+I</span></h2>
+          ${renderTodos(INBOX)}
+        </div>
+      </div>
     </main>
     ${bottomNav('dashboard')}`;
 }
@@ -2980,17 +2996,7 @@ function renderAccount() {
       <h2 class="section-title">🔐 Google se login</h2>
       <div class="card">${GOOGLE_CLIENT_ID ? googleSection() : '<p class="muted small" style="margin:0">Google login abhi set nahi hua.</p>'}</div>
 
-      ${canEarn() ? `<h2 class="section-title">💰 Earning</h2>
-      <div class="card row-between" style="gap:10px;flex-wrap:wrap">
-        <span>${earnCloud.code ? '🔓 Earning khula hai' + (cloud.googleEarn ? ' · Google se juda' : '') : '🔒 Earning locked hai'}</span>
-        <span class="btn-row">${earnCloud.code
-          ? '<button class="btn" data-action="earn-creds">🔑 ID / password</button><button class="btn" data-action="earn-lock">🔒 Lock karo</button>'
-          : '<a class="btn primary" href="#/earn">🔓 Unlock karo</a>'}</span>
-      </div>` : ''}
-
-      <h2 class="section-title">☁️ Sync</h2>
-      ${renderSyncCard()}
-      <p class="muted small" style="margin:10px 2px 0"><b>Disconnect</b> = is device se logout. Data cloud me safe rehta hai — dobara Google / code se login karte hi wapas aa jata hai.</p>
+      <p class="muted small" style="margin:14px 2px 0">${syncState.status === 'error' ? '⚠️ Sync abhi nahi ho raha — internet check karo' : `☁️ Sab devices pe sync${cloud.lastSync ? ' · ' + timeAgo(cloud.lastSync) : ''}`}</p>
     </main>
     ${bottomNav('account')}`;
 }
@@ -6498,7 +6504,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11p';
+const APP_VERSION = '2026-11-11q';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
