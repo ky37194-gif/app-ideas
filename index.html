@@ -2970,10 +2970,10 @@ function renderAccount() {
     ${topBar('👤 Account / Login')}
     <main class="page" style="max-width:720px">
       <section class="card acc-card">
-        <div class="acc-avatar">${g ? esc(g[0].toUpperCase()) : '👤'}</div>
+        <div class="acc-avatar">K</div>
         <div style="flex:1;min-width:0">
-          <b>${g ? esc(g) : cloud.account ? 'ID: ' + esc(cloud.account) : 'Code se login'}</b>
-          <div class="muted small">${g ? '🔐 Google se juda hai — kisi bhi device pe ek click me login' : 'Abhi Google se nahi juda'}</div>
+          <b>Kuldeep</b>
+          <div class="muted small">${g ? `🔐 ${esc(g)} — kisi bhi device pe ek click me login` : '🔐 Google abhi nahi juda — neeche ek click me jodo'}</div>
         </div>
       </section>
 
@@ -6498,7 +6498,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11o';
+const APP_VERSION = '2026-11-11p';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
