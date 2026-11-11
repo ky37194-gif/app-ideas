@@ -473,7 +473,8 @@ function makeSampleIdeas(accountIds) {
      Deletions are remembered in `deleted` so they spread to other devices too.
    ===================================================================== */
 const SITE_URL = 'https://content-planner-ps.vercel.app';
-const SYNC_URL = (location.origin === SITE_URL ? '' : SITE_URL) + '/api/sync';
+// Inside App Ideas: use its own sync (Upstash Redis). The old content-planner-ps Blob store hit Vercel's free limits.
+const SYNC_URL = location.origin === SITE_URL ? '/api/sync' : '/api/sm-sync';
 const SYNC_STORAGE_KEY = 'contentPlanner.sync'; // { code, lastSync } – stays on this device only
 
 const SYNC_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid typos

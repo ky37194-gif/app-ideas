@@ -2,33 +2,21 @@
    POST /api/account  { action: 'create' | 'login' | 'change', id, key, ... }
    See _accounts.js for how passwords are protected. The accounts file is a
    PRIVATE Vercel Blob and can't be reached through /api/sync. */
-import { get, put } from '@vercel/blob';
+import { kv } from './_kv.js';
 import { accountAction, makeGoogleVerifier } from './_accounts.js';
 import { GOOGLE_CLIENT_ID } from './_google.js';
 
 const verifyGoogle = makeGoogleVerifier(process.env.GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID);
 
-const strongEtag = tag => (tag ? String(tag).replace(/^W\//, '') : tag);
-
+// The accounts list lives in Upstash Redis (the old Vercel Blob store hit the free plan's limits).
 const store = {
   async read(pathname) {
-    const found = await get(pathname, { access: 'private', useCache: false });
-    if (!found) return null;
-    const text = await new Response(found.stream).text();
-    return { data: JSON.parse(text), etag: strongEtag(found.blob.etag) };
+    const found = await kv.get(pathname);
+    return found ? { data: JSON.parse(found.text), etag: found.etag } : null;
   },
   async write(pathname, data, etag) {
-    const options = { access: 'private', contentType: 'application/json', addRandomSuffix: false, cacheControlMaxAge: 60 };
-    if (etag) options.ifMatch = strongEtag(etag);
-    else options.allowOverwrite = false;
-    try {
-      await put(pathname, JSON.stringify(data), options);
-      return 'ok';
-    } catch (err) {
-      const msg = String(err && err.message);
-      if (err?.name === 'BlobPreconditionFailedError' || /precondition|already exists/i.test(msg)) return 'conflict';
-      throw err;
-    }
+    const saved = await kv.put(pathname, JSON.stringify(data), etag || '');
+    return saved.ok ? 'ok' : 'conflict';
   },
 };
 
