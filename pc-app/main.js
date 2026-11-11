@@ -1,7 +1,10 @@
 // App Ideas for Windows: the live site in its own window + Alt+I quick Inbox popup.
 // The site itself lives on Vercel, so every push shows up here with no rebuild.
-const { app, BrowserWindow, globalShortcut, Tray, Menu, shell, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, shell, nativeImage, screen, ipcMain } = require('electron');
 const path = require('path');
+const http = require('http');
+const crypto = require('crypto');
+const PRELOAD = path.join(__dirname, 'preload.js');
 
 const SITE = 'https://app-ideas-beta.vercel.app/';
 const ORIGIN = new URL(SITE).origin;
@@ -61,7 +64,7 @@ function createWindow() {
     backgroundColor: '#0b0f19',
     autoHideMenuBar: true,
     show: false,
-    webPreferences: { contextIsolation: true, spellcheck: true },
+    webPreferences: { contextIsolation: true, spellcheck: true, preload: PRELOAD },
   });
   win.removeMenu();
   handleLinks(win.webContents);
@@ -106,7 +109,7 @@ function openPop() {
     backgroundColor: '#0b0f19',
     autoHideMenuBar: true,
     show: false,
-    webPreferences: { contextIsolation: true, spellcheck: true },
+    webPreferences: { contextIsolation: true, spellcheck: true, preload: PRELOAD },
   });
   pop.removeMenu();
   handleLinks(pop.webContents);
@@ -148,6 +151,48 @@ function createTray() {
 }
 
 app.on('second-instance', () => showMain());
+
+// 🔐 Google login without typing a password: open the site in your normal browser (already signed in to Google),
+// you pick your account there, and the page posts Google's answer back to this app on 127.0.0.1.
+let googleWait = null;
+ipcMain.handle('google-login', () => {
+  if (googleWait) googleWait.cancel();
+  return new Promise((resolve) => {
+    const state = crypto.randomBytes(16).toString('hex');
+    let done = false;
+    const finish = (cred) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      googleWait = null;
+      setTimeout(() => server.close(), 300);
+      if (cred) showMain();
+      resolve(cred || null);
+    };
+    const page = (title, text) => `<!doctype html><meta charset="utf-8"><title>${title}</title>
+      <body style="margin:0;height:100vh;display:grid;place-items:center;background:#0b0f19;color:#e5e7eb;font:16px 'Segoe UI',sans-serif;text-align:center">
+      <div><div style="font-size:44px">${title.startsWith('✅') ? '✅' : '❌'}</div><h2>${title.replace(/^\S+\s/, '')}</h2><p style="color:#9ca3af">${text}</p></div>
+      <script>setTimeout(() => window.close(), 1500)</script></body>`;
+    const server = http.createServer((req, res) => {
+      if (req.method !== 'POST' || !req.url.startsWith('/cb')) { res.writeHead(404); res.end(); return; }
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 20000) req.destroy(); });
+      req.on('end', () => {
+        const form = new URLSearchParams(body);
+        const ok = form.get('state') === state && form.get('credential');
+        res.writeHead(ok ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(ok ? page('✅ PC app me login ho gaya', 'Ye tab band kar sakte ho — App Ideas khul gaya hai.') : page('❌ Login nahi hua', 'PC app se dobara try karo.'));
+        if (ok) finish(form.get('credential'));
+      });
+    });
+    const timer = setTimeout(() => finish(null), 5 * 60 * 1000);
+    googleWait = { cancel: () => finish(null) };
+    server.on('error', () => finish(null));
+    server.listen(0, '127.0.0.1', () => {
+      shell.openExternal(`${SITE}#/pcauth/${server.address().port}/${state}`);
+    });
+  });
+});
 
 app.whenReady().then(() => {
   registerHotkey();

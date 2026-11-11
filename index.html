@@ -731,6 +731,8 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  .g-pc { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border-radius: 99px; font-weight: 700; }
+  .g-logo { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #fff; color: #4285f4; font-weight: 900; font-family: Arial, sans-serif; }
   .cut-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 10px 8px 14px; border-radius: 12px;
     border: 1px dashed var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface)); font-size: .9rem; }
   .cut-banner > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4986,6 +4988,10 @@ async function mountGoogleButtons() {
   const slots = [...document.querySelectorAll('.g-btn:not([data-done])')];
   if (!GOOGLE_CLIENT_ID || !slots.length) return;
   slots.forEach(el => { el.dataset.done = '1'; });
+  if (window.appIdeasPC?.googleLogin) {
+    slots.forEach(el => { el.innerHTML = '<button type="button" class="btn g-pc" data-action="pc-google"><span class="g-logo">G</span> Google se login (browser me 1 click)</button>'; });
+    return;
+  }
   try { await loadGsi(); } catch (err) { slots.forEach(el => { el.innerHTML = `<p class="muted small">${esc(err.message)}</p>`; }); return; }
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential, auto_select: false, ux_mode: 'popup' });
   slots.forEach(el => google.accounts.id.renderButton(el, {
@@ -4994,6 +5000,46 @@ async function mountGoogleButtons() {
   }));
 }
 const earnLink = () => (earnCloud.code && earnCloud.id ? { code: earnCloud.code, id: earnCloud.id } : null);
+// PC app: sign in through the browser, then the app gets the Google answer back.
+const pcGoogleAction = async () => {
+  toast('🌐 Browser me Google khul raha hai — wahan apna account chuno');
+  try {
+    const credential = await window.appIdeasPC.googleLogin();
+    if (credential) await onGoogleCredential({ credential });
+    else toast('Google login cancel ho gaya');
+  } catch (err) { toast('❌ ' + (err.message || err)); }
+};
+
+/* ----- #/pcauth/<port>/<state>: opened in your normal browser by the PC app ----- */
+function renderPcAuth(port, state) {
+  return `<main class="page" style="max-width:460px;margin-top:10vh">
+    <div class="card" style="text-align:center;display:grid;gap:12px;justify-items:center;padding:28px 22px">
+      <div class="big" style="font-size:2.6rem">💻</div>
+      <h2 style="margin:0">PC app me login</h2>
+      <p class="muted" style="margin:0">Neeche apna Google account chuno — PC app apne aap khul jayega.</p>
+      <div id="pc-g-btn"></div>
+      <p id="pc-auth-msg" class="muted small" style="margin:0"></p>
+    </div></main>`;
+}
+async function mountPcAuth(port, state) {
+  const msg = document.getElementById('pc-auth-msg');
+  if (!/^d{2,5}$/.test(port || '') || !/^[a-f0-9]{16,64}$/.test(state || '')) { msg.textContent = '❌ Galat link — PC app se dobara try karo'; return; }
+  try { await loadGsi(); } catch (err) { msg.textContent = err.message; return; }
+  const send = resp => {
+    if (!resp || !resp.credential) return;
+    msg.textContent = '⏳ PC app ko bhej rahe hain…';
+    // Hand the Google answer to the PC app running on this computer (POST, so it never sits in a URL).
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `http://127.0.0.1:${port}/cb`;
+    [['credential', resp.credential], ['state', state]].forEach(([k, v]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = v; form.appendChild(i); });
+    document.body.appendChild(form);
+    form.submit();
+  };
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: send, auto_select: true, ux_mode: 'popup' });
+  google.accounts.id.renderButton(document.getElementById('pc-g-btn'), { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'continue_with' });
+  google.accounts.id.prompt(); // One Tap: if you're signed in, it's one click
+}
 async function onGoogleCredential(resp) {
   const credential = resp && resp.credential;
   if (!credential) return;
@@ -5500,6 +5546,7 @@ function render() {
   const panelScroll = document.getElementById('todo-panel')?.scrollTop || 0;
   document.body.classList.remove('panel-open');
 
+  if (page === 'pcauth') { app.innerHTML = renderPcAuth(id, parseRoute().extra); document.title = 'PC app me login'; mountPcAuth(id, parseRoute().extra); return; }
   if (!cloud.code) {
     // No code yet → the site stays locked until the right code is typed.
     app.innerHTML = renderJoin();
@@ -5507,7 +5554,8 @@ function render() {
     mountGoogleButtons();
     return;
   }
-  if (page === 'today' || page === 'inbox' || page === 'misc') { location.hash = '#/dashboard'; return; } // merged into Dashboard + Inbox // 📅 Today was merged into the Inbox
+  if (page === 'today' || page === 'inbox' || page === 'misc') { location.hash = '#/dashboard'; return; } // merged into Dashboard + Inbox
+  if (page === 'pcauth') { app.innerHTML = renderPcAuth(id, parseRoute().extra); document.title = 'PC app me login'; mountPcAuth(id, parseRoute().extra); return; } // 📅 Today was merged into the Inbox
   document.body.classList.toggle('pop-mode', page === 'pop');
   if (page === 'pop') {
     // Tiny Alt+I window: type → Enter → straight into 📥 Inbox, then the window closes.
@@ -5860,7 +5908,7 @@ const actions = {
   },
 };
 
-Object.assign(actions, extraActions, weekActions, cutActions); // Inbox + Earning buttons (Section 11A/11B)
+Object.assign(actions, extraActions, weekActions, cutActions, { 'pc-google': pcGoogleAction }); // Inbox + Earning buttons (Section 11A/11B)
 // Idea page checklist
 Object.assign(actions, {
   'toggle-done-list'(el) {
@@ -6411,7 +6459,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11l';
+const APP_VERSION = '2026-11-11m';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
