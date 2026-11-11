@@ -1075,11 +1075,11 @@ function normalizeTodo(raw = {}) {
     desc: String(raw.desc || ''), // longer notes, written in the task's side panel
     images: (Array.isArray(raw.images) ? raw.images : []).filter(s => typeof s === 'string' && s.startsWith('data:image/')).slice(0, 12),
     parentId: raw.parentId || null, // set = this task lives inside another task
-    folder: raw.folder || null, // which Misc list: null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
+    folder: raw.folder === 'today' ? 'inbox' : raw.folder || null, // which Misc list (old 📅 Today tasks now live in the Inbox): null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
     prevFolder: raw.prevFolder === undefined ? undefined : raw.prevFolder, // where a 🎯 task came from (so un-🎯 sends it back)
     done: !!raw.done,
     priority: !!raw.priority, // 🔥 = shows on the Priority page
-    today: !!raw.today, // ☀️ = also shows on the 📅 Today page
+    today: false, // the 📅 Today section was removed
     doneAt: Number(raw.doneAt) || null,
     doneBy: normPerson(raw.doneBy),
     by: normPerson(raw.by),
@@ -1288,7 +1288,6 @@ function bottomNav(active) {
     <nav class="bottom-nav" aria-label="Main">
       <button type="button" class="nav-search pc-only" data-action="open-search">🔍 <span>Search…</span><kbd>Ctrl K</kbd></button>
       <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
-      <a class="nav-item ${active === TODAY ? 'active' : ''}" href="#/today" data-drop-list="today"><span class="ico">📅</span>Today<span class="nav-count">${todayCount() || ''}</span></a>
       <a class="nav-item pc-only ${active === CURRENT ? 'active' : ''}" href="#/current" data-drop-list="current"><span class="ico">🎯</span>Current Project</a>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox" data-drop-list="inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
@@ -1453,9 +1452,6 @@ function renderMisc(folder = null) {
 /* ----- Extra lists (same as Misc, stored as todos with their own folder) ----- */
 const DOUBTS = 'doubts', CURRENT = 'current', TODAY = 'today', APPWORK = 'appwork';
 const LISTS = {
-  [TODAY]: { emoji: '📅', label: 'Today', title: '📅 Today — aaj ke kaam',
-    add: 'Aaj kya karna hai? Likho aur Enter dabao…',
-    empty: 'Aaj jo karna hai upar likho. Kisi aur list ka task yahan chahiye to us task pe ☀️ dabao.', allDone: 'Aaj ka sab ho gaya! 🎉' },
   [CURRENT]: { emoji: '🎯', label: 'Current Project', title: '🎯 Current Project — abhi kya chal raha hai',
     add: 'Kaun sa project / kaam abhi chal raha hai? Likho aur Enter dabao…',
     empty: 'Abhi jis project pe kaam kar rahe ho, upar likho. Uske ＋ se steps daalo.', allDone: 'Sab khatam! 🎉 Naya project upar likho.' },
@@ -2855,7 +2851,8 @@ const prioTodos = () => state.todos.filter(t => t.priority && !t.done && visible
 const prioIdeas = () => state.ideas.filter(i => i.priority === 'High' && i.status !== 'launched' && (ui.person === 'all' || (i.owner && i.owner.id === ui.person)));
 const priorityCount = () => prioTodos().length + prioIdeas().length;
 
-function todayButton(t) {
+function todayButton() { return ''; } // 📅 Today section removed
+function oldTodayButton(t) {
   if (t.folder === TODAY) return ''; // already a Today task
   const label = t.today ? 'Today se hatao' : 'Today me dikhao';
   return `<button class="icon-btn prio-btn ${t.today ? 'on' : ''}" data-action="toggle-today" data-id="${t.id}" aria-label="${label}" title="${label}">☀️</button>`;
@@ -4194,7 +4191,7 @@ const extraActions = {
         <h3 class="sheet-sub">💡 Naya idea banao</h3>
         <div class="move-grid">${FOLDERS.map(f => opt('idea:' + f.key, `${f.emoji} ${f.label}`)).join('')}</div>
         <h3 class="sheet-sub">🧰 Misc list me (to-do)</h3>
-        <div class="move-grid">${opt('misc:today', '📅 Today')}${opt('misc:current', '🎯 Current Project')}${opt('misc:doubts', '❓ Doubts &amp; To Know')}${opt('misc:appwork', '🛠️ Pending in this App')}${opt('misc:', '🧰 Main Misc')}${FOLDERS.map(f => opt('misc:' + f.key, `${f.emoji} ${f.label} · Misc`)).join('')}</div>
+        <div class="move-grid">${opt('misc:current', '🎯 Current Project')}${opt('misc:doubts', '❓ Doubts &amp; To Know')}${opt('misc:appwork', '🛠️ Pending in this App')}${opt('misc:', '🧰 Main Misc')}${FOLDERS.map(f => opt('misc:' + f.key, `${f.emoji} ${f.label} · Misc`)).join('')}</div>
         ${earnPart}
         <button type="button" class="btn block" data-action="close-sheet" style="margin-top:16px">Cancel</button>
       </div>`;
@@ -4905,7 +4902,6 @@ function drawerList() {
       </a>`).join('') : '<p class="muted small" style="margin:4px 8px">Abhi khaali.</p>');
     }).join('') : '<p class="muted small" style="margin:8px">Abhi koi idea nahi hai.</p>'}
     <h3>📋 Lists</h3>
-    <a class="drawer-item" href="#/today"><span class="name">📅 Today</span><span class="meta">${todayCount() || ''}</span></a>
     <a class="drawer-item" href="#/current"><span class="name">🎯 Current Project</span><span class="meta">${esc(currentFocus()?.text.slice(0, 22) || '')}</span></a>
     <a class="drawer-item" href="#/appwork"><span class="name">🛠️ Pending in this App</span><span class="meta">${openTodos(APPWORK) || ''}</span></a>
     <a class="drawer-item" href="#/doubts"><span class="name">❓ Doubts &amp; To Know</span><span class="meta">${openTodos(DOUBTS) || ''}</span></a>
@@ -5072,6 +5068,7 @@ function render() {
     mountGoogleButtons();
     return;
   }
+  if (page === 'today') { location.hash = '#/inbox'; return; } // 📅 Today was merged into the Inbox
   document.body.classList.toggle('pop-mode', page === 'pop');
   if (page === 'pop') {
     // Tiny Alt+I window: type → Enter → straight into 📥 Inbox, then the window closes.
@@ -5554,7 +5551,7 @@ function openMoveInto(id) {
   const ids = new Set(state.todos.map(x => x.id));
   const opt = (value, label, depth, path) => `<button type="button" class="btn" data-action="todo-move-pick" data-value="${esc(value)}" data-q="${esc(path.toLowerCase())}" style="--d:${10 + depth * 18}px">
     <span class="tree-label">${label}</span><span class="path-label">${esc(path)}</span></button>`;
-  const folders = [...new Set(['', TODAY, CURRENT, APPWORK, DOUBTS, INBOX, ...state.todos.map(x => x.folder || '')])];
+  const folders = [...new Set(['', CURRENT, APPWORK, DOUBTS, INBOX, ...state.todos.map(x => x.folder || '')])];
   const rows = [];
   folders.forEach(f => {
     const name = listName(f);
@@ -5678,7 +5675,7 @@ document.addEventListener('submit', e => {
 Object.assign(actions, panelActions);
 
 /* ----- ⚡ Quick add (like TickTick): press N / Q anywhere, or the ⚡ button in the top bar ----- */
-const QA_LISTS = () => [[INBOX, '📥 Inbox'], [TODAY, '📅 Today'], [CURRENT, '🎯 Current'], [APPWORK, '🛠️ Is App'], [DOUBTS, '❓ Doubt'], ['', '🧰 Misc']];
+const QA_LISTS = () => [[INBOX, '📥 Inbox'], [CURRENT, '🎯 Current'], [APPWORK, '🛠️ Is App'], [DOUBTS, '❓ Doubt'], ['', '🧰 Misc']];
 function openQuickAdd() {
   const { page } = parseRoute();
   const here = page === 'misc' ? '' : LISTS[page] || page === INBOX ? page : null;
@@ -5691,7 +5688,6 @@ function openQuickAdd() {
       <div class="qa-lists" role="radiogroup" aria-label="Kis list me">
         ${QA_LISTS().map(([k, l]) => `<button type="button" class="chip ${ui.qaList === k ? 'active' : ''}" data-action="qa-list" data-value="${k}" role="radio" aria-checked="${ui.qaList === k}">${l}</button>`).join('')}
       </div>
-      <label class="check"><input type="checkbox" name="today"${ui.qaList === TODAY ? ' disabled' : ''}> ☀️ Aaj bhi dikhao</label>
       <p id="qa-added" class="muted small" style="margin:8px 0 0"></p>
       <div class="btn-row" style="margin-top:12px">
         <button type="button" class="btn" data-action="close-sheet">Band karo</button>
@@ -5719,7 +5715,7 @@ document.addEventListener('submit', e => {
   const priority = /!\s*$/.test(text);
   if (priority) text = text.replace(/!+\s*$/, '').trim() || text;
   const folder = ui.qaList || null;
-  state.todos.push(normalizeTodo({ text, folder, priority, today: form.elements.today.checked && folder !== TODAY, by: myRef() }));
+  state.todos.push(normalizeTodo({ text, folder, priority, today: false, by: myRef() }));
   saveState();
   render(); // list behind updates; the sheet stays open for the next task
   form.elements.text.value = '';
@@ -5922,7 +5918,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11d';
+const APP_VERSION = '2026-11-11e';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
