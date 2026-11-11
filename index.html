@@ -735,6 +735,9 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  .dash-more { border: 0; background: none; padding: 6px 4px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--primary); cursor: pointer; text-align: left; }
+  .dash-more:hover { text-decoration: underline; }
+  .dash-more-li { list-style: none; }
   .qr-box { width: min(300px, 80vw); aspect-ratio: 1; margin: 0 auto; padding: 10px; background: #fff; border-radius: 14px; display: grid; place-items: center; color: #111; }
   .qr-box svg { width: 100%; height: 100%; }
   .dash-cur-head .todo-drag { width: 20px; height: 24px; margin: 0 -4px 0 -6px; }
@@ -1931,6 +1934,8 @@ const nowActions = {
   },
 };
 
+// Which folded Dashboard lists are opened ("▸ N aur"), per device until reload.
+const dashMore = new Set();
 // Dashboard: what you're working on now (every open 🎯 Current Project task, with % done and next step).
 function dashCurrentCard() {
   const ids = new Set(state.todos.map(t => t.id));
@@ -1940,7 +1945,18 @@ function dashCurrentCard() {
   // A line with a tick box: ⠿ drag · ☐ done · text (tap = details) · ▶️ abhi yahi.
   const line = (x, cls = '') => `<li class="upnext-item ${cls}" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button><button class="now-play" data-action="send-back" data-id="${x.id}" title="Yahan se hatao — jahan se aaya tha wahin wapas">↩️</button></li>`;
   const addBox = (parent, placeholder, folder = '') => `<form class="dash-add-form" data-parent="${parent}" data-folder="${folder}" autocomplete="off"><input name="text" maxlength="300" required placeholder="${placeholder}" aria-label="${placeholder}"></form>`;
-  const rows = list.map((t, i) => {
+  // Long lists stay short: first N shown, the rest folded under "▸ N aur" (tap to open / close).
+  const fold = (key, items, n, render, unit) => {
+    if (items.length <= n) return items.map(render).join('');
+    const openAll = dashMore.has(key);
+    return (openAll ? items : items.slice(0, n)).map(render).join('')
+      + `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${key}">${openAll ? '▴ Kam dikhao' : `▸ ${items.length - n} aur ${unit}`}</button></li>`;
+  };
+  const rowsShown = (() => {
+    if (list.length <= 2 || dashMore.has('projects')) return list;
+    return list.slice(0, 2);
+  })();
+  const rows = rowsShown.map((t, i) => {
     const steps = descendantsOf(t.id);
     const open = ordered(childrenOf(t.id).filter(x => !x.done), stepSort);
     return `<div class="dash-cur-row${i === 0 ? ' main' : ''}" data-drop-todo="${t.id}" data-rank title="Task yahan chhodo = is project ka step · upar/neeche chhodo = order">
@@ -1950,10 +1966,11 @@ function dashCurrentCard() {
         <button class="now-play" data-action="send-back" data-id="${t.id}" title="Current Project se hatao — jahan se aaya tha wahin wapas">↩️</button></div>
       ${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}
       ${steps.length ? progressLine(steps) : ''}
-      ${open.length ? `<ul class="upnext-list dash-steps">${open.map(x => line(x)).join('')}</ul>` : ''}
+      ${open.length ? `<ul class="upnext-list dash-steps">${fold('steps:' + t.id, open, 5, x => line(x), 'steps')}</ul>` : ''}
       ${addBox(t.id, '＋ Step likho… Enter')}
     </div>`;
-  }).join('');
+  }).join('') + (list.length > 2
+    ? `<button type="button" class="dash-more" data-action="dash-more" data-key="projects">${dashMore.has('projects') ? '▴ Kam dikhao' : `▸ ${list.length - 2} aur projects`}</button>` : '');
   return `<section class="card dash-current" data-drop-list="current" title="Up next / Inbox se task yahan chhodo = naya current project">
       <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
       ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Neeche likho, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
@@ -1962,7 +1979,7 @@ function dashCurrentCard() {
     ${dashNowCard(upNext)}
     <section class="card dash-upnext-box" data-drop-todo="${UP_NEXT}">
       <div class="row-between"><span class="dash-cur-label">⏭️ Up next${upNext.length ? ` · ${upNext.length}` : ''}</span><a class="muted small" href="#/current">Kholo ›</a></div>
-      ${upNext.length ? `<ul class="upnext-list">${upNext.map(x => line(x)).join('')}</ul>` : ''}
+      ${upNext.length ? `<ul class="upnext-list">${fold('upnext', upNext, 5, x => line(x), 'tasks')}</ul>` : ''}
       ${addBox(UP_NEXT, '＋ Up next me likho… Enter')}
       <div class="upnext-drop">⠿ Inbox se task yahan chhodo → Up next · Up next ka ⠿ upar Current Project pe chhodo → wahi current ban jayega</div>
     </section>`;
@@ -6330,7 +6347,7 @@ const actions = {
   },
 };
 
-Object.assign(actions, extraActions, weekActions, cutActions, nowActions, { 'phone-login': () => openPhoneLogin() }, { 'pc-link': pcLinkAction, 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
+Object.assign(actions, extraActions, weekActions, cutActions, nowActions, { 'phone-login': () => openPhoneLogin(), 'dash-more'(el) { const k = el.dataset.key; if (dashMore.has(k)) dashMore.delete(k); else dashMore.add(k); render(); } }, { 'pc-link': pcLinkAction, 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
 // Idea page checklist
 Object.assign(actions, {
   'toggle-done-list'(el) {
@@ -6883,7 +6900,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12k';
+const APP_VERSION = '2026-11-12l';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
