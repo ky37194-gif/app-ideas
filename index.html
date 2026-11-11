@@ -678,6 +678,57 @@
     [data-theme="tick"] .nav-sub { min-height: 34px; }
     [data-theme="tick"] .todo-panel { box-shadow: none; }
   }
+
+  /* ---------- 20. Cleaner task rows, description, progress, focus rank, photos, Alt+I popup ---------- */
+  body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  .todo { transition: background .12s, border-color .12s, box-shadow .12s; }
+  .todo:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
+  .todo-text { display: flex; flex-direction: column; gap: 3px; padding: 4px 0; }
+  .todo-text .tt { font-weight: 550; line-height: 1.35; }
+  .tt-row { display: block; }
+  .todo-desc { font-size: .8rem; line-height: 1.4; color: var(--muted); font-weight: 400; white-space: pre-line;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .todo.done .todo-desc { text-decoration: none; }
+  .todo-prog { display: inline-flex; align-items: center; gap: 8px; font-size: .72rem; color: var(--muted); font-weight: 500; }
+  .todo-prog b { color: var(--text); font-weight: 700; }
+  .todo-prog-bar { width: 84px; height: 5px; border-radius: 99px; background: var(--surface-2); overflow: hidden; flex: none; }
+  .todo-prog-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), var(--success)); transition: width .3s; }
+  /* PC: row buttons stay quiet until you point at the row (active ones like 🔥 ☀️ 🎯 always show) */
+  @media (hover: hover) and (min-width: 900px) {
+    .todo .icon-btn:not(.on) { opacity: 0; transition: opacity .12s; }
+    .todo:hover .icon-btn:not(.on), .todo.selected .icon-btn:not(.on), .todo .icon-btn:focus-visible { opacity: .75; }
+    .todo .icon-btn:not(.on):hover { opacity: 1; }
+    .todo .prio-btn:not(.on) { filter: grayscale(1); }
+  }
+  /* Earning focus rank */
+  .rank-badge { flex: none; display: inline-grid; place-items: center; min-width: 30px; height: 22px; padding: 0 7px; border-radius: 99px;
+    font-size: .72rem; font-weight: 800; letter-spacing: .02em; color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, transparent); }
+  [data-rank] { position: relative; }
+  .drop-before::before, .drop-after::after { content: ""; position: absolute; left: 6px; right: 6px; height: 3px; border-radius: 3px;
+    background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); pointer-events: none; z-index: 2; }
+  .drop-before::before { top: -5px; }
+  .drop-after::after { bottom: -5px; }
+  /* Sidebar: Earning folders with their pages inside */
+  .nav-sub { padding-left: calc(6px + var(--d, 0) * 16px); gap: 6px; min-width: 0; }
+  @media (min-width: 900px) { .bottom-nav, .bottom-nav.mobile-hidden { overflow-x: hidden; } }
+  .nav-sub-arrow { flex: none; width: 18px; height: 22px; display: inline-grid; place-items: center; border: 0; padding: 0; background: transparent;
+    color: var(--muted); font-size: 1rem; cursor: pointer; transition: transform .15s; border-radius: 6px; }
+  button.nav-sub-arrow:hover { background: var(--surface-2); color: var(--text); }
+  .nav-sub-arrow.open { transform: rotate(90deg); }
+  /* Photos in Earning pages */
+  .blk-image { align-items: flex-start; padding: 4px 0; }
+  .blk-image img { display: block; max-width: min(100%, 560px); max-height: 420px; border-radius: 12px; border: 1px solid var(--border); cursor: zoom-in; object-fit: contain; background: var(--surface-2); }
+  /* Alt+I popup window */
+  body.pop-mode { background: var(--surface); padding: 0 !important; overflow: hidden; }
+  body.pop-mode .bottom-nav, body.pop-mode #todo-panel { display: none !important; }
+  .pop { display: grid; gap: 8px; padding: 14px 16px; height: 100vh; box-sizing: border-box; align-content: start; }
+  .pop-head { display: flex; align-items: center; gap: 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
+  .pop-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent); }
+  .pop-keys { margin-left: auto; font-weight: 500; font-size: .72rem; }
+  .pop-keys kbd { font: inherit; font-weight: 700; padding: 1px 5px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface-2); }
+  .pop input { min-height: 46px; font-size: 1.05rem; }
+  .pop textarea { resize: none; font-size: .9rem; min-height: 58px; }
+  .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
 </style>
 </head>
 
@@ -1015,6 +1066,7 @@ function normalizeTodo(raw = {}) {
     images: (Array.isArray(raw.images) ? raw.images : []).filter(s => typeof s === 'string' && s.startsWith('data:image/')).slice(0, 12),
     parentId: raw.parentId || null, // set = this task lives inside another task
     folder: raw.folder || null, // which Misc list: null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
+    prevFolder: raw.prevFolder === undefined ? undefined : raw.prevFolder, // where a 🎯 task came from (so un-🎯 sends it back)
     done: !!raw.done,
     priority: !!raw.priority, // 🔥 = shows on the Priority page
     today: !!raw.today, // ☀️ = also shows on the 📅 Today page
@@ -1235,7 +1287,6 @@ function bottomNav(active) {
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       <a class="nav-item pc-only ${active === 'inbox' ? 'active' : ''}" href="#/inbox" data-drop-list="inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
       ${canEarn() ? `<a class="nav-item ${active === 'earn' && !parseRoute().id ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>${earnNavSubs()}` : ''}
-      ${canEarn() && earnCloud.code && findPage(APPS_PAGE) ? `<a class="nav-item pc-only ${inPageTree(APPS_PAGE) ? 'active' : ''}" href="#/earn/${APPS_PAGE}"><span class="ico">📱</span>Apps</a>` : ''}
       ${canEarn() ? `<a class="nav-item pc-only ${parseRoute().page === 'sm' ? 'active' : ''}" href="#/sm"><span class="ico">📣</span>Social Media</a>` : ''}
       <a class="nav-item pc-only ${active === 'doubts' ? 'active' : ''}" href="#/doubts" data-drop-list="doubts"><span class="ico">❓</span>Doubts &amp; To Know<span class="nav-count">${openTodos(DOUBTS) || ''}</span></a>
       <a class="nav-item pc-only ${active === APPWORK ? 'active' : ''}" href="#/appwork" data-drop-list="appwork"><span class="ico">🛠️</span>Pending in this App<span class="nav-count">${openTodos(APPWORK) || ''}</span></a>
@@ -1252,11 +1303,22 @@ function inPageTree(id) {
   const p = findPage(open);
   return !!p && (p.id === id || pageAncestors(p).some(a => a.id === id));
 }
+// Sidebar folders you closed (▸) are remembered per device.
+const NAV_CLOSED_KEY = 'app-ideas-nav-closed';
+const navClosed = new Set((() => { try { return JSON.parse(localStorage.getItem(NAV_CLOSED_KEY)) || []; } catch { return []; } })());
 function earnNavSubs() {
   if (!earnCloud.code) return '';
-  const tops = earn.pages.filter(p => !p.parentId || !findPage(p.parentId)).sort((a, b) => a.createdAt - b.createdAt);
+  const tops = earn.pages.filter(isTopPage).sort(byRank((a, b) => a.createdAt - b.createdAt));
   if (!tops.length) return '';
-  return `<div class="nav-subs">${tops.map(p => `<a class="nav-sub ${inPageTree(p.id) ? 'active' : ''}" href="#/earn/${p.id}" title="${esc(p.title || 'Untitled')}"><span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>`).join('')}</div>`;
+  const row = (p, depth) => {
+    const kids = depth < 2 ? childPages(p.id) : [];
+    const open = kids.length && !navClosed.has(p.id);
+    return `<a class="nav-sub ${inPageTree(p.id) ? 'active' : ''}" href="#/earn/${p.id}" title="${esc(p.title || 'Untitled')}" data-drop-page="${p.id}" data-rank style="--d:${depth}">
+        ${kids.length ? `<button type="button" class="nav-sub-arrow ${open ? 'open' : ''}" data-action="nav-sub-toggle" data-id="${p.id}" aria-label="${open ? 'Band karo' : 'Kholo'}">›</button>` : '<span class="nav-sub-arrow"></span>'}
+        <span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>
+      ${open ? kids.map(k => row(k, depth + 1)).join('') : ''}`;
+  };
+  return `<div class="nav-subs">${tops.map(p => row(p, 0)).join('')}</div>`;
 }
 
 /* ----- Search: finds ideas in every folder, best matches first ----- */
@@ -1430,7 +1492,7 @@ function renderTodayPicked() {
       <li><div class="todo${t.priority ? ' prio' : ''}">
         <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Mark done"></button>
         <a class="todo-text" href="${todoLink(t)}" style="color:inherit;text-decoration:none">${esc(t.text)}<br><span class="prio-where">${esc(todoPlace(t))}</span></a>
-        ${prioButton(t)}${todayButton(t)}
+        ${prioButton(t)}${todayButton(t)}${currentButton(t)}
       </div></li>`).join('')}</ul>`
       : '<p class="muted small">Misc, Doubts, Current Project ya Inbox me kisi bhi task pe <b>☀️</b> dabao, wo yahan aa jayega.</p>'}`;
 }
@@ -1464,6 +1526,13 @@ function descendantsOf(id) {
 // Top-level = no parent, or its parent was deleted on another device.
 const isTopTodo = (t, ids) => !t.parentId || !ids.has(t.parentId);
 
+// "▓▓░░ 2/5 · 40%" under a task that has tasks inside it.
+function progressLine(all) {
+  const done = all.filter(x => x.done).length;
+  const pct = Math.round((done / all.length) * 100);
+  return `<span class="todo-prog" title="Andar ke kaam: ${done}/${all.length} ho gaye"><span class="todo-prog-bar"><i style="width:${pct}%"></i></span>${done}/${all.length} · <b>${pct}%</b></span>`;
+}
+
 function todoRow(t) {
   const kids = childrenOf(t.id);
   const all = descendantsOf(t.id);
@@ -1477,11 +1546,12 @@ function todoRow(t) {
           ? `<button class="todo-arrow ${isOpen ? 'open' : ''}" data-action="collapse-todo" data-id="${t.id}" aria-label="${isOpen ? 'Band karo' : 'Kholo'}">›</button>`
           : '<span class="todo-arrow-space"></span>'}
         <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
-        <span class="todo-text" data-action="open-todo" data-id="${t.id}" title="Kholo — edit, details, photos"><span class="tt">${esc(t.text)}</span>${t.desc || t.images.length ? `<span class="todo-extra">${t.desc ? '📝' : ''}${t.images.length ? '🖼️' + t.images.length : ''}</span>` : ''}</span>
-        ${all.length ? `<span class="todo-count" title="Andar ke kaam">☰ ${all.filter(x => x.done).length}/${all.length}</span>` : ''}
+        <span class="todo-text" data-action="open-todo" data-id="${t.id}" title="Kholo — description, photos, andar ke kaam"><span class="tt-row"><span class="tt">${esc(t.text)}</span>${t.images.length ? `<span class="todo-extra">🖼️${t.images.length}</span>` : ''}</span>${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}${all.length ? progressLine(all) : ''}</span>
         ${t.by ? avatar(t.by) : ''}
-        ${prioButton(t)}${todayButton(t)}
-        ${canEarn() ? `<button class="icon-btn" data-action="todo-to-earn" data-id="${t.id}" aria-label="Earning me bhejo" title="💰 Earning me bhejo">📂</button>` : ''}
+        ${prioButton(t)}${todayButton(t)}${currentButton(t)}
+        ${t.folder === INBOX && !t.parentId
+          ? `<button class="icon-btn" data-action="inbox-move" data-id="${t.id}" aria-label="Folder me daalo" title="📂 Kisi folder / list / Earning page me daalo">📂</button>`
+          : canEarn() ? `<button class="icon-btn" data-action="todo-to-earn" data-id="${t.id}" aria-label="Earning me bhejo" title="💰 Earning me bhejo">📂</button>` : ''}
         <button class="icon-btn todo-sub" data-action="add-subtodo" data-id="${t.id}" aria-label="Iske andar task add karo" title="Andar task add karo">＋</button>
         <button class="icon-btn todo-del" data-action="delete-todo" data-id="${t.id}" aria-label="Delete">✕</button>
       </div>
@@ -1502,7 +1572,7 @@ function renderTodos(folder = null) {
   const done = top.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   return `
     <form id="todo-form" class="todo-add" data-folder="${folder || ''}" autocomplete="off">
-      <input name="text" required maxlength="200" placeholder="${LISTS[folder] ? LISTS[folder].add : 'Kya karna hai? Likho aur Enter dabao…'}" aria-label="New to-do">
+      <input name="text" required maxlength="${folder === INBOX ? 5000 : 200}" placeholder="${LISTS[folder] ? LISTS[folder].add : folder === INBOX ? 'Jaldi kuch likho… Enter dabao' : 'Kya karna hai? Likho aur Enter dabao…'}" aria-label="New to-do">
       <button type="submit" class="btn primary">+ Add</button>
     </form>
     <p class="muted small" style="margin:-4px 2px 10px">Kisi task ke andar aur task chahiye? Uske <b>＋</b> pe tap karo.</p>
@@ -1515,7 +1585,7 @@ function renderTodos(folder = null) {
         <b class="muted small">✓ Ho gaye (${done.length})</b>
         <button class="btn" data-action="clear-done-todos" data-folder="${folder || ''}" style="min-height:34px;padding:0 12px;font-size:.85rem">Clear done</button>
       </div>
-      <ul class="todo-list">${done.map(todoRow).join('')}</ul>` : ''}`;
+      ${folder === CURRENT ? '' : `<ul class="todo-list">${done.map(todoRow).join('')}</ul>`}` : ''}`;
 }
 
 // Only re-draw the list (so typing in the search box doesn't lose focus).
@@ -2666,18 +2736,14 @@ function renderQuick() {
     </main>`;
 }
 
+// Inbox = a normal task list: every line can have a description, photos, tasks inside (with % done),
+// and 📂 sends it to a folder / list / Earning page.
 function renderInbox() {
-  const items = myInbox();
   return `
     ${topBar('📥 Inbox', { back: '#/', actions: '<a class="icon-btn" href="#/quick" aria-label="Jaldi likho" title="Jaldi likho">⚡</a>' })}
-    <main class="page" style="max-width:720px">
-      <form id="quick-form" class="todo-add" autocomplete="off">
-        <input name="text" required maxlength="5000" placeholder="Jaldi kuch likho… Enter dabao" aria-label="Quick note">
-        <button class="btn primary" type="submit">+ Add</button>
-      </form>
-      <p class="muted small" style="margin:-4px 2px 12px">Jaldi wale notes yahan aate hain (sirf aapko dikhte hain). <b>📂</b> dabao aur jis folder me chaho daal do.</p>
-      ${items.length ? `<div class="list">${items.map(inboxCard).join('')}</div>`
-        : `<div class="card empty"><div class="big">📥</div><p class="muted">Inbox khaali hai. Phone widget ya ⚡ button se jaldi likho.</p></div>`}
+    <main class="page">
+      <p class="muted small" style="margin:0 2px 10px">Jaldi wale notes yahan aate hain (PC pe kahin bhi <b>Alt+I</b>). Line pe tap karo = <b>description, photo, andar ke kaam</b>. <b>🎯</b> = Current Project, <b>📂</b> = kisi folder / Earning page me.</p>
+      ${renderTodos(INBOX)}
     </main>
     ${bottomNav('inbox')}`;
 }
@@ -2696,6 +2762,51 @@ function inboxCard(t) {
       </div>
     </div>`;
 }
+
+/* ----- Alt+I popup (PC): a small window just for adding one line to the Inbox ----- */
+function renderPop() {
+  return `
+    <form id="pop-form" class="pop" autocomplete="off">
+      <div class="pop-head"><span class="pop-dot"></span>📥 Inbox me daalo<span class="pop-keys"><kbd>Enter</kbd> save · <kbd>Tab</kbd> description · <kbd>Esc</kbd> band</span></div>
+      <input id="pop-text" name="text" maxlength="5000" required placeholder="Kya yaad rakhna hai? Likho aur Enter…" aria-label="Inbox note">
+      <textarea id="pop-desc" name="desc" rows="2" placeholder="📝 Description (optional) — Shift+Enter = nayi line" aria-label="Description"></textarea>
+      <div id="pop-msg" class="pop-msg"></div>
+    </form>`;
+}
+async function savePop(form) {
+  const text = form.elements.text.value.trim();
+  if (!text || form.dataset.busy) return;
+  form.dataset.busy = '1';
+  const msg = document.getElementById('pop-msg');
+  state.todos.push(normalizeTodo({ text, desc: form.elements.desc.value.trim(), folder: INBOX, by: myRef() }));
+  saveState(true); // sync right now (below), not after the usual delay
+  msg.textContent = '☁️ Saving…';
+  clearTimeout(syncState.timer);
+  for (let i = 0; syncState.running && i < 60; i++) await new Promise(r => setTimeout(r, 150)); // the start-up sync may still be running
+  await syncNow();
+  const ok = syncState.status === 'ok';
+  msg.textContent = ok ? '✅ Inbox me chala gaya' : '✅ Save ho gaya (internet aate hi sync hoga)';
+  form.reset();
+  delete form.dataset.busy;
+  setTimeout(() => { window.close(); document.getElementById('pop-text')?.focus(); msg.textContent = ''; }, ok ? 350 : 1200);
+}
+document.addEventListener('keydown', e => {
+  if (parseRoute().page !== 'pop') return;
+  if (e.key === 'Escape') { e.preventDefault(); window.close(); return; }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && (e.target.id === 'pop-text' || e.target.id === 'pop-desc')) {
+    e.preventDefault();
+    savePop(document.getElementById('pop-form'));
+  }
+});
+// Another window (the Alt+I popup) added a note → show it here too.
+window.addEventListener('storage', e => {
+  if (e.key !== STORAGE_KEY || parseRoute().page === 'pop') return;
+  const fresh = loadState();
+  const merged = mergeData({ ideas: state.ideas, todos: state.todos, deleted: state.deleted }, fresh);
+  if (fingerprint(merged) === fingerprint({ ideas: state.ideas, todos: state.todos, deleted: state.deleted })) return;
+  Object.assign(state, { ideas: merged.ideas, todos: merged.todos, deleted: merged.deleted });
+  refreshAfterSync();
+});
 
 function saveQuick(form, submitter) {
   const text = form.elements.text.value.trim();
@@ -2731,6 +2842,13 @@ function todayButton(t) {
   const label = t.today ? 'Today se hatao' : 'Today me dikhao';
   return `<button class="icon-btn prio-btn ${t.today ? 'on' : ''}" data-action="toggle-today" data-id="${t.id}" aria-label="${label}" title="${label}">☀️</button>`;
 }
+// 🎯 = "I'm working on this now" → moves the task to Current Project. Tap again → back where it came from.
+function currentButton(t) {
+  if (t.parentId && state.todos.some(x => x.id === t.parentId)) return ''; // sub-tasks go with their parent
+  const on = t.folder === CURRENT;
+  const label = on ? 'Current Project se hatao (wapas purani list me)' : 'Current Project me daalo — abhi isi pe kaam chal raha hai';
+  return `<button class="icon-btn prio-btn ${on ? 'on' : ''}" data-action="toggle-current" data-id="${t.id}" aria-label="${label}" title="${label}">🎯</button>`;
+}
 function prioButton(t) {
   const label = t.priority ? 'Priority hatao' : 'Priority banao';
   return `<button class="icon-btn prio-btn ${t.priority ? 'on' : ''}" data-action="toggle-prio" data-id="${t.id}" aria-label="${label}" title="${label}">🔥</button>`;
@@ -2759,7 +2877,7 @@ function renderPriority() {
           <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Mark done"></button>
           <a class="todo-text" href="${todoLink(t)}" style="color:inherit;text-decoration:none">${esc(t.text)}<br><span class="prio-where">${esc(todoPlace(t))}</span></a>
           ${t.by ? avatar(t.by) : ''}
-          ${prioButton(t)}${todayButton(t)}
+          ${prioButton(t)}${todayButton(t)}${currentButton(t)}
         </div></li>`).join('')}</ul>`
         : '<div class="card empty" style="padding:24px 16px"><div class="big">🔥</div><p class="muted">Koi priority kaam nahi. Misc ya Inbox me kisi kaam pe 🔥 dabao.</p></div>'}
       <h2 class="section-title">💡 Priority ideas (${ideas.length})</h2>
@@ -2782,7 +2900,7 @@ function renderPriority() {
 const EARN_KEY = 'appIdeasTracker.earn';
 const EARN_CLOUD_KEY = 'appIdeasTracker.earnCloud';
 const EARN_SALT = 'app-ideas-earning-private-v1';
-const BLOCK_TYPES = ['p', 'h1', 'h2', 'h3', 'bullet', 'num', 'todo', 'quote', 'callout', 'code', 'divider'];
+const BLOCK_TYPES = ['p', 'h1', 'h2', 'h3', 'bullet', 'num', 'todo', 'quote', 'callout', 'code', 'divider', 'image'];
 // [type, icon, label, search words] — shown in the "/" menu and the ⋮⋮ menu
 const BLOCK_MENU = [
   ['p', '¶', 'Text', 'text paragraph likho'],
@@ -2796,6 +2914,7 @@ const BLOCK_MENU = [
   ['callout', '💡', 'Callout box', 'callout note important highlight'],
   ['code', '</>', 'Code', 'code'],
   ['divider', '—', 'Divider line', 'divider line hr'],
+  ['image', '🖼️', 'Photo / image', 'image photo picture tasveer pic screenshot'],
   ['page', '📄', 'Andar naya page', 'page subpage folder'],
 ];
 const PAGE_ICONS = '💰 💵 💸 🤑 🪙 💎 📈 📊 🏦 💳 🛒 📦 🎥 📱 💻 🧠 ✍️ 🎨 📸 🎮 🤝 🏠 🚀 🎯 ⭐ 🔥 ✅ 📄 📁 💡'.split(' ');
@@ -2811,12 +2930,17 @@ function normalizePage(raw = {}) {
     parentId: raw.parentId || null,
     icon: String(raw.icon || '📄').slice(0, 8),
     title: String(raw.title || ''),
-    blocks: (Array.isArray(raw.blocks) ? raw.blocks : []).map(b => ({
-      id: b.id || uid(),
-      type: BLOCK_TYPES.includes(b.type) ? b.type : 'p',
-      text: String(b.text || ''),
-      checked: !!b.checked,
-    })),
+    order: Number.isFinite(raw.order) ? raw.order : null, // your own rank among sibling pages (0 = top focus)
+    blocks: (Array.isArray(raw.blocks) ? raw.blocks : []).map(b => {
+      const blk = {
+        id: b.id || uid(),
+        type: BLOCK_TYPES.includes(b.type) ? b.type : 'p',
+        text: String(b.text || ''),
+        checked: !!b.checked,
+      };
+      if (blk.type === 'image') blk.src = typeof b.src === 'string' && b.src.startsWith('data:image/') ? b.src : '';
+      return blk;
+    }).filter(b => b.type !== 'image' || b.src),
     by: normPerson(raw.by),
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
@@ -2852,8 +2976,41 @@ function touchPage(page) {
 function flushEarn() { if (earnSaveTimer) saveEarn(); }
 
 const findPage = id => earn.pages.find(p => p.id === id);
-const childPages = id => earn.pages.filter(p => p.parentId === id).sort((a, b) => a.createdAt - b.createdAt);
-const topEarnPages = () => earn.pages.filter(p => !p.parentId || !findPage(p.parentId)).sort((a, b) => b.updatedAt - a.updatedAt);
+// Your own order (set by dragging ⠿ above / below another page) comes first; unranked pages follow.
+const byRank = fallback => (a, b) => {
+  const ra = a.order ?? Infinity, rb = b.order ?? Infinity;
+  return ra !== rb ? ra - rb : fallback(a, b);
+};
+const childPages = id => earn.pages.filter(p => p.parentId === id).sort(byRank((a, b) => a.createdAt - b.createdAt));
+const isTopPage = p => !p.parentId || !findPage(p.parentId);
+const topEarnPages = () => earn.pages.filter(isTopPage).sort(byRank((a, b) => b.updatedAt - a.updatedAt));
+const siblingPages = parentId => (parentId && findPage(parentId) ? childPages(parentId) : topEarnPages());
+// "#1" = most focus. Shown on cards, sub-page rows and the sidebar.
+const rankOf = p => siblingPages(p.parentId && findPage(p.parentId) ? p.parentId : null).indexOf(p) + 1;
+const rankBadge = p => `<span class="rank-badge" title="Focus rank (#1 = sabse zyada focus) — ⠿ pakad ke kisi page ke upar / neeche chhodo">#${rankOf(p)}</span>`;
+
+// Put a page just before / after another one (same folder as that page), then number the whole folder.
+function reorderPage(pageId, targetId, where) {
+  const page = findPage(pageId), target = findPage(targetId);
+  if (!page || !target || page === target) return false;
+  const parentId = target.parentId && findPage(target.parentId) ? target.parentId : null;
+  if (parentId && (parentId === pageId || pageDescendants(pageId).some(p => p.id === parentId))) {
+    toast('❌ Page ko uske apne andar nahi daal sakte'); return false;
+  }
+  const before = earn.pages.map(p => ({ p, order: p.order, parentId: p.parentId, updatedAt: p.updatedAt }));
+  const list = siblingPages(parentId).filter(p => p !== page);
+  list.splice(list.indexOf(target) + (where === 'after' ? 1 : 0), 0, page);
+  const now = Date.now();
+  page.parentId = parentId;
+  list.forEach((p, i) => { if (p.order !== i || p === page) { p.order = i; p.updatedAt = now; } });
+  saveEarn(); render();
+  toast(`🏆 "${page.title || 'Untitled'}" ab #${list.indexOf(page) + 1} pe hai`, () => {
+    const t2 = Date.now();
+    before.forEach(b => { if (b.p.order !== b.order || b.p.parentId !== b.parentId) Object.assign(b.p, { order: b.order, parentId: b.parentId, updatedAt: t2 }); });
+    saveEarn(); render();
+  });
+  return true;
+}
 function pageDescendants(id) {
   const out = [];
   const walk = pid => childPages(pid).forEach(c => { if (!out.includes(c)) { out.push(c); walk(c.id); } });
@@ -3139,9 +3296,9 @@ function earnCard(p) {
   const todos = p.blocks.filter(b => b.type === 'todo');
   const meta = [inside ? `📄 ${inside} page andar` : '', todos.length ? `☑ ${todos.filter(b => b.checked).length}/${todos.length}` : ''].filter(Boolean).join(' · ');
   return `
-    <a class="card idea-card" href="#/earn/${p.id}" data-drop-page="${p.id}">
+    <a class="card idea-card" href="#/earn/${p.id}" data-drop-page="${p.id}" data-rank>
       <div class="card-top">
-        <h3 class="row" style="gap:10px"><span class="earn-card-ico">${esc(p.icon)}</span><span>${esc(p.title || 'Untitled')}</span></h3>
+        <h3 class="row" style="gap:10px">${rankBadge(p)}<span class="earn-card-ico">${esc(p.icon)}</span><span>${esc(p.title || 'Untitled')}</span></h3>
         <span class="pg-drag" data-drag-page="${p.id}" title="Pakad ke kisi page pe chhodo — uske andar chala jayega" aria-label="Drag">⠿</span>
       </div>
       ${pagePreview(p) ? `<p class="card-desc" style="margin-bottom:0">${esc(pagePreview(p))}</p>` : ''}
@@ -3160,7 +3317,7 @@ function renderEarnHome() {
       ${state.ideas.length ? `<button class="card sm-card" data-action="ideas-to-earn" style="cursor:pointer;border-color:var(--primary)"><span class="big" style="font-size:1.8rem">💡</span><span style="flex:1"><b>Saare ideas (${state.ideas.length}) yahan shift karo</b><br><span class="muted small">Har folder Earning me folder banega — phir ⠿ se jahan chaho daalo</span></span><span class="muted">›</span></button>` : ''}
       <a class="card sm-card" href="#/sm"><span class="big" style="font-size:1.8rem">📱</span><span style="flex:1"><b>SM — Content Planner</b><br><span class="muted small">Social media ke saare ideas, posts aur plan</span></span><span class="muted">›</span></a>
       <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
-      ${top.length > 1 ? '<p class="hint" style="margin:10px 0 0">💡 <b>⠿</b> pakad ke kisi doosre page pe chhodo — wo uske folder me chala jayega.</p>' : ''}
+      ${top.length > 1 ? '<p class="hint" style="margin:10px 0 0">🏆 <b>⠿</b> pakad ke kisi page ke <b>upar / neeche</b> chhodo = apna focus rank set karo (#1 = sabse zyada focus). <b>Beech me</b> chhodo = us page ke andar chala jayega.</p>' : ''}
       <div class="list" style="margin-top:12px">${top.length ? top.map(earnCard).join('')
         : '<div class="card empty"><div class="big">💰</div><p class="muted">Abhi kuch nahi. Upar ＋ dabao aur pehla earning method likho.</p></div>'}</div>
     </main>
@@ -3182,7 +3339,10 @@ function renderEarnPage(page) {
       <div id="pg-title" class="pg-title" contenteditable="${CE}" data-ph="Untitled" role="textbox" aria-label="Page title">${esc(page.title)}</div>
       <div class="muted small">${page.by ? avatar(page.by) + ' ' : ''}Last edit ${timeAgo(page.updatedAt)}</div>
       <div id="blocks" class="blocks">${blocksHTML(page)}</div>
-      <button class="add-block" data-action="earn-add-block">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <button class="add-block" data-action="earn-add-block" style="flex:1">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
+        <button class="add-block" data-action="earn-add-photo" style="flex:none" title="Photo daalo (paste / drag-drop bhi chalta hai)">🖼️ Photo</button>
+      </div>
       <section class="subpages">
         <div class="drop-root" ${page.parentId && findPage(page.parentId) ? `data-drop-page="${page.parentId}"` : 'data-drop-root'}>⬆️ Yahan chhodo — is folder se bahar nikalo</div>
         <div class="row-between">
@@ -3192,7 +3352,7 @@ function renderEarnPage(page) {
         ${page.id.startsWith('ideas-folder-') && kids.some(k => !isFeatureList(k)) ? `<button class="btn block" data-action="earn-features-only" data-id="${page.id}" style="margin:6px 0 10px">🧹 Har idea page me sirf features rakho (baaki sab hatao)</button>` : ''}
         ${kids.map(k => {
           const n = pageDescendants(k.id).length;
-          return `<a class="subpage" href="#/earn/${k.id}" data-drop-page="${k.id}"><span class="pg-drag" data-drag-page="${k.id}" title="Pakad ke kisi page pe chhodo" aria-label="Drag">⠿</span><span>${esc(k.icon)}</span><span class="name">${esc(k.title || 'Untitled')}</span><span class="muted small">${n ? '📄 ' + n + ' ' : ''}›</span></a>`;
+          return `<a class="subpage" href="#/earn/${k.id}" data-drop-page="${k.id}" data-rank><span class="pg-drag" data-drag-page="${k.id}" title="Pakad ke kisi page ke upar / neeche chhodo = rank badlo · beech me chhodo = andar daalo" aria-label="Drag">⠿</span>${rankBadge(k)}<span>${esc(k.icon)}</span><span class="name">${esc(k.title || 'Untitled')}</span><span class="muted small">${n ? '📄 ' + n + ' ' : ''}›</span></a>`;
         }).join('')}
       </section>
       <p class="hint" style="margin-top:22px">Shortcut: <b>#</b> heading · <b>-</b> list · <b>1.</b> number · <b>[]</b> checkbox · <b>&gt;</b> quote · <b>---</b> line · <b>/</b> sab options · <b>⋮⋮</b> se block badlo / hatao</p>
@@ -3215,6 +3375,7 @@ document.addEventListener('contextmenu', e => {
 function blockHTML(b, n) {
   const handle = `<button class="blk-handle" data-action="earn-block-menu" data-id="${b.id}" aria-label="Block options" tabindex="-1">⋮⋮</button>`;
   if (b.type === 'divider') return `<div class="blk blk-divider" data-id="${b.id}">${handle}<hr></div>`;
+  if (b.type === 'image') return `<div class="blk blk-image" data-id="${b.id}">${handle}<img src="${b.src}" alt="Photo" data-action="earn-view-img" data-id="${b.id}"></div>`;
   const mark = b.type === 'todo'
     ? `<button class="blk-check" data-action="earn-check" data-id="${b.id}" aria-label="${b.checked ? 'Done — tap to undo' : 'Mark done'}">${b.checked ? '✓' : ''}</button>`
     : { bullet: '<span class="blk-mark">•</span>', num: `<span class="blk-mark">${n}.</span>`, callout: '<span class="blk-mark">💡</span>' }[b.type] || '';
@@ -3375,6 +3536,10 @@ function blockBackspace(el) {
   }
   const prev = page.blocks[i - 1];
   if (prev.type === 'divider') { page.blocks.splice(i - 1, 1); touchPage(page); redrawBlocks(b.id, 0); return true; }
+  if (prev.type === 'image') { // never delete a photo by accident — just drop the empty line under it
+    if (!text) { page.blocks.splice(i, 1); touchPage(page); redrawBlocks(); }
+    return true;
+  }
   if (prev.type === 'code') {
     if (!text) { page.blocks.splice(i, 1); touchPage(page); redrawBlocks(prev.id, -1); } else focusBlock(prev.id, -1);
     return true;
@@ -3391,7 +3556,7 @@ function focusNeighbour(el, dir) {
   const { page, i } = blockOf(el);
   if (!page) return false;
   for (let j = i + dir; j >= 0 && j < page.blocks.length; j += dir) {
-    if (page.blocks[j].type !== 'divider') { focusBlock(page.blocks[j].id, dir < 0 ? -1 : 0); return true; }
+    if (page.blocks[j].type !== 'divider' && page.blocks[j].type !== 'image') { focusBlock(page.blocks[j].id, dir < 0 ? -1 : 0); return true; }
   }
   if (dir < 0) { placeCaret(document.getElementById('pg-title'), -1); return true; }
   return false;
@@ -3421,7 +3586,51 @@ function insertPlain(text) {
 }
 
 // Pasting several lines → one block per line (with # - [] > shortcuts understood).
+/* ----- 🖼️ Photos inside Earning pages (shrunk JPEGs, like task photos) ----- */
+const earnImageBytes = () => earn.pages.reduce((n, p) => n + p.blocks.reduce((m, b) => m + (b.src ? b.src.length : 0), 0), 0);
+// Adds photos as blocks right after block `afterId` (an empty text line is replaced by the first photo).
+async function addEarnImages(afterId, files) {
+  const page = curPage();
+  if (!page) return;
+  const list = [...files].filter(f => f.type.startsWith('image/'));
+  if (!list.length) return;
+  let i = page.blocks.findIndex(x => x.id === afterId);
+  const added = [];
+  for (const f of list) {
+    if (earnImageBytes() > 2.6 * 1024 * 1024) { toast('⚠️ Earning me photos ki jagah bhar gayi — kuch purani photos hatao'); break; }
+    try { added.push({ ...newBlock('image'), src: await shrinkImage(f) }); } catch { toast('Ye photo nahi khuli'); }
+  }
+  if (!added.length) return;
+  const cur = page.blocks[i];
+  if (cur && cur.type === 'p' && !cur.text.trim()) page.blocks.splice(i, 1, ...added);
+  else if (i < 0) page.blocks.push(...added);
+  else page.blocks.splice(i + 1, 0, ...added);
+  i = page.blocks.indexOf(added[added.length - 1]);
+  const next = newBlock();
+  page.blocks.splice(i + 1, 0, next); // a line under the photo to keep writing
+  touchPage(page); saveEarn(); redrawBlocks(next.id, 0);
+  toast(`🖼️ ${added.length} photo add ho gayi`);
+}
+function pickEarnImages(afterId) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+  input.onchange = () => { if (input.files.length) addEarnImages(afterId, input.files); };
+  input.click();
+}
+// Drop photos anywhere on an Earning page.
+document.addEventListener('dragover', e => { if (curPage() && [...(e.dataTransfer?.items || [])].some(i => i.kind === 'file')) e.preventDefault(); });
+document.addEventListener('drop', e => {
+  const page = curPage();
+  const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
+  if (!page || !files.length || !e.target.closest?.('.notion')) return;
+  e.preventDefault();
+  const blk = e.target.closest('.blk[data-id]');
+  addEarnImages(blk ? blk.dataset.id : (page.blocks[page.blocks.length - 1]?.id || ''), files);
+});
+
 function onBlockPaste(e, el) {
+  const pics = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+  if (pics.length && el.id !== 'pg-title') { e.preventDefault(); addEarnImages(el.dataset.id, pics); return; }
   const text = e.clipboardData?.getData('text/plain');
   if (text == null) return;
   e.preventDefault();
@@ -3490,6 +3699,11 @@ function applyBlockType(id, type, fromSlash) {
     if (!b.text.trim()) page.blocks.splice(i, 1);
     touchPage(page);
     newEarnPage(page.id);
+    return;
+  }
+  if (type === 'image') {
+    if (b.text.trim()) touchPage(page);
+    pickEarnImages(b.id);
     return;
   }
   if (type === 'divider') {
@@ -3631,7 +3845,9 @@ function movePageInto(pageId, targetId) {
   }
   const from = page.parentId && findPage(page.parentId) ? page.parentId : null;
   if (from === targetId) return false;
+  const oldOrder = page.order;
   page.parentId = targetId;
+  page.order = null; // new folder → goes to the end there until you rank it
   page.updatedAt = Date.now();
   saveEarn();
   render();
@@ -3639,7 +3855,7 @@ function movePageInto(pageId, targetId) {
   toast(`📁 "${page.title || 'Untitled'}" → ${to ? to.icon + ' ' + (to.title || 'Untitled') : 'main list'}`, () => {
     const p = findPage(pageId);
     if (!p) return;
-    p.parentId = from; p.updatedAt = Date.now(); saveEarn(); render();
+    p.parentId = from; p.order = oldOrder; p.updatedAt = Date.now(); saveEarn(); render();
   });
   return true;
 }
@@ -3647,11 +3863,24 @@ function movePageInto(pageId, targetId) {
 // Drag ⠿ on an Earning page and drop it on another page (card, sub-page row or breadcrumb).
 let pgDrag = null;
 let pgJustDragged = 0;
+// Cards / rows marked data-rank: top part = put above, bottom part = put below, middle = inside.
 function pgDropTarget(x, y) {
   const el = document.elementFromPoint(x, y);
   const t = el && el.closest('[data-drop-page],[data-drop-root]');
   if (!t || !pgDrag || t.dataset.dropPage === pgDrag.id) return null;
+  let where = 'into';
+  if (t.hasAttribute('data-rank')) {
+    const r = t.getBoundingClientRect();
+    const edge = Math.min(r.height * 0.3, 22);
+    if (y < r.top + edge) where = 'before';
+    else if (y > r.bottom - edge) where = 'after';
+  }
+  pgDrag.where = where;
   return t;
+}
+function markDrop(t, where) {
+  document.querySelectorAll('.drop-before,.drop-after').forEach(n => n.classList.remove('drop-before', 'drop-after'));
+  if (t && where !== 'into') t.classList.add('drop-' + where);
 }
 document.addEventListener('pointerdown', e => {
   const h = e.target.closest('[data-drag-page]');
@@ -3681,8 +3910,9 @@ document.addEventListener('pointermove', e => {
   if (t !== pgDrag.over) {
     if (pgDrag.over) pgDrag.over.classList.remove('drop-hover');
     pgDrag.over = t;
-    if (t) t.classList.add('drop-hover');
   }
+  if (t) t.classList.toggle('drop-hover', pgDrag.where === 'into');
+  markDrop(t, pgDrag.where);
   if (e.clientY < 90) window.scrollBy(0, -12);
   else if (e.clientY > window.innerHeight - 90) window.scrollBy(0, 12);
 });
@@ -3693,10 +3923,13 @@ function endPgDrag(e, cancel) {
   document.body.classList.remove('pg-drag-on');
   if (d.ghost) d.ghost.remove();
   if (d.over) d.over.classList.remove('drop-hover');
+  markDrop(null);
   if (d.src) d.src.classList.remove('pg-dragging');
   if (!d.moved) return;
   pgJustDragged = Date.now(); // swallow the click that follows
-  if (!cancel && d.over) movePageInto(d.id, d.over.dataset.dropPage || null);
+  if (cancel || !d.over) return;
+  if (d.where && d.where !== 'into' && d.over.dataset.dropPage) reorderPage(d.id, d.over.dataset.dropPage, d.where);
+  else movePageInto(d.id, d.over.dataset.dropPage || null);
 }
 document.addEventListener('pointerup', e => endPgDrag(e, false));
 document.addEventListener('pointercancel', e => endPgDrag(e, true));
@@ -3790,7 +4023,7 @@ function pageToText(page) {
   const lines = page.blocks.map(b => {
     n = b.type === 'num' ? n + 1 : 0;
     return ({ h1: '# ', h2: '## ', h3: '### ', bullet: '• ', num: n + '. ', todo: b.checked ? '[x] ' : '[ ] ', quote: '> ', callout: '💡 ' }[b.type] || '')
-      + (b.type === 'divider' ? '———' : b.text);
+      + (b.type === 'divider' ? '———' : b.type === 'image' ? '🖼️ (photo)' : b.text);
   });
   return `${page.icon} ${page.title || 'Untitled'}\n\n${lines.join('\n')}`.trim();
 }
@@ -4015,6 +4248,31 @@ const extraActions = {
     toast(t.today ? '☀️ Today me dikhega' : 'Today se hata diya');
   },
 
+  'toggle-current'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    const group = [t, ...descendantsOf(t.id)];
+    const before = group.map(x => ({ x, folder: x.folder, prevFolder: x.prevFolder }));
+    const now = Date.now();
+    let msg;
+    if (t.folder === CURRENT) {
+      const back = t.prevFolder === undefined || t.prevFolder === CURRENT ? null : t.prevFolder;
+      group.forEach(x => { x.folder = back; x.updatedAt = now; });
+      t.prevFolder = undefined;
+      msg = `🎯 Current Project se hata diya → ${listName(back)}`;
+    } else {
+      t.prevFolder = t.folder;
+      group.forEach(x => { x.folder = CURRENT; x.updatedAt = now; });
+      msg = '🎯 Current Project me shift ho gaya';
+    }
+    saveState(); render();
+    toast(msg, () => {
+      const t2 = Date.now();
+      before.forEach(b => Object.assign(b.x, { folder: b.folder, prevFolder: b.prevFolder, updatedAt: t2 }));
+      saveState(); render();
+    });
+  },
+
   'toggle-prio'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
@@ -4044,6 +4302,19 @@ const extraActions = {
       state.todos.push(t);
       saveState(); render();
     });
+  },
+
+  'nav-sub-toggle'(el) {
+    const id = el.dataset.id;
+    if (navClosed.has(id)) navClosed.delete(id); else navClosed.add(id);
+    try { localStorage.setItem(NAV_CLOSED_KEY, JSON.stringify([...navClosed])); } catch { /* ignore */ }
+    render();
+  },
+
+  'earn-rename'() {
+    closeSheet();
+    const t = document.getElementById('pg-title');
+    if (t) { placeCaret(t, -1); toast('✏️ Naya naam likho — apne aap save hota hai'); }
   },
 
   'earn-new'(el) { closeSheet(); newEarnPage(el.dataset.parent || null); },
@@ -4096,6 +4367,7 @@ const extraActions = {
       <div class="sheet-inner">
         <h2>${esc(page.icon)} ${esc(page.title || 'Untitled')}</h2>
         <div style="display:grid;gap:10px">
+          <button type="button" class="btn" data-action="earn-rename">✏️ Naam badlo</button>
           <button type="button" class="btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>
           <button type="button" class="btn" data-action="earn-move-pick">📁 Kisi folder me daalo</button>
           <button type="button" class="btn" data-action="earn-copy">📋 Saara text copy karo</button>
@@ -4150,9 +4422,11 @@ const extraActions = {
     sheet.innerHTML = `
       <div class="sheet-inner">
         <h2>Block</h2>
-        <h3 class="sheet-sub" style="margin-top:0">Isko badlo</h3>
+        ${curPage()?.blocks.find(x => x.id === id)?.type === 'image'
+          ? `<button type="button" class="btn block" data-action="earn-turn" data-id="${id}" data-value="image">🖼️ Iske neeche aur photo daalo</button>`
+          : `<h3 class="sheet-sub" style="margin-top:0">Isko badlo</h3>
         <div class="chip-group">${BLOCK_MENU.filter(m => m[0] !== 'page').map(([type, ico, label]) =>
-          `<button type="button" class="chip" data-action="earn-turn" data-id="${id}" data-value="${type}">${ico} ${label}</button>`).join('')}</div>
+          `<button type="button" class="chip" data-action="earn-turn" data-id="${id}" data-value="${type}">${ico} ${label}</button>`).join('')}</div>`}
         <div class="btn-row" style="margin-top:16px">
           <button type="button" class="btn" data-action="earn-move" data-id="${id}" data-value="-1">⬆️ Upar</button>
           <button type="button" class="btn" data-action="earn-move" data-id="${id}" data-value="1">⬇️ Neeche</button>
@@ -4194,7 +4468,26 @@ const extraActions = {
     });
   },
 
-  'earn-turn'(el) { closeSheet(); applyBlockType(el.dataset.id, el.dataset.value, false); },
+  'earn-turn'(el) {
+    closeSheet();
+    const b = curPage()?.blocks.find(x => x.id === el.dataset.id);
+    if (b && b.type === 'image') { if (el.dataset.value === 'image') pickEarnImages(b.id); return; } // a photo stays a photo
+    applyBlockType(el.dataset.id, el.dataset.value, false);
+  },
+
+  'earn-add-photo'() {
+    const page = curPage();
+    if (page) pickEarnImages(page.blocks[page.blocks.length - 1]?.id || '');
+  },
+
+  'earn-view-img'(el) {
+    const b = curPage()?.blocks.find(x => x.id === el.dataset.id);
+    if (!b || !b.src) return;
+    const sheet = document.getElementById('sheet');
+    sheet.innerHTML = `<div class="sheet-inner"><img src="${b.src}" alt="" style="width:100%;border-radius:12px;display:block">
+      <button type="button" class="btn block" data-action="close-sheet" style="margin-top:12px">Band karo</button></div>`;
+    sheet.showModal();
+  },
 
   'earn-move'(el) {
     const page = curPage();
@@ -4738,9 +5031,20 @@ function parseRoute() {
 }
 const currentIdeaId = () => parseRoute().id;
 
+// One-time: the old side-hustle folder name → a clearer one. Once you rename it yourself, this never touches it again.
+function renameSideHustle() {
+  const p = earnCloud.code && findPage('side-hustle');
+  if (!p || p.title.trim() !== 'Bana ke Becho') return;
+  p.title = 'Digital Products';
+  p.icon = '🚀';
+  p.updatedAt = Date.now();
+  saveEarn();
+}
+
 function render() {
   const app = document.getElementById('app');
   const { page, id } = parseRoute();
+  renameSideHustle();
   const panelScroll = document.getElementById('todo-panel')?.scrollTop || 0;
   document.body.classList.remove('panel-open');
 
@@ -4749,6 +5053,14 @@ function render() {
     app.innerHTML = renderJoin();
     document.querySelector('#password-form input[name="password"]')?.focus();
     mountGoogleButtons();
+    return;
+  }
+  document.body.classList.toggle('pop-mode', page === 'pop');
+  if (page === 'pop') {
+    // Tiny Alt+I window: type → Enter → straight into 📥 Inbox, then the window closes.
+    app.innerHTML = renderPop();
+    document.title = '⚡ Inbox me likho';
+    document.getElementById('pop-text')?.focus();
     return;
   }
   if (page === 'join') {
@@ -5104,7 +5416,7 @@ Object.assign(actions, extraActions); // Inbox + Earning buttons (Section 11A/11
 const LIST_NAMES = () => ({ '': '🧰 Misc', [INBOX]: '📥 Inbox', ...Object.fromEntries(Object.entries(LISTS).map(([k, L]) => [k, `${L.emoji} ${L.label}`])),
   ...Object.fromEntries(FOLDERS.map(f => [f.key, `${f.emoji} ${f.label} · Misc`])) });
 const listName = folder => LIST_NAMES()[folder || ''] || '🧰 Misc';
-const panelPage = () => { const { page } = parseRoute(); return page === 'misc' || !!LISTS[page]; };
+const panelPage = () => { const { page } = parseRoute(); return page === 'misc' || page === 'inbox' || !!LISTS[page]; };
 
 function renderTodoPanel() {
   const t = ui.openTodo && state.todos.find(x => x.id === ui.openTodo);
@@ -5117,7 +5429,7 @@ function renderTodoPanel() {
       <div class="tp-head">
         <button class="todo-check${t.done ? ' on' : ''}" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
         <span class="tp-place">${parent ? `<a href="#" data-action="open-todo" data-id="${parent.id}">‹ ${esc(parent.text.slice(0, 30))}</a>` : esc(listName(t.folder))}</span>
-        ${prioButton(t)}${todayButton(t)}
+        ${prioButton(t)}${todayButton(t)}${currentButton(t)}
         <button class="icon-btn" data-action="close-todo" aria-label="Band karo" title="Band karo (Esc)">✕</button>
       </div>
       <textarea id="tp-title" class="tp-title" data-id="${t.id}" rows="1" maxlength="500" aria-label="Task ka naam">${esc(t.text)}</textarea>
@@ -5593,7 +5905,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-01n';
+const APP_VERSION = '2026-11-11a';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
