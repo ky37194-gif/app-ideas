@@ -115,6 +115,8 @@ public class MainActivity extends Activity {
     private static String hashFor(Intent intent) {
         Uri d = intent == null ? null : intent.getData();
         if (d == null || !"appideas".equals(d.getScheme())) return "";
+        // QR login from the PC: the code stays in the #fragment (never sent to any server)
+        if ("login".equals(d.getHost()) && d.getEncodedFragment() != null) return "#/applogin/" + d.getEncodedFragment();
         String page = d.getLastPathSegment();
         return "quick".equals(page) ? "#/quick" : "inbox".equals(page) ? "#/dashboard" : "";
     }
