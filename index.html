@@ -5023,7 +5023,7 @@ function renderPcAuth(port, state) {
 }
 async function mountPcAuth(port, state) {
   const msg = document.getElementById('pc-auth-msg');
-  if (!/^d{2,5}$/.test(port || '') || !/^[a-f0-9]{16,64}$/.test(state || '')) { msg.textContent = '❌ Galat link — PC app se dobara try karo'; return; }
+  if (!/^[0-9]{2,5}$/.test(port || '') || !/^[a-f0-9]{16,64}$/.test(state || '')) { msg.textContent = '❌ Galat link — PC app se dobara try karo'; return; }
   try { await loadGsi(); } catch (err) { msg.textContent = err.message; return; }
   const send = resp => {
     if (!resp || !resp.credential) return;
@@ -6459,7 +6459,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11m';
+const APP_VERSION = '2026-11-11n';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
