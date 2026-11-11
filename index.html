@@ -735,6 +735,26 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  /* ❤️ Passion board */
+  .ch-split { display: grid; gap: 16px; margin: 14px 0 18px; align-items: start; }
+  @media (min-width: 1000px) { .ch-split { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+  .ch-left { display: grid; gap: 14px; }
+  .ch-card { display: grid; gap: 10px; border-left: 4px solid var(--border); min-width: 0; }
+  .ch-card > * { min-width: 0; }
+  .ch-card.youtube { border-left-color: #ef4444; }
+  .ch-card.instagram { border-left-color: #ec4899; }
+  .ch-card.drop-hover { outline: 2px dashed var(--primary); outline-offset: 2px; }
+  .ch-head { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; }
+  .ch-ico { font-size: 1.2rem; }
+  .ch-plat { margin-left: auto; font-size: .75rem; color: var(--muted); }
+  .ch-now { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--warning) 7%, var(--surface-2)); }
+  .ch-now-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ch-now-text { flex: 1; min-width: 0; font-weight: 750; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ch-right { position: sticky; top: 76px; }
+  .ch-ideas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .ch-ideas a { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: inherit; text-decoration: none; }
+  .ch-ideas a:hover { border-color: var(--primary); }
+  .ch-idea-title { font-weight: 650; }
   .dash-more { border: 0; background: none; padding: 6px 4px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--primary); cursor: pointer; text-align: left; }
   .dash-more:hover { text-decoration: underline; }
   .dash-more-li { list-style: none; }
@@ -1215,6 +1235,7 @@ function normalizeTodo(raw = {}) {
     priority: !!raw.priority, // 🔥 = shows on the Priority page
     today: false, // the 📅 Today section was removed
     now: Number(raw.now) || 0, // ⚡ "abhi yahi kar raha hoon" — when you started it
+    chnow: Number(raw.chnow) || 0, // ⚡ the one you're on for its YouTube / Instagram channel
     doneAt: Number(raw.doneAt) || null,
     doneBy: normPerson(raw.doneBy),
     by: normPerson(raw.by),
@@ -3991,6 +4012,64 @@ function renderEarnHome() {
     ${bottomNav('earn')}`;
 }
 
+/* ----- ❤️ Passion board: one card per channel / page ----- */
+function channelBoard({ platform = null, accountId = null } = {}) {
+  const accs = smAccounts().filter(a => (!platform || a.platform === platform) && (!accountId || a.id === accountId));
+  if (!accs.length) return '';
+  const ids = new Set(state.todos.map(t => t.id));
+  const chLine = x => `<li class="upnext-item" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke order badlo / kisi aur channel pe chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}${childrenOf(x.id).length ? ` <span class="muted small">☰ ${childrenOf(x.id).filter(k => k.done).length}/${childrenOf(x.id).length}</span>` : ''}</span><button class="now-play" data-action="ch-now" data-id="${x.id}" title="Abhi isi pe kaam">▶️</button></li>`;
+  const cards = accs.map(a => {
+    const folder = 'ch:' + a.id;
+    const tasks = ordered(state.todos.filter(t => t.folder === folder && !t.done && isTopTodo(t, ids)), upNextSort);
+    const now = tasks.filter(t => t.chnow).sort((x, y) => y.chnow - x.chnow)[0] || null;
+    const rest = tasks.filter(t => t !== now);
+    const next = rest[0] || null;
+    const shown = dashMore.has(folder) ? rest : rest.slice(0, 5);
+    return `<section class="card ch-card ${a.platform}" data-drop-list="${folder}">
+        <div class="ch-head"><span class="ch-ico">${esc(a.icon)}</span><b>${esc(a.name)}</b><span class="ch-plat">${platIco(a.platform)}</span></div>
+        <div class="ch-now">
+          <span class="dash-cur-label" style="color:var(--warning)">⚡ Abhi</span>
+          ${now ? `<div class="ch-now-row"><span class="ch-now-text" data-action="open-todo" data-id="${now.id}">${esc(now.text)}</span>
+              <button class="btn primary small-btn" data-action="toggle-todo" data-id="${now.id}">✓</button><button class="icon-btn" data-action="ch-now-clear" data-id="${now.id}" title="Rok do">✕</button></div>`
+            : '<span class="muted small">Kuch nahi — neeche kisi kaam pe ▶️ dabao</span>'}
+          ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span><button class="btn small-btn" data-action="ch-now" data-id="${next.id}">▶️</button></div>` : ''}
+        </div>
+        <span class="dash-cur-label">📥 Inbox${rest.length ? ` · ${rest.length}` : ''}</span>
+        ${rest.length ? `<ul class="upnext-list">${shown.map(chLine).join('')}${rest.length > 5 ? `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${folder}">${dashMore.has(folder) ? '▴ Kam dikhao' : `▸ ${rest.length - 5} aur`}</button></li>` : ''}</ul>` : ''}
+        <form class="dash-add-form" data-parent="" data-folder="${folder}" autocomplete="off"><input name="text" maxlength="300" required placeholder="＋ ${esc(a.name)} ke liye kuch bhi likho… Enter" aria-label="New task"></form>
+      </section>`;
+  }).join('');
+  // Right side: what the Content Planner has coming up for these channels.
+  const d = smData();
+  const accIds = new Set(accs.map(a => a.id));
+  const ideas = (d && Array.isArray(d.ideas) ? d.ideas : [])
+    .filter(i => i.status !== 'posted' && (i.accountIds || []).some(x => accIds.has(x)))
+    .sort((x, y) => (x.date || '9999') < (y.date || '9999') ? -1 : 1).slice(0, 20);
+  const accOf = id => smAccounts().find(a => a.id === id);
+  return `<div class="ch-split">
+      <div class="ch-left">${cards}</div>
+      <div class="ch-right">
+        <div class="row-between" style="margin-bottom:8px"><b>📣 Content Planner — aage kya aa raha hai</b><a class="muted small" href="#/sm">Kholo ›</a></div>
+        ${ideas.length ? `<ul class="ch-ideas">${ideas.map(i => `<li><a href="#/sm">
+            <span class="ch-idea-title">${esc(i.title || 'Untitled')}</span>
+            <span class="muted small">${(i.accountIds || []).map(accOf).filter(Boolean).map(a => esc(a.icon + ' ' + a.name)).join(', ')}${i.date ? ' · 📅 ' + esc(i.date) : ''}${i.status ? ' · ' + esc(i.status) : ''}</span></a></li>`).join('')}</ul>`
+          : '<p class="muted small">Koi idea nahi. <a href="#/sm">📣 Content Planner</a> me video / reel ke ideas daalo — yahan dikhenge.</p>'}
+        <a class="card sm-card" href="#/week" style="margin-top:12px"><span class="big" style="font-size:1.4rem">🗓️</span><span style="flex:1"><b>YT &amp; IG Hafta plan</b><br><span class="muted small">Kis din, kis time, kya kaam</span></span><span class="muted">›</span></a>
+      </div>
+    </div>`;
+}
+const channelActions = {
+  'ch-now'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    const time = Date.now();
+    state.todos.forEach(x => { if (x.chnow && x.folder === t.folder && x !== t) { x.chnow = 0; x.updatedAt = time; } });
+    t.chnow = time; t.updatedAt = time;
+    saveState(); render();
+  },
+  'ch-now-clear'(el) { const t = state.todos.find(x => x.id === el.dataset.id); if (t) { t.chnow = 0; t.updatedAt = Date.now(); saveState(); render(); } },
+};
+
 // ❤️ Passion pages (YouTube / Instagram / channels) open the YT & IG planners right from here.
 function plannerCards(page) {
   const passion = page.id === CAT_PASSION || pageAncestors(page).some(a => a.id === CAT_PASSION);
@@ -4015,7 +4094,11 @@ function renderEarnPage(page) {
       <button class="pg-icon" data-action="earn-icon" aria-label="Icon badlo" title="Icon badlo">${esc(page.icon)}</button>
       <div id="pg-title" class="pg-title" contenteditable="${CE}" data-ph="Untitled" role="textbox" aria-label="Page title">${esc(page.title)}</div>
       <div class="muted small">${page.by ? avatar(page.by) + ' ' : ''}Last edit ${timeAgo(page.updatedAt)}</div>
-      ${plannerCards(page)}
+      ${page.id === CAT_PASSION ? channelBoard()
+        : page.id === 'cat-yt' ? channelBoard({ platform: 'youtube' })
+        : page.id === 'cat-ig' ? channelBoard({ platform: 'instagram' })
+        : page.id.startsWith('ch-') && smAccounts().some(a => 'ch-' + a.id === page.id) ? channelBoard({ accountId: page.id.slice(3) })
+        : plannerCards(page)}
       ${kids.length ? `
         <div class="row-between" style="margin:14px 0 8px"><h3 style="margin:0">📁 Andar (${kids.length})</h3>
           <button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Naya page</button></div>
@@ -4634,6 +4717,7 @@ function moveTodoTo(id, target) {
     t.parentId = null;
   }
   saveState(); render();
+  if (!DROP_NAMES[target]) DROP_NAMES[target] = listName(target);
   const what = target === 'today' ? 'Today me bhi dikhega (apni list me bhi rahega)' : target === 'priority' ? 'Priority bana diya' : `${DROP_NAMES[target]} me shift ho gaya`;
   toast(`✅ ${what}`, () => {
     const t2 = Date.now();
@@ -6347,7 +6431,7 @@ const actions = {
   },
 };
 
-Object.assign(actions, extraActions, weekActions, cutActions, nowActions, { 'phone-login': () => openPhoneLogin(), 'dash-more'(el) { const k = el.dataset.key; if (dashMore.has(k)) dashMore.delete(k); else dashMore.add(k); render(); } }, { 'pc-link': pcLinkAction, 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
+Object.assign(actions, extraActions, weekActions, cutActions, nowActions, channelActions, { 'phone-login': () => openPhoneLogin(), 'dash-more'(el) { const k = el.dataset.key; if (dashMore.has(k)) dashMore.delete(k); else dashMore.add(k); render(); } }, { 'pc-link': pcLinkAction, 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
 // Idea page checklist
 Object.assign(actions, {
   'toggle-done-list'(el) {
@@ -6387,8 +6471,11 @@ Object.assign(actions, {
    ===================================================================== */
 const LIST_NAMES = () => ({ '': '🧰 Misc', [INBOX]: '📥 Inbox', ...Object.fromEntries(Object.entries(LISTS).map(([k, L]) => [k, `${L.emoji} ${L.label}`])),
   ...Object.fromEntries(FOLDERS.map(f => [f.key, `${f.emoji} ${f.label} · Misc`])) });
-const listName = folder => LIST_NAMES()[folder || ''] || '🧰 Misc';
-const panelPage = () => { const { page } = parseRoute(); return page === 'misc' || page === 'inbox' || page === 'dashboard' || !!LISTS[page]; };
+const listName = folder => {
+  if (folder && folder.startsWith('ch:')) { const a = smAccounts().find(x => x.id === folder.slice(3)); return a ? `${a.icon} ${a.name} · ${platIco(a.platform)}` : '📺 Channel'; }
+  return LIST_NAMES()[folder || ''] || '🧰 Misc';
+};
+const panelPage = () => { const { page } = parseRoute(); return page === 'misc' || page === 'inbox' || page === 'dashboard' || page === 'earn' || !!LISTS[page]; };
 
 function renderTodoPanel() {
   const t = ui.openTodo && state.todos.find(x => x.id === ui.openTodo);
@@ -6900,7 +6987,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12l';
+const APP_VERSION = '2026-11-12m';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
