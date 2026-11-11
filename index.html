@@ -729,6 +729,16 @@
   .pop input { min-height: 46px; font-size: 1.05rem; }
   .pop textarea { resize: none; font-size: .9rem; min-height: 58px; }
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
+  /* Dashboard: 🎯 Current Project card */
+  .dash-current { display: grid; gap: 4px; margin-bottom: 14px; border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), var(--surface)); }
+  .dash-current.empty-cur { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+  .dash-cur-label { font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--primary); }
+  .dash-cur-row { display: grid; gap: 4px; padding: 10px 2px; text-decoration: none; color: inherit; border-top: 1px solid var(--border); }
+  .dash-cur-row:first-of-type { border-top: 0; }
+  .dash-cur-name { font-weight: 700; font-size: 1rem; }
+  .dash-cur-row.main .dash-cur-name { font-size: 1.3rem; font-weight: 800; }
+  .dash-cur-row:hover .dash-cur-name { color: var(--primary); }
 </style>
 </head>
 
@@ -1281,7 +1291,6 @@ function bottomNav(active) {
     <nav class="bottom-nav" aria-label="Main">
       <button type="button" class="nav-search pc-only" data-action="open-search">🔍 <span>Search…</span><kbd>Ctrl K</kbd></button>
       <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
-      <a class="nav-item ${active === 'priority' ? 'active' : ''}" href="#/priority" data-drop-list="priority"><span class="ico">🔥</span>Priority<span class="nav-count">${priorityCount() || ''}</span></a>
       <a class="nav-item ${active === TODAY ? 'active' : ''}" href="#/today" data-drop-list="today"><span class="ico">📅</span>Today<span class="nav-count">${todayCount() || ''}</span></a>
       <a class="nav-item pc-only ${active === CURRENT ? 'active' : ''}" href="#/current" data-drop-list="current"><span class="ico">🎯</span>Current Project</a>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
@@ -1481,6 +1490,30 @@ function renderCurrentHero() {
         : '<div class="muted small">Iske ＋ pe tap karke steps daalo.</div>'}
     </div>`;
 }
+// Dashboard: what you're working on now (every open 🎯 Current Project task, with % done and next step).
+function dashCurrentCard() {
+  const ids = new Set(state.todos.map(t => t.id));
+  const list = state.todos.filter(t => t.folder === CURRENT && !t.done && isTopTodo(t, ids))
+    .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
+  if (!list.length) {
+    return `<a class="card dash-current empty-cur" href="#/current"><span class="big">🎯</span><span style="flex:1"><b>Abhi koi Current Project nahi</b><br>
+      <span class="muted small">Kisi bhi task pe 🎯 dabao — wo yahan dikhega</span></span><span class="muted">›</span></a>`;
+  }
+  const rows = list.map((t, i) => {
+    const steps = descendantsOf(t.id);
+    const next = steps.find(x => !x.done);
+    return `<a class="dash-cur-row${i === 0 ? ' main' : ''}" href="#/current">
+      <span class="dash-cur-name">${esc(t.text)}</span>
+      ${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}
+      ${steps.length ? `${progressLine(steps)}${next ? `<span class="muted small">👉 Agla step: <b>${esc(next.text)}</b></span>` : ''}` : ''}
+    </a>`;
+  }).join('');
+  return `<section class="card dash-current">
+      <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
+      ${rows}
+    </section>`;
+}
+
 // Tasks from other lists marked ☀️ for today.
 const todayPicked = () => state.todos.filter(t => t.today && t.folder !== TODAY && !t.done).sort((a, b) => (b.priority - a.priority) || (b.updatedAt - a.updatedAt));
 const todayCount = () => openTodos(TODAY) + todayPicked().length;
@@ -2218,6 +2251,7 @@ function renderDashboard() {
   return `
     ${topBar('📊 Dashboard')}
     <main class="page">
+      ${dashCurrentCard()}
       <div class="stats">
         <div class="card stat"><div class="num">${total}</div><div class="lbl">Total ideas</div></div>
         <div class="card stat"><div class="num">${avg}%</div><div class="lbl">Overall progress (avg)</div></div>
@@ -2238,22 +2272,9 @@ function renderDashboard() {
         </a>`
       : `<div class="card"><p class="muted" style="margin:0">No activity this week yet. Kisi idea pe thoda kaam karo! 💪</p></div>`}
 
-      <h2 class="section-title">Ideas by status</h2>
-      <div class="card">${statusRows}</div>
-
-      <h2 class="section-title">☁️ Sync & aap kaun ho</h2>
+      <h2 class="section-title">☁️ Sync</h2>
       ${renderSyncCard()}
-      ${cloud.code ? `<div class="card" style="margin-top:12px">${googleSection()}</div><div class="card" style="margin-top:12px">${accountSection()}</div>` : ''}
-
-      <h2 class="section-title">💾 Backup</h2>
-      <div class="card">
-        <p class="muted small" style="margin-top:0">Your data is saved only in this browser. Export a JSON backup regularly, and import it on another device.</p>
-        <div class="btn-row">
-          <button class="btn primary" data-action="export">⬇️ Export JSON</button>
-          <button class="btn" data-action="import" data-value="merge">⬆️ Import (merge)</button>
-          <button class="btn danger" data-action="import" data-value="replace">Import (replace all)</button>
-        </div>
-      </div>
+      ${cloud.code && GOOGLE_CLIENT_ID ? `<div class="card" style="margin-top:12px">${googleSection()}</div>` : ''}
     </main>
     ${bottomNav('dashboard')}`;
 }
@@ -4834,7 +4855,7 @@ function searchEverything(q) {
   const item = (href, name, meta) => `<a class="drawer-item" href="${href}"><span class="name">${name}</span><span class="meta">${meta}</span></a>`;
   let out = '';
   // App sections
-  const sections = [['#/dashboard', '📊 Dashboard'], ['#/priority', '🔥 Priority'], ['#/inbox', '📥 Inbox'], ['#/misc', '🧰 Misc'],
+  const sections = [['#/dashboard', '📊 Dashboard'], ['#/inbox', '📥 Inbox'], ['#/misc', '🧰 Misc'],
     ...Object.entries(LISTS).map(([k, L]) => ['#/' + k, `${L.emoji} ${L.label}`]), ...(canEarn() ? [['#/earn', '💰 Earning'], ['#/sm', '📣 Social Media (SM Planner)'], ['#/earn/' + APPS_PAGE, '📱 Apps']] : [])]
     .filter(([, n]) => hit(n));
   if (sections.length) out += `<h3>📂 Sections</h3>` + sections.map(([h, n]) => item(h, hl(n, q), '')).join('');
@@ -4894,7 +4915,6 @@ function drawerList() {
     <h3>🧰 Misc to-do (${openTodos()} baaki)</h3>
     <a class="drawer-item" href="#/misc"><span class="name">🧰 To-do list kholo</span></a>
     <h3>🔥 Priority (${priorityCount()})</h3>
-    <a class="drawer-item" href="#/priority"><span class="name">🔥 Priority wale kaam</span></a>
     <h3>📥 Inbox (${myInbox().length})</h3>
     <a class="drawer-item" href="#/quick"><span class="name">⚡ Jaldi likho</span></a>
     <a class="drawer-item" href="#/inbox"><span class="name">📥 Inbox kholo</span></a>
@@ -5905,7 +5925,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11a';
+const APP_VERSION = '2026-11-11c';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
