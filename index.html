@@ -1184,6 +1184,7 @@ function normalizeTodo(raw = {}) {
     parentId: raw.parentId || null, // set = this task lives inside another task
     folder: !raw.folder || raw.folder === 'today' || ['apps', 'vr', 'pc', 'rea', 'feature', 'misc'].includes(raw.folder) ? 'inbox' : raw.folder, // Misc + 📅 Today were merged into the 📥 Inbox: null = main Misc page, 'apps' / 'vr' / 'pc' / 'rea' = that folder's Misc
     prevFolder: raw.prevFolder === undefined ? undefined : raw.prevFolder, // where a 🎯 task came from (so un-🎯 sends it back)
+    prevParent: raw.prevParent || null, // …and which task it sat inside
     done: !!raw.done,
     priority: !!raw.priority, // 🔥 = shows on the Priority page
     today: false, // the 📅 Today section was removed
@@ -1802,7 +1803,8 @@ function dashNowCard(upNext) {
       ${t ? `<div class="now-task">
           <div style="flex:1;min-width:0"><div class="now-title">${esc(t.text)}</div>${where ? `<div class="muted small">${esc(where.text.replace(/^⏭️\s*/, '⏭️ ').slice(0, 60))} me</div>` : ''}</div>
           <button class="btn primary small-btn" data-action="now-done" data-id="${t.id}">✓ Ho gaya</button>
-          <button class="icon-btn" data-action="now-clear" aria-label="Hatao" title="Abhi wala hatao">✕</button>
+          <button class="icon-btn" data-action="send-back" data-id="${t.id}" aria-label="Wapas bhejo" title="Hatao — jahan se aaya tha wahin wapas">↩️</button>
+          <button class="icon-btn" data-action="now-clear" aria-label="Rok do" title="Abhi wala rok do (task wahin rahega)">✕</button>
         </div>`
         : '<p class="muted small" style="margin:6px 0">Kuch shuru nahi kiya. Kisi project / Up next pe <b>▶️</b> dabao, ya ⠿ se task yahan chhodo.</p>'}
       ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span>
@@ -1832,7 +1834,35 @@ document.addEventListener('submit', e => {
   saveState(); render();
   document.querySelector(`.dash-add-form[data-parent="${form.dataset.parent || ''}"][data-folder="${form.dataset.folder || ''}"] input`)?.focus(); // keep adding
 });
+// Entering 🎯 Current Project from another list: note where it was, so ↩️ can send it back.
+function rememberOrigin(t, toFolder) {
+  if (toFolder !== CURRENT || t.folder === CURRENT) return;
+  t.prevFolder = t.folder;
+  t.prevParent = t.parentId || null;
+}
+// ↩️ Back to where it came from (that list, inside that task if it still exists) — else the Inbox.
+function sendBack(id) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t) return;
+  const group = [t, ...descendantsOf(t.id)];
+  const before = group.map(x => ({ x, folder: x.folder, parentId: x.parentId, prevFolder: x.prevFolder, prevParent: x.prevParent, now: x.now }));
+  const inGroup = new Set(group.map(x => x.id));
+  let folder = t.prevFolder === undefined || t.prevFolder === CURRENT ? INBOX : t.prevFolder || INBOX;
+  const parent = t.prevParent && !inGroup.has(t.prevParent) && state.todos.find(x => x.id === t.prevParent);
+  if (parent) folder = parent.folder;
+  const time = Date.now();
+  group.forEach(x => { x.folder = folder; x.updatedAt = time; });
+  t.parentId = parent ? parent.id : null;
+  t.prevFolder = undefined; t.prevParent = null; t.now = 0;
+  saveState(); render();
+  toast(`↩️ Wapas ${parent ? '"' + parent.text.slice(0, 30) + '" me' : listName(folder) + ' me'} chala gaya`, () => {
+    const t2 = Date.now();
+    before.forEach(b => Object.assign(b.x, { folder: b.folder, parentId: b.parentId, prevFolder: b.prevFolder, prevParent: b.prevParent, now: b.now, updatedAt: t2 }));
+    saveState(); render();
+  });
+}
 const nowActions = {
+  'send-back'(el) { sendBack(el.dataset.id); },
   'set-now'(el) { setNow(el.dataset.id); },
   'now-clear'() { const t = nowTask(); if (t) { t.now = 0; t.updatedAt = Date.now(); saveState(); render(); } },
   'now-done'(el) {
@@ -1852,7 +1882,7 @@ function dashCurrentCard() {
     .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
   // Each project (and the ⏭️ Up next box) is a drop target: drag a task's ⠿ from the Inbox onto it.
   // A line with a tick box: ⠿ drag · ☐ done · text (tap = details) · ▶️ abhi yahi.
-  const line = (x, cls = '') => `<li class="upnext-item ${cls}"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button></li>`;
+  const line = (x, cls = '') => `<li class="upnext-item ${cls}"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button><button class="now-play" data-action="send-back" data-id="${x.id}" title="Yahan se hatao — jahan se aaya tha wahin wapas">↩️</button></li>`;
   const addBox = (parent, placeholder, folder = '') => `<form class="dash-add-form" data-parent="${parent}" data-folder="${folder}" autocomplete="off"><input name="text" maxlength="300" required placeholder="${placeholder}" aria-label="${placeholder}"></form>`;
   const rows = list.map((t, i) => {
     const steps = descendantsOf(t.id);
@@ -1860,7 +1890,8 @@ function dashCurrentCard() {
     return `<div class="dash-cur-row${i === 0 ? ' main' : ''}" data-drop-todo="${t.id}" title="Task yahan chhodo = is project ka step">
       <div class="dash-cur-head"><button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Project ho gaya"></button>
         <span class="dash-cur-name" data-action="open-todo" data-id="${t.id}">${esc(t.text)}</span>
-        <button class="now-play" data-action="set-now" data-id="${(open[0] || t).id}" title="Abhi yahi kar raha hoon">▶️</button></div>
+        <button class="now-play" data-action="set-now" data-id="${(open[0] || t).id}" title="Abhi yahi kar raha hoon">▶️</button>
+        <button class="now-play" data-action="send-back" data-id="${t.id}" title="Current Project se hatao — jahan se aaya tha wahin wapas">↩️</button></div>
       ${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}
       ${steps.length ? progressLine(steps) : ''}
       ${open.length ? `<ul class="upnext-list dash-steps">${open.map(x => line(x)).join('')}</ul>` : ''}
@@ -4523,6 +4554,7 @@ function moveTodoTo(id, target) {
   else if (target === 'today' && t.folder !== TODAY) { if (t.today) return toast('Ye pehle se 📅 Today me dikh raha hai'); t.today = true; t.updatedAt = now; }
   else {
     const folder = target === 'misc' ? INBOX : target;
+    rememberOrigin(t, folder);
     if (t.folder === folder && !t.parentId) return toast(`Ye pehle se ${DROP_NAMES[target]} me hai`);
     group.forEach(x => { x.folder = folder; x.updatedAt = now; });
     t.parentId = null;
@@ -4844,6 +4876,7 @@ const extraActions = {
       msg = `🎯 Current Project se hata diya → ${listName(back)}`;
     } else {
       t.prevFolder = t.folder;
+      t.prevParent = t.parentId || null;
       group.forEach(x => { x.folder = CURRENT; x.updatedAt = now; });
       msg = '🎯 Current Project me shift ho gaya';
     }
@@ -6301,6 +6334,7 @@ function moveTodoInto(id, value) {
     collapsed.delete(target.id); saveCollapsed();
   }
   const now = Date.now();
+  rememberOrigin(t, folder);
   group.forEach(x => { x.folder = folder; x.updatedAt = now; });
   t.parentId = parentId;
   // Open work inside a done task re-opens it.
@@ -6706,7 +6740,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12d';
+const APP_VERSION = '2026-11-12e';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
