@@ -745,6 +745,8 @@
   .dash-line-text:hover, .dash-cur-name:hover { color: var(--primary); }
   .dash-steps { margin-left: 4px; }
   .dash-add-form input { width: 100%; min-height: 36px; padding: 6px 12px; font-size: .9rem; border-radius: 10px; border: 1px dashed var(--border); background: transparent; color: var(--text); }
+  @media (hover: hover) { .dash-cur-row .dash-add-form { display: none; } .dash-cur-row:hover .dash-add-form, .dash-cur-row:focus-within .dash-add-form { display: block; } }
+  .dash-left > .card { margin-bottom: 14px; }
   .dash-add-form input:focus { border-style: solid; border-color: var(--primary); background: var(--surface-2); outline: none; }
   .dash-now { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
   .dash-now .dash-cur-label { color: var(--warning); }
@@ -1933,7 +1935,8 @@ function dashCurrentCard() {
       ${addBox(t.id, '＋ Step likho… Enter')}
     </div>`;
   }).join('');
-  return `<section class="card dash-current" data-drop-list="current" title="Up next / Inbox se task yahan chhodo = naya current project">
+  return `${dashNowCard(upNext)}
+    <section class="card dash-current" data-drop-list="current" title="Up next / Inbox se task yahan chhodo = naya current project">
       <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
       ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Neeche likho, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
       ${addBox('', '＋ Naya current project… Enter', CURRENT)}
@@ -1943,8 +1946,7 @@ function dashCurrentCard() {
       ${upNext.length ? `<ul class="upnext-list">${upNext.map(x => line(x)).join('')}</ul>` : ''}
       ${addBox(UP_NEXT, '＋ Up next me likho… Enter')}
       <div class="upnext-drop">⠿ Inbox se task yahan chhodo → Up next · Up next ka ⠿ upar Current Project pe chhodo → wahi current ban jayega</div>
-    </section>
-    ${dashNowCard(upNext)}`;
+    </section>`;
 }
 
 // Tasks from other lists marked ☀️ for today.
@@ -6786,7 +6788,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12f';
+const APP_VERSION = '2026-11-12g';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
