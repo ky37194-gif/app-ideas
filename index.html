@@ -735,6 +735,15 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  .dash-now { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
+  .dash-now .dash-cur-label { color: var(--warning); }
+  .dash-now.drop-hover { outline: 2px dashed var(--warning); outline-offset: 2px; }
+  .now-task { display: flex; align-items: center; gap: 10px; }
+  .now-title { font-size: 1.15rem; font-weight: 800; line-height: 1.3; }
+  .now-next { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .now-next-text { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .now-play { border: 0; background: none; cursor: pointer; font-size: .85rem; padding: 2px 6px; margin-left: 6px; border-radius: 6px; opacity: .5; vertical-align: middle; }
+  .now-play:hover { opacity: 1; background: var(--surface-2); }
   .nav-drag { width: 22px; height: 26px; margin-left: auto; font-size: .9rem; opacity: 0; transition: opacity .12s; }
   .nav-sub:hover .nav-drag, body.pg-drag-on .nav-drag { opacity: .8; }
   @media (hover: none) { .nav-drag { opacity: .6; } }
@@ -1169,6 +1178,7 @@ function normalizeTodo(raw = {}) {
     done: !!raw.done,
     priority: !!raw.priority, // 🔥 = shows on the Priority page
     today: false, // the 📅 Today section was removed
+    now: Number(raw.now) || 0, // ⚡ "abhi yahi kar raha hoon" — when you started it
     doneAt: Number(raw.doneAt) || null,
     doneBy: normPerson(raw.doneBy),
     by: normPerson(raw.by),
@@ -1772,6 +1782,46 @@ const weekActions = {
   },
 };
 
+/* ----- ⚡ Abhi kar raha hoon: one task you're doing right now + the next one ----- */
+const nowTask = () => state.todos.filter(t => t.now && !t.done).sort((a, b) => b.now - a.now)[0] || null;
+function dashNowCard(upNext) {
+  const t = nowTask();
+  const next = [...upNext].reverse().find(x => !t || x.id !== t.id) || null;
+  const where = t && t.parentId && state.todos.find(x => x.id === t.parentId);
+  return `<section class="card dash-now" data-drop-now="1" title="Koi bhi task yahan chhodo = abhi yahi kar raha hoon">
+      <span class="dash-cur-label">⚡ Abhi kar raha hoon</span>
+      ${t ? `<div class="now-task">
+          <div style="flex:1;min-width:0"><div class="now-title">${esc(t.text)}</div>${where ? `<div class="muted small">${esc(where.text.replace(/^⏭️\s*/, '⏭️ ').slice(0, 60))} me</div>` : ''}</div>
+          <button class="btn primary small-btn" data-action="now-done" data-id="${t.id}">✓ Ho gaya</button>
+          <button class="icon-btn" data-action="now-clear" aria-label="Hatao" title="Abhi wala hatao">✕</button>
+        </div>`
+        : '<p class="muted small" style="margin:6px 0">Kuch shuru nahi kiya. Kisi project / Up next pe <b>▶️</b> dabao, ya ⠿ se task yahan chhodo.</p>'}
+      ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span>
+          <button class="btn small-btn" data-action="set-now" data-id="${next.id}">▶️ Shuru karo</button></div>` : ''}
+    </section>`;
+}
+function setNow(id) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t) return;
+  const now = Date.now();
+  state.todos.forEach(x => { if (x.now && x !== t) { x.now = 0; x.updatedAt = now; } });
+  t.now = now; t.updatedAt = now;
+  if (t.done) { t.done = false; t.doneAt = null; }
+  saveState(); render();
+  toast(`⚡ Abhi: ${t.text.slice(0, 40)}`);
+}
+const nowActions = {
+  'set-now'(el) { setNow(el.dataset.id); },
+  'now-clear'() { const t = nowTask(); if (t) { t.now = 0; t.updatedAt = Date.now(); saveState(); render(); } },
+  'now-done'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    t.done = true; t.doneAt = Date.now(); t.doneBy = myRef(); t.now = 0; t.updatedAt = Date.now();
+    saveState(); render();
+    toast('✅ Ho gaya! Ab Next pe ▶️ dabao');
+  },
+};
+
 // Dashboard: what you're working on now (every open 🎯 Current Project task, with % done and next step).
 function dashCurrentCard() {
   const ids = new Set(state.todos.map(t => t.id));
@@ -1783,7 +1833,7 @@ function dashCurrentCard() {
     const steps = descendantsOf(t.id);
     const next = steps.find(x => !x.done);
     return `<a class="dash-cur-row${i === 0 ? ' main' : ''}" href="#/current" data-drop-todo="${t.id}" title="Inbox se task yahan chhodo = is project ka step">
-      <span class="dash-cur-name">${esc(t.text)}</span>
+      <span class="dash-cur-name">${esc(t.text)}<button class="now-play" data-action="set-now" data-id="${(next || t).id}" title="Abhi yahi kar raha hoon${next ? ' (agla step)' : ''}">▶️</button></span>
       ${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}
       ${steps.length ? `${progressLine(steps)}${next ? `<span class="muted small">👉 Agla step: <b>${esc(next.text)}</b></span>` : ''}` : ''}
     </a>`;
@@ -1794,9 +1844,10 @@ function dashCurrentCard() {
     </section>
     <section class="card dash-upnext-box" data-drop-todo="${UP_NEXT}">
       <div class="row-between"><span class="dash-cur-label">⏭️ Up next${upNext.length ? ` · ${upNext.length}` : ''}</span><a class="muted small" href="#/current">Kholo ›</a></div>
-      ${upNext.length ? `<ul class="upnext-list">${[...upNext].reverse().map(x => `<li class="upnext-item"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke Current Project pe chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span>${esc(x.text)}</span></li>`).join('')}</ul>` : ''}
+      ${upNext.length ? `<ul class="upnext-list">${[...upNext].reverse().map(x => `<li class="upnext-item"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke Current Project pe chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span style="flex:1">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button></li>`).join('')}</ul>` : ''}
       <div class="upnext-drop">⠿ Inbox se task yahan chhodo → Up next · Up next ka ⠿ upar Current Project pe chhodo → wahi current ban jayega</div>
-    </section>`;
+    </section>
+    ${dashNowCard(upNext)}`;
 }
 
 // Tasks from other lists marked ☀️ for today.
@@ -4456,7 +4507,7 @@ function moveTodoTo(id, target) {
 // Where a dragged task can land: a list (sidebar), another task (→ inside it), or an Earning page (sidebar / cards).
 function tdDropTarget(x, y) {
   const el = document.elementFromPoint(x, y);
-  const t = el && el.closest('[data-drop-list],[data-drop-todo],[data-drop-page]');
+  const t = el && el.closest('[data-drop-now],[data-drop-list],[data-drop-todo],[data-drop-page]');
   if (!t || !tdDrag) return null;
   if (t.dataset.dropTodo) { // not onto itself or anything inside it
     const skip = new Set([tdDrag.id, ...descendantsOf(tdDrag.id).map(x => x.id)]);
@@ -4507,7 +4558,8 @@ function endTdDrag(e, cancel) {
   if (!d.moved) return;
   tdJustDragged = Date.now();
   if (cancel || !d.over) return;
-  if (d.over.dataset.dropTodo) moveTodoInto(d.id, d.over.dataset.dropTodo); // → sub-task of that task
+  if (d.over.dataset.dropNow) setNow(d.id); // → ⚡ abhi yahi kar raha hoon
+  else if (d.over.dataset.dropTodo) moveTodoInto(d.id, d.over.dataset.dropTodo); // → sub-task of that task
   else if (d.over.dataset.dropPage) moveTodoToEarn(d.id, d.over.dataset.dropPage); // → into that Earning page
   else moveTodoTo(d.id, d.over.dataset.dropList);
 }
@@ -6071,7 +6123,7 @@ const actions = {
   },
 };
 
-Object.assign(actions, extraActions, weekActions, cutActions, { 'pc-link': pcLinkAction, 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
+Object.assign(actions, extraActions, weekActions, cutActions, nowActions, { 'pc-link': pcLinkAction, 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
 // Idea page checklist
 Object.assign(actions, {
   'toggle-done-list'(el) {
@@ -6126,6 +6178,7 @@ function renderTodoPanel() {
         <button class="todo-check${t.done ? ' on' : ''}" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
         <span class="tp-place">${parent ? `<a href="#" data-action="open-todo" data-id="${parent.id}">‹ ${esc(parent.text.slice(0, 30))}</a>` : esc(listName(t.folder))}</span>
         ${prioButton(t)}${todayButton(t)}${currentButton(t)}
+        <button class="icon-btn" data-action="set-now" data-id="${t.id}" aria-label="Abhi yahi kar raha hoon" title="⚡ Abhi yahi kar raha hoon">▶️</button>
         <button class="icon-btn" data-action="close-todo" aria-label="Band karo" title="Band karo (Esc)">✕</button>
       </div>
       <textarea id="tp-title" class="tp-title" data-id="${t.id}" rows="1" maxlength="500" aria-label="Task ka naam">${esc(t.text)}</textarea>
@@ -6622,7 +6675,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12b';
+const APP_VERSION = '2026-11-12c';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
