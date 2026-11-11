@@ -15,3 +15,9 @@ sm planning/
 
 # private Earning backups
 backup-earning-*.json
+
+# PC app (Electron) build files
+pc-app/node_modules/
+pc-app/dist/
+pc-app/icon.ico
+pc-app/icon.png

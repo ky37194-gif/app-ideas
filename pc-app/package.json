@@ -1,0 +1,17 @@
+{
+  "name": "app-ideas-pc",
+  "productName": "App Ideas",
+  "version": "1.0.0",
+  "description": "App Ideas Tracker for Windows — opens the live site in its own window, Alt+I quick Inbox popup",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "icon": "node make-icon.cjs",
+    "pack": "node make-icon.cjs && electron-packager . \"App Ideas\" --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico --ignore=^/dist --ignore=^/install.ps1"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^33.2.0"
+  }
+}
