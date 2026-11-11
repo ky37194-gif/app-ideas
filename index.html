@@ -3220,6 +3220,13 @@ async function savePop(form) {
   state.todos.push(normalizeTodo({ text, desc: form.elements.desc.value.trim(), images: popPics.splice(0), folder: INBOX, by: myRef() }));
   document.getElementById('pop-pics').innerHTML = '';
   saveState(true); // sync right now (below), not after the usual delay
+  if (!cloud.code) { // not logged in on this device yet → keep it here; it uploads when you log in
+    msg.textContent = '✅ Save ho gaya';
+    form.reset();
+    delete form.dataset.busy;
+    setTimeout(() => { window.close(); msg.textContent = ''; }, 350);
+    return;
+  }
   msg.textContent = '☁️ Saving…';
   clearTimeout(syncState.timer);
   for (let i = 0; syncState.running && i < 60; i++) await new Promise(r => setTimeout(r, 150)); // the start-up sync may still be running
@@ -5603,15 +5610,13 @@ function render() {
   document.body.classList.remove('panel-open');
 
   if (page === 'pcauth') { app.innerHTML = renderPcAuth(id, parseRoute().extra); document.title = 'PC app me login'; mountPcAuth(id, parseRoute().extra); return; }
-  if (page === 'pop' && !cloud.code) {
-    // Alt+I before logging in on this device: say so plainly instead of a squeezed login page.
+  if (page === 'pop') {
+    // Tiny Alt+I window: type → Enter → straight into 📥 Inbox, then it closes.
+    // Works even before you log in on this device: the note is kept here and syncs once you log in.
     document.body.classList.add('pop-mode');
+    app.innerHTML = renderPop();
     document.title = '⚡ Inbox me likho';
-    app.innerHTML = `<div class="pop" style="text-align:center;align-content:center">
-      <div style="font-size:1.8rem">🔒</div>
-      <b>Pehle is PC app me ek baar login karo</b>
-      <span class="muted small">Uske baad Alt+I se seedha Inbox me likh paoge.</span>
-      <button class="btn primary" data-action="pop-open-main" style="justify-self:center">App Ideas kholo</button></div>`;
+    document.getElementById('pop-text')?.focus();
     return;
   }
   if (!cloud.code) {
@@ -6528,7 +6533,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11s';
+const APP_VERSION = '2026-11-11t';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
