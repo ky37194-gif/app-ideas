@@ -155,6 +155,49 @@ app.on('second-instance', () => showMain());
 // Alt+I popup asked for the main window (e.g. to log in first).
 ipcMain.on('show-main', () => { showMain(); if (pop && !pop.isDestroyed()) pop.close(); });
 
+// 🔗 Copy the login from your browser: open the site there (where App Ideas is already logged in);
+// that page posts its sync code back to this app on 127.0.0.1, checked with a one-time state value.
+let linkWait = null;
+ipcMain.handle('link-login', () => {
+  if (linkWait) linkWait.cancel();
+  return new Promise((resolve) => {
+    const state = crypto.randomBytes(16).toString('hex');
+    let done = false;
+    const finish = (data) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      linkWait = null;
+      setTimeout(() => server.close(), 300);
+      if (data) showMain();
+      resolve(data || null);
+    };
+    const page = (ok) => `<!doctype html><meta charset="utf-8"><title>PC app</title>
+      <body style="margin:0;height:100vh;display:grid;place-items:center;background:#0e1013;color:#e8eaee;font:16px 'Segoe UI',sans-serif;text-align:center">
+      <div><div style="font-size:44px">${ok ? '✅' : '❌'}</div><h2>${ok ? 'PC app me login ho gaya' : 'Login nahi hua'}</h2>
+      <p style="color:#8d94a0">${ok ? 'Ye tab band kar sakte ho — App Ideas khul gaya hai.' : 'PC app se dobara try karo.'}</p></div>
+      <script>setTimeout(() => window.close(), 1500)</script></body>`;
+    const server = http.createServer((req, res) => {
+      if (req.method !== 'POST' || !req.url.startsWith('/link')) { res.writeHead(404); res.end(); return; }
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 20000) req.destroy(); });
+      req.on('end', () => {
+        const form = new URLSearchParams(body);
+        const ok = form.get('state') === state && /^[a-f0-9]{64}$/.test(form.get('code') || '');
+        res.writeHead(ok ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(page(ok));
+        if (ok) finish({ code: form.get('code'), google: form.get('google'), account: form.get('account'), earnCode: form.get('earnCode'), earnId: form.get('earnId') });
+      });
+    });
+    const timer = setTimeout(() => finish(null), 5 * 60 * 1000);
+    linkWait = { cancel: () => finish(null) };
+    server.on('error', () => finish(null));
+    server.listen(0, '127.0.0.1', () => {
+      shell.openExternal(`${SITE}#/pclink/${server.address().port}/${state}`);
+    });
+  });
+});
+
 // 🔐 Google login without typing a password: open the site in your normal browser (already signed in to Google),
 // you pick your account there, and the page posts Google's answer back to this app on 127.0.0.1.
 let googleWait = null;

@@ -777,7 +777,9 @@
   }
   .dash-upnext-box { display: grid; gap: 8px; }
   .upnext-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .upnext-list li { display: flex; align-items: center; gap: 10px; font-size: .92rem; }
+  .upnext-list li { display: flex; align-items: center; gap: 8px; font-size: .92rem; }
+  .upnext-list .todo-drag { width: 22px; height: 26px; margin: 0; }
+  .dash-current.drop-hover { outline: 2px dashed var(--primary); outline-offset: 2px; }
   .upnext-list .todo-check { width: 22px; height: 22px; border-radius: 6px; }
   .upnext-drop { border: 1.5px dashed var(--border); border-radius: 10px; padding: 10px; text-align: center; font-size: .8rem; color: var(--muted); }
   body.todo-drag-on .upnext-drop, body.todo-drag-on .dash-cur-row { border-color: var(--primary); }
@@ -1373,7 +1375,6 @@ function bottomNav(active) {
     <nav class="bottom-nav" aria-label="Main">
       <button type="button" class="nav-search pc-only" data-action="open-search">🔍 <span>Search…</span><kbd>Ctrl K</kbd></button>
       <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard" data-drop-list="inbox"><span class="ico">📊</span>Dashboard + Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
-      <a class="nav-item pc-only ${active === CURRENT ? 'active' : ''}" href="#/current" data-drop-list="current"><span class="ico">🎯</span>Current Project</a>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       ${canEarn() ? `<a class="nav-item ${active === 'earn' && !parseRoute().id ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>${earnNavSubs()}` : ''}
       ${earnCloud.code && findPage(CAT_PASSION) ? '' /* both live under ❤️ Passion + Earning in the Earning list */ : `
@@ -1503,6 +1504,8 @@ function renderJoin() {
         <div style="font-size:3rem">👋</div>
         <h2 style="margin:0">Namaste${me.name ? ' ' + esc(fullName(me.name)) : ''}!</h2>
         ${!me.name ? `<p class="small" style="margin:0">Aap kaun ho?</p><div class="btn-row" style="justify-content:center">${whoAmIButtons()}</div>` : ''}
+        ${window.appIdeasPC?.linkLogin ? `<button class="btn primary block" data-action="pc-link" style="min-height:52px;font-size:1.02rem">🔗 Browser wala login yahan le aao (1 click)</button>
+          <p class="muted small" style="margin:-4px 0 0">Jis browser me App Ideas khula hai, wahi login PC app me aa jayega — code type nahi karna.</p><div class="or-line">ya</div>` : ''}
         ${GOOGLE_CLIENT_ID ? `<div class="g-wrap"><div class="g-btn" data-gtext="signin_with"></div><p class="muted small" style="margin:6px 0 0">Naya phone/PC? Google se login karo — saara data wapas aa jayega.</p></div><div class="or-line">ya</div>` : ''}
         ${ui.codeLogin ? `
           <p class="muted" style="margin:0">🔒 Site kholne ke liye <b>code</b> daalo (Kuldeep se pucho).</p>
@@ -1782,14 +1785,14 @@ function dashCurrentCard() {
       ${steps.length ? `${progressLine(steps)}${next ? `<span class="muted small">👉 Agla step: <b>${esc(next.text)}</b></span>` : ''}` : ''}
     </a>`;
   }).join('');
-  return `<section class="card dash-current">
+  return `<section class="card dash-current" data-drop-list="current" title="Up next / Inbox se task yahan chhodo = naya current project">
       <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
       ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Kisi task pe <b>🎯</b> dabao, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
     </section>
     <section class="card dash-upnext-box" data-drop-todo="${UP_NEXT}">
       <div class="row-between"><span class="dash-cur-label">⏭️ Up next${upNext.length ? ` · ${upNext.length}` : ''}</span><a class="muted small" href="#/current">Kholo ›</a></div>
-      ${upNext.length ? `<ul class="upnext-list">${[...upNext].reverse().map(x => `<li><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span>${esc(x.text)}</span></li>`).join('')}</ul>` : ''}
-      <div class="upnext-drop">⠿ Inbox se koi bhi task pakad ke yahan chhodo → Up next me</div>
+      ${upNext.length ? `<ul class="upnext-list">${[...upNext].reverse().map(x => `<li class="upnext-item"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke Current Project pe chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span>${esc(x.text)}</span></li>`).join('')}</ul>` : ''}
+      <div class="upnext-drop">⠿ Inbox se task yahan chhodo → Up next · Up next ka ⠿ upar Current Project pe chhodo → wahi current ban jayega</div>
     </section>`;
 }
 
@@ -5072,6 +5075,44 @@ const pcGoogleAction = async () => {
   } catch (err) { toast('❌ ' + (err.message || err)); }
 };
 
+/* ----- #/pclink/<port>/<state>: the PC app asks this browser for its login ----- */
+function renderPcLink(port, state) {
+  const ok = /^[0-9]{2,5}$/.test(port || '') && /^[a-f0-9]{16,64}$/.test(state || '');
+  const logged = !!cloud.code;
+  return `<main class="page" style="max-width:460px;margin-top:10vh">
+    <div class="card" style="text-align:center;display:grid;gap:12px;justify-items:center;padding:28px 22px">
+      <div style="font-size:2.6rem">${!ok ? '❌' : logged ? '💻' : '🔒'}</div>
+      <h2 style="margin:0">${!ok ? 'Galat link' : logged ? 'PC app me login bhej rahe hain…' : 'Is browser me App Ideas login nahi hai'}</h2>
+      <p class="muted" style="margin:0">${!ok ? 'PC app se dobara try karo.' : logged ? 'Bas ek second — phir ye tab band kar sakte ho.' : 'Jis browser me App Ideas khula hota hai (jaise Edge), usme ye link kholo — ya PC app me code se login karo.'}</p>
+    </div></main>`;
+}
+function sendPcLink(port, state) {
+  if (!cloud.code || !/^[0-9]{2,5}$/.test(port || '') || !/^[a-f0-9]{16,64}$/.test(state || '')) return;
+  const fields = { state, code: cloud.code, google: cloud.google || '', account: cloud.account || '', earnCode: earnCloud.code || '', earnId: earnCloud.id || '' };
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `http://127.0.0.1:${port}/link`;
+  Object.entries(fields).forEach(([k, v]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = v; form.appendChild(i); });
+  document.body.appendChild(form);
+  form.submit();
+}
+const pcLinkAction = async () => {
+  toast('🌐 Browser khul raha hai — login apne aap aa jayega');
+  try {
+    const r = await window.appIdeasPC.linkLogin();
+    if (!r || !r.code) { toast('Login nahi aaya — browser me App Ideas login hai na?'); return; }
+    cloud = { code: r.code, verified: true, account: r.account || undefined, google: r.google || undefined };
+    writeJSON(CLOUD_KEY, cloud);
+    if (r.earnCode && canEarn()) { earnCloud = { code: r.earnCode, id: r.earnId || undefined }; writeJSON(EARN_CLOUD_KEY, earnCloud); }
+    toast('✅ PC app me login ho gaya — data aa raha hai');
+    render();
+    await syncNow();
+    if (earnCloud.code) await earnSyncNow();
+    location.hash = '#/dashboard';
+    render();
+  } catch (err) { toast('❌ ' + (err.message || err)); }
+};
+
 /* ----- #/pcauth/<port>/<state>: opened in your normal browser by the PC app ----- */
 function renderPcAuth(port, state) {
   return `<main class="page" style="max-width:460px;margin-top:10vh">
@@ -5399,7 +5440,6 @@ function drawerList() {
       </a>`).join('') : '<p class="muted small" style="margin:4px 8px">Abhi khaali.</p>');
     }).join('') : '<p class="muted small" style="margin:8px">Abhi koi idea nahi hai.</p>'}
     <h3>📋 Lists</h3>
-    <a class="drawer-item" href="#/current"><span class="name">🎯 Current Project</span><span class="meta">${esc(currentFocus()?.text.slice(0, 22) || '')}</span></a>
     <a class="drawer-item" href="#/appwork"><span class="name">🛠️ Pending in this App</span><span class="meta">${openTodos(APPWORK) || ''}</span></a>
     <a class="drawer-item" href="#/doubts"><span class="name">❓ Doubts &amp; To Know</span><span class="meta">${openTodos(DOUBTS) || ''}</span></a>
     <h3>🧰 Misc to-do (${openTodos()} baaki)</h3>
@@ -5544,6 +5584,9 @@ const currentIdeaId = () => parseRoute().id;
 
 // One-time: the old side-hustle folder name → a clearer one. Once you rename it yourself, this never touches it again.
 function renameSideHustle() {
+  // The 💸 Earning category holds apps, websites, extensions, e-books, notes, Pinterest, affiliate… → a clearer name (once).
+  const cat = earnCloud.code && findPage(CAT_EARN);
+  if (cat && cat.title.trim() === 'Earning') { cat.title = 'Digital Business'; cat.icon = '💼'; cat.updatedAt = Date.now(); saveEarn(); }
   const p = earnCloud.code && findPage('side-hustle');
   if (!p || p.title.trim() !== 'Bana ke Becho') return;
   p.title = 'Digital Products';
@@ -5578,7 +5621,7 @@ function earnCategorize() {
     if (!findPage(id)) earn.pages.push(normalizePage({ id, icon, title, parentId, order, createdAt: now, updatedAt: now }));
     return findPage(id);
   };
-  make(CAT_EARN, '💸', 'Earning', null, 0);
+  make(CAT_EARN, '💼', 'Digital Business', null, 0);
   make(CAT_PASSION, '❤️', 'Passion + Earning', null, 1);
   EARN_CATS.forEach(([id, icon, title], i) => make(id, icon, title, CAT_EARN, i));
   PASSION_CATS.forEach(([id, icon, title], i) => make(id, icon, title, CAT_PASSION, i));
@@ -5610,6 +5653,7 @@ function render() {
   document.body.classList.remove('panel-open');
 
   if (page === 'pcauth') { app.innerHTML = renderPcAuth(id, parseRoute().extra); document.title = 'PC app me login'; mountPcAuth(id, parseRoute().extra); return; }
+  if (page === 'pclink') { app.innerHTML = renderPcLink(id, parseRoute().extra); document.title = 'PC app me login'; setTimeout(() => sendPcLink(id, parseRoute().extra), 300); return; }
   if (page === 'pop') {
     // Tiny Alt+I window: type → Enter → straight into 📥 Inbox, then it closes.
     // Works even before you log in on this device: the note is kept here and syncs once you log in.
@@ -5982,7 +6026,7 @@ const actions = {
   },
 };
 
-Object.assign(actions, extraActions, weekActions, cutActions, { 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
+Object.assign(actions, extraActions, weekActions, cutActions, { 'pc-link': pcLinkAction, 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
 // Idea page checklist
 Object.assign(actions, {
   'toggle-done-list'(el) {
@@ -6533,7 +6577,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11t';
+const APP_VERSION = '2026-11-11x';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
