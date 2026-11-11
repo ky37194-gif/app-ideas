@@ -14,9 +14,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SDK="${ANDROID_HOME:-D:/dev/android}"
-BT="$SDK/build-tools/36.0.0"
-JAR="$SDK/platforms/android-35/android.jar"
+SDK="${ANDROID_HOME:-C:/Android/Sdk}"
+# Newest installed build-tools / platform
+BT="$SDK/build-tools/$(ls "$SDK/build-tools" | sort -V | tail -1)"
+JAR="$SDK/platforms/$(ls "$SDK/platforms" | sort -V | tail -1)/android.jar"
+# A JDK for javac / java: $JAVA_HOME, else D:/dev/jdk21
+JDK="${JAVA_HOME:-D:/dev/jdk21}"; export PATH="$(cygpath -u "$JDK" 2>/dev/null || echo "$JDK")/bin:$PATH"
 ADB="$SDK/platform-tools/adb.exe"
 VERSION_CODE="${VERSION_CODE:-$(date +%s | cut -c1-9)}"   # grows every build, so updates install cleanly
 

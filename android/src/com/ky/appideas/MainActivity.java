@@ -1,6 +1,8 @@
 package com.ky.appideas;
 
 import android.app.Activity;
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ContentValues;
@@ -43,11 +45,10 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         // Match status/navigation bar colours to the app's light/dark theme.
-        boolean night = (getResources().getConfiguration().uiMode
-                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        int bg = night ? 0xFF0B0F1A : 0xFFF5F6FB;
+        boolean night = true; // the app is always dark now
+        int bg = night ? 0xFF0E1013 : 0xFFF5F6FB;
         getWindow().setStatusBarColor(bg);
-        getWindow().setNavigationBarColor(night ? 0xFF141A29 : 0xFFFFFFFF);
+        getWindow().setNavigationBarColor(night ? 0xFF16191E : 0xFFFFFFFF);
         if (!night) {
             getWindow().getDecorView().setSystemUiVisibility(
                     View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
@@ -94,6 +95,7 @@ public class MainActivity extends Activity {
             }
         });
 
+        maybePinWidget(getIntent());
         web.loadUrl(BASE_URL + hashFor(getIntent()));
     }
 
@@ -102,6 +104,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        maybePinWidget(intent);
         String hash = hashFor(intent);
         if (!hash.isEmpty() && web != null) {
             web.evaluateJavascript("location.hash='" + hash + "';setTimeout(function(){try{render()}catch(e){}},60);", null);
@@ -113,7 +116,17 @@ public class MainActivity extends Activity {
         Uri d = intent == null ? null : intent.getData();
         if (d == null || !"appideas".equals(d.getScheme())) return "";
         String page = d.getLastPathSegment();
-        return "quick".equals(page) || "inbox".equals(page) ? "#/" + page : "";
+        return "quick".equals(page) ? "#/quick" : "inbox".equals(page) ? "#/dashboard" : "";
+    }
+
+    // appideas://open/pin-widget → Android asks "Add the App Ideas widget to the home screen?"
+    private void maybePinWidget(Intent intent) {
+        Uri d = intent == null ? null : intent.getData();
+        if (d == null || !"appideas".equals(d.getScheme()) || !"pin-widget".equals(d.getLastPathSegment())) return;
+        AppWidgetManager mgr = getSystemService(AppWidgetManager.class);
+        if (mgr != null && mgr.isRequestPinAppWidgetSupported()) {
+            mgr.requestPinAppWidget(new ComponentName(this, QuickWidget.class), null, null);
+        }
     }
 
     @Override

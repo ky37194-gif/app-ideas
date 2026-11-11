@@ -799,8 +799,17 @@
   @media (min-width: 1000px) {
     /* Each side scrolls on its own: wherever the mouse is, only that column moves */
     .dash-page { padding-top: 12px; padding-bottom: 0; }
-    .dash-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: calc(100dvh - 76px); }
+    .dash-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: calc(100dvh - 90px); }
     .dash-left, .dash-right { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 40px 2px; scrollbar-width: thin; }
+    body.dash-mode { overflow: hidden; padding-bottom: 0; } /* the page itself never scrolls here */
+  }
+  /* Smooth feel: a new page fades in, buttons / cards ease, scrolling glides */
+  @media (prefers-reduced-motion: no-preference) {
+    html, .dash-left, .dash-right, #todo-panel { scroll-behavior: smooth; }
+    main.route-in { animation: routeIn .18s ease-out; }
+    @keyframes routeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .btn, .icon-btn, .chip, .todo-check, .nav-item, .nav-sub, .card, .todo { transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .12s, opacity .15s; }
+    .btn:active, .icon-btn:active, .todo-check:active { transform: scale(.96); }
   }
   .dash-upnext-box { display: grid; gap: 8px; }
   .upnext-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -1937,12 +1946,12 @@ function dashCurrentCard() {
       ${addBox(t.id, '＋ Step likho… Enter')}
     </div>`;
   }).join('');
-  return `${dashNowCard(upNext)}
-    <section class="card dash-current" data-drop-list="current" title="Up next / Inbox se task yahan chhodo = naya current project">
+  return `<section class="card dash-current" data-drop-list="current" title="Up next / Inbox se task yahan chhodo = naya current project">
       <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
       ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Neeche likho, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
       ${addBox('', '＋ Naya current project… Enter', CURRENT)}
     </section>
+    ${dashNowCard(upNext)}
     <section class="card dash-upnext-box" data-drop-todo="${UP_NEXT}">
       <div class="row-between"><span class="dash-cur-label">⏭️ Up next${upNext.length ? ` · ${upNext.length}` : ''}</span><a class="muted small" href="#/current">Kholo ›</a></div>
       ${upNext.length ? `<ul class="upnext-list">${upNext.map(x => line(x)).join('')}</ul>` : ''}
@@ -5942,7 +5951,23 @@ function render() {
   mountTodoPanel(panelScroll);
   document.title = page === 'idea' && findIdea(id) ? `${findIdea(id).name} · App Ideas` : page === 'earn' ? '💰 Earning' : page === 'sm' ? '📱 SM Planner' : LISTS[page] ? LISTS[page].title : 'App Ideas Tracker';
   animateBars();
+  // Smooth: a redraw on the same page keeps where you had scrolled; a new page fades in.
+  document.body.classList.toggle('dash-mode', page === 'dashboard');
+  const routeKey = location.hash;
+  if (routeKey === lastRouteKey) {
+    keptScroll.forEach((top, sel) => { const el = document.querySelector(sel); if (el) el.scrollTop = top; });
+  } else {
+    app.querySelector('main')?.classList.add('route-in');
+  }
+  lastRouteKey = routeKey;
 }
+// Columns that scroll on their own (Dashboard) — remember their position across redraws.
+let lastRouteKey = '';
+const keptScroll = new Map();
+document.addEventListener('scroll', e => {
+  const el = e.target;
+  if (el && el.classList && (el.classList.contains('dash-left') || el.classList.contains('dash-right'))) keptScroll.set('.' + [...el.classList].find(c => c.startsWith('dash-')), el.scrollTop);
+}, true);
 
 window.addEventListener('hashchange', () => {
   ui.openTodo = null;
@@ -6790,7 +6815,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12h';
+const APP_VERSION = '2026-11-12i';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
