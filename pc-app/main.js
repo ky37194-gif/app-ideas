@@ -135,6 +135,7 @@ function trayMenu() {
     { label: `⚡ Inbox me likho${hotkey ? `   (${hotkey})` : ''}`, click: openPop },
     { label: '📥 Inbox', click: () => showMain('#/inbox') },
     { label: '🎯 Current Project', click: () => showMain('#/current') },
+    { label: '👤 Account / Google login', click: () => showMain('#/account') },
     { type: 'separator' },
     { label: 'PC on hote hi chalu karo (Alt+I hamesha chale)', type: 'checkbox', checked: login,
       click: (m) => { app.setLoginItemSettings({ openAtLogin: m.checked, args: ['--hidden'] }); tray.setContextMenu(trayMenu()); } },

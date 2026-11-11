@@ -731,6 +731,9 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  .acc-card { display: flex; align-items: center; gap: 14px; }
+  .acc-avatar { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.4rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 40%, #ec4899)); color: #fff; }
   .g-pc { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border-radius: 99px; font-weight: 700; }
   .g-logo { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #fff; color: #4285f4; font-weight: 900; font-family: Arial, sans-serif; }
   .cut-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 10px 8px 14px; border-radius: 12px;
@@ -1351,6 +1354,7 @@ function bottomNav(active) {
       <a class="nav-item pc-only ${active === 'week' ? 'active' : ''}" href="#/week"><span class="ico">🗓️</span>YT &amp; IG plan</a>`}
       <a class="nav-item pc-only ${active === 'doubts' ? 'active' : ''}" href="#/doubts" data-drop-list="doubts"><span class="ico">❓</span>Doubts &amp; To Know<span class="nav-count">${openTodos(DOUBTS) || ''}</span></a>
       <a class="nav-item pc-only ${active === APPWORK ? 'active' : ''}" href="#/appwork" data-drop-list="appwork"><span class="ico">🛠️</span>Pending in this App<span class="nav-count">${openTodos(APPWORK) || ''}</span></a>
+      <a class="nav-item pc-only ${active === 'account' ? 'active' : ''}" href="#/account"><span class="ico">👤</span>Account / Login${cloud.google ? '' : '<span class="nav-count">!</span>'}</a>
     </nav>`;
 }
 
@@ -2959,6 +2963,38 @@ function passwordForm() {
 }
 
 // Card on the Dashboard.
+/* ----- 👤 Account / Login: who you're logged in as, Google (1 click), Earning lock, logout ----- */
+function renderAccount() {
+  const g = cloud.google;
+  return `
+    ${topBar('👤 Account / Login')}
+    <main class="page" style="max-width:720px">
+      <section class="card acc-card">
+        <div class="acc-avatar">${g ? esc(g[0].toUpperCase()) : '👤'}</div>
+        <div style="flex:1;min-width:0">
+          <b>${g ? esc(g) : cloud.account ? 'ID: ' + esc(cloud.account) : 'Code se login'}</b>
+          <div class="muted small">${g ? '🔐 Google se juda hai — kisi bhi device pe ek click me login' : 'Abhi Google se nahi juda'}</div>
+        </div>
+      </section>
+
+      <h2 class="section-title">🔐 Google se login</h2>
+      <div class="card">${GOOGLE_CLIENT_ID ? googleSection() : '<p class="muted small" style="margin:0">Google login abhi set nahi hua.</p>'}</div>
+
+      ${canEarn() ? `<h2 class="section-title">💰 Earning</h2>
+      <div class="card row-between" style="gap:10px;flex-wrap:wrap">
+        <span>${earnCloud.code ? '🔓 Earning khula hai' + (cloud.googleEarn ? ' · Google se juda' : '') : '🔒 Earning locked hai'}</span>
+        <span class="btn-row">${earnCloud.code
+          ? '<button class="btn" data-action="earn-creds">🔑 ID / password</button><button class="btn" data-action="earn-lock">🔒 Lock karo</button>'
+          : '<a class="btn primary" href="#/earn">🔓 Unlock karo</a>'}</span>
+      </div>` : ''}
+
+      <h2 class="section-title">☁️ Sync</h2>
+      ${renderSyncCard()}
+      <p class="muted small" style="margin:10px 2px 0"><b>Disconnect</b> = is device se logout. Data cloud me safe rehta hai — dobara Google / code se login karte hi wapas aa jata hai.</p>
+    </main>
+    ${bottomNav('account')}`;
+}
+
 function renderSyncCard() {
   if (!cloud.code) {
     return `<div class="card" id="sync-card">${passwordForm()}</div>`;
@@ -5345,6 +5381,7 @@ function drawerList() {
     <h3>📥 Inbox (${myInbox().length})</h3>
     <a class="drawer-item" href="#/quick"><span class="name">⚡ Jaldi likho</span></a>
     <a class="drawer-item" href="#/inbox"><span class="name">📥 Inbox kholo</span></a>
+    <a class="drawer-item" href="#/account"><span class="name">👤 Account / Login (Google)</span></a>
     <a class="drawer-item" href="#/week"><span class="name">🗓️ YouTube &amp; Instagram — Hafta plan</span></a>
     ${canEarn() ? `<h3>💰 Earning (private)</h3>` + (earnCloud.code
       ? topEarnPages().map(p => `<a class="drawer-item" href="#/earn/${p.id}"><span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>`).join('')
@@ -5588,6 +5625,8 @@ function render() {
     app.innerHTML = renderQuick();
     document.getElementById('quick-text')?.focus();
     try { window.AndroidBridge?.showKeyboard?.(); } catch { /* older app */ }
+  } else if (page === 'account') {
+    app.innerHTML = renderAccount();
   } else if (page === 'week') {
     app.innerHTML = renderWeek();
   } else if (page === 'inbox') {
@@ -6459,7 +6498,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11n';
+const APP_VERSION = '2026-11-11o';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
