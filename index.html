@@ -797,8 +797,10 @@
   .dash-page { max-width: 1400px; }
   .dash-split { display: grid; gap: 18px; align-items: start; }
   @media (min-width: 1000px) {
-    .dash-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-    .dash-left { position: sticky; top: 76px; }
+    /* Each side scrolls on its own: wherever the mouse is, only that column moves */
+    .dash-page { padding-top: 12px; padding-bottom: 0; }
+    .dash-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: calc(100dvh - 76px); }
+    .dash-left, .dash-right { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 40px 2px; scrollbar-width: thin; }
   }
   .dash-upnext-box { display: grid; gap: 8px; }
   .upnext-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -6788,7 +6790,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12g';
+const APP_VERSION = '2026-11-12h';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
