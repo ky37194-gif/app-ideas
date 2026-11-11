@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#6366f1" />
+<meta name="theme-color" content="#0e1013" />
 <title>App Ideas Tracker</title>
 <link rel="icon" href="icons/icon-192.png" />
 <!-- PWA: lets you "install" the site as an app on your phone, and open it offline -->
@@ -1314,10 +1314,10 @@ function weeklyActivity(idea) {
    ===================================================================== */
 const THEME_ICONS = { system: '🌓', light: '☀️', dark: '🌙', tick: '✔️' };
 
+// Always dark (you asked for it); saved as 'dark' so the Content Planner inside follows too.
 function applyTheme() {
-  const root = document.documentElement;
-  if (state.theme === 'system') root.removeAttribute('data-theme');
-  else root.setAttribute('data-theme', state.theme);
+  if (state.theme !== 'dark') { state.theme = 'dark'; try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ } }
+  document.documentElement.setAttribute('data-theme', 'dark');
 }
 
 function cycleTheme() {
@@ -6622,7 +6622,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12a';
+const APP_VERSION = '2026-11-12b';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
