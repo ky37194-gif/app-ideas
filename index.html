@@ -5587,6 +5587,8 @@ function renameSideHustle() {
   // The 💸 Earning category holds apps, websites, extensions, e-books, notes, Pinterest, affiliate… → a clearer name (once).
   const cat = earnCloud.code && findPage(CAT_EARN);
   if (cat && cat.title.trim() === 'Earning') { cat.title = 'Digital Business'; cat.icon = '💼'; cat.updatedAt = Date.now(); saveEarn(); }
+  const pas = earnCloud.code && findPage(CAT_PASSION);
+  if (pas && pas.title.trim() === 'Passion + Earning') { pas.title = 'Passion Projects'; pas.updatedAt = Date.now(); saveEarn(); }
   const p = earnCloud.code && findPage('side-hustle');
   if (!p || p.title.trim() !== 'Bana ke Becho') return;
   p.title = 'Digital Products';
@@ -5622,7 +5624,7 @@ function earnCategorize() {
     return findPage(id);
   };
   make(CAT_EARN, '💼', 'Digital Business', null, 0);
-  make(CAT_PASSION, '❤️', 'Passion + Earning', null, 1);
+  make(CAT_PASSION, '❤️', 'Passion Projects', null, 1);
   EARN_CATS.forEach(([id, icon, title], i) => make(id, icon, title, CAT_EARN, i));
   PASSION_CATS.forEach(([id, icon, title], i) => make(id, icon, title, CAT_PASSION, i));
   // Every YT channel / IG page from the Content Planner gets its own page.
@@ -6577,7 +6579,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11x';
+const APP_VERSION = '2026-11-11y';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
