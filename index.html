@@ -753,9 +753,14 @@
   .dash-now { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
   .dash-now .dash-cur-label { color: var(--warning); }
   .dash-now.drop-hover { outline: 2px dashed var(--warning); outline-offset: 2px; }
-  .now-task { display: flex; align-items: center; gap: 10px; }
-  .now-title { font-size: 1.15rem; font-weight: 800; line-height: 1.3; }
-  .now-next { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .dash-now > * { min-width: 0; } /* long text never pushes the card wider */
+  .now-task { display: grid; gap: 10px; }
+  .now-main { min-width: 0; }
+  .now-title { font-size: 1.05rem; font-weight: 750; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .now-btns { display: flex; align-items: center; gap: 6px; }
+  .now-btns .btn { min-height: 36px; }
+  .now-next { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); min-width: 0; }
+  .now-next .btn { flex: none; }
   .now-next-text { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .now-play { border: 0; background: none; cursor: pointer; font-size: .85rem; padding: 2px 6px; margin-left: 6px; border-radius: 6px; opacity: .5; vertical-align: middle; }
   .now-play:hover { opacity: 1; background: var(--surface-2); }
@@ -1853,10 +1858,10 @@ function dashNowCard(upNext) {
   return `<section class="card dash-now" data-drop-now="1" title="Koi bhi task yahan chhodo = abhi yahi kar raha hoon">
       <span class="dash-cur-label">⚡ Abhi kar raha hoon</span>
       ${t ? `<div class="now-task">
-          <div style="flex:1;min-width:0"><div class="now-title">${esc(t.text)}</div>${where ? `<div class="muted small">${esc(where.text.replace(/^⏭️\s*/, '⏭️ ').slice(0, 60))} me</div>` : ''}</div>
-          <button class="btn primary small-btn" data-action="now-done" data-id="${t.id}">✓ Ho gaya</button>
+          <div class="now-main"><div class="now-title" title="${esc(t.text)}">${esc(t.text)}</div>${where ? `<div class="muted small">${esc(where.text.replace(/^⏭️\s*/, '⏭️ ').slice(0, 60))} me</div>` : ''}</div>
+          <div class="now-btns"><button class="btn primary small-btn" data-action="now-done" data-id="${t.id}">✓ Ho gaya</button>
           <button class="icon-btn" data-action="send-back" data-id="${t.id}" aria-label="Wapas bhejo" title="Hatao — jahan se aaya tha wahin wapas">↩️</button>
-          <button class="icon-btn" data-action="now-clear" aria-label="Rok do" title="Abhi wala rok do (task wahin rahega)">✕</button>
+          <button class="icon-btn" data-action="now-clear" aria-label="Rok do" title="Abhi wala rok do (task wahin rahega)">✕</button></div>
         </div>`
         : '<p class="muted small" style="margin:6px 0">Kuch shuru nahi kiya. Kisi project / Up next pe <b>▶️</b> dabao, ya ⠿ se task yahan chhodo.</p>'}
       ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span>
@@ -6878,7 +6883,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12j';
+const APP_VERSION = '2026-11-12k';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
