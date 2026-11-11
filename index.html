@@ -31,38 +31,40 @@
   =====================================================================
 -->
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   /* ---------- 1. Design tokens (colours) ---------- */
   /* Light theme is the default. */
   :root {
-    --bg: #f5f6fb;
+    --bg: #f6f7f9;
     --surface: #ffffff;
-    --surface-2: #eef0f6;
-    --text: #0f172a;
-    --muted: #64748b;
-    --border: #e2e6ef;
-    --primary: #6366f1;
+    --surface-2: #f0f2f5;
+    --text: #111827;
+    --muted: #6b7280;
+    --border: #e3e6eb;
+    --primary: #2f6bff;
     --primary-ink: #ffffff;
-    --danger: #e11d48;
+    --danger: #dc2626;
     --success: #16a34a;
     --warning: #d97706;
-    --shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 6px 18px rgba(15, 23, 42, .06);
-    --radius: 18px;
+    --shadow: 0 1px 2px rgba(17, 24, 39, .04), 0 4px 14px rgba(17, 24, 39, .05);
+    --radius: 14px;
     color-scheme: light;
   }
 
   /* Dark theme: used when the phone/PC is in dark mode (unless user forced light) ... */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0b0f1a;
-      --surface: #141a29;
-      --surface-2: #1d2537;
-      --text: #e6eaf3;
-      --muted: #94a0b8;
-      --border: #263049;
-      --primary: #8b8ff8;
-      --primary-ink: #0b0f1a;
-      --danger: #fb7185;
+      --bg: #0e1013;
+      --surface: #16191e;
+      --surface-2: #1e2228;
+      --text: #e8eaee;
+      --muted: #8d94a0;
+      --border: #272c34;
+      --primary: #5b8cff;
+      --primary-ink: #ffffff;
+      --danger: #f87171;
       --success: #4ade80;
       --warning: #fbbf24;
       --shadow: none;
@@ -71,15 +73,15 @@
   }
   /* ... or when the user picks dark mode with the toggle button. */
   :root[data-theme="dark"] {
-    --bg: #0b0f1a;
-    --surface: #141a29;
-    --surface-2: #1d2537;
-    --text: #e6eaf3;
-    --muted: #94a0b8;
-    --border: #263049;
-    --primary: #8b8ff8;
-    --primary-ink: #0b0f1a;
-    --danger: #fb7185;
+    --bg: #0e1013;
+    --surface: #16191e;
+    --surface-2: #1e2228;
+    --text: #e8eaee;
+    --muted: #8d94a0;
+    --border: #272c34;
+    --primary: #5b8cff;
+    --primary-ink: #ffffff;
+    --danger: #f87171;
     --success: #4ade80;
     --warning: #fbbf24;
     --shadow: none;
@@ -92,7 +94,9 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 15.5px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv11", "ss01";
+    letter-spacing: -.005em;
     -webkit-tap-highlight-color: transparent;
     padding-bottom: calc(96px + env(safe-area-inset-bottom));
     transition: background-color .2s;
@@ -731,6 +735,14 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  /* Professional finish: quieter cards, crisp borders, consistent focus ring */
+  .card { box-shadow: var(--shadow); }
+  .btn.primary { box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 1px 2px rgba(0,0,0,.18); }
+  .btn:focus-visible, .icon-btn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary) 70%, transparent); outline-offset: 2px; }
+  .section-title { letter-spacing: -.01em; }
+  .topbar-title { letter-spacing: -.015em; }
+  .nav-item.active, .nav-sub.active { color: var(--text); }
+  .nav-item.active .ico { filter: none; }
   .acc-card { display: flex; align-items: center; gap: 14px; }
   .acc-avatar { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.4rem; font-weight: 800;
     background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 40%, #ec4899)); color: #fff; }
@@ -2917,7 +2929,8 @@ async function syncNow() {
 }
 
 // The real shared list always has Kuldeep's ideas. A wrong code opens an empty (or someone-else) list.
-const isRealList = data => !!data && (data.space === 'K' || (data.ideas || []).some(i => i.owner && i.owner.name === 'K'));
+// (An empty cloud is accepted too: sync moved to a new store on 2026-11-11, so the first device to log in fills it.)
+const isRealList = data => !data || data.space === 'K' || (data.ideas || []).some(i => i.owner && i.owner.name === 'K');
 
 // Turn on sync with a password (same password on every device).
 async function connectWithPassword(password) {
@@ -5590,6 +5603,17 @@ function render() {
   document.body.classList.remove('panel-open');
 
   if (page === 'pcauth') { app.innerHTML = renderPcAuth(id, parseRoute().extra); document.title = 'PC app me login'; mountPcAuth(id, parseRoute().extra); return; }
+  if (page === 'pop' && !cloud.code) {
+    // Alt+I before logging in on this device: say so plainly instead of a squeezed login page.
+    document.body.classList.add('pop-mode');
+    document.title = '⚡ Inbox me likho';
+    app.innerHTML = `<div class="pop" style="text-align:center;align-content:center">
+      <div style="font-size:1.8rem">🔒</div>
+      <b>Pehle is PC app me ek baar login karo</b>
+      <span class="muted small">Uske baad Alt+I se seedha Inbox me likh paoge.</span>
+      <button class="btn primary" data-action="pop-open-main" style="justify-self:center">App Ideas kholo</button></div>`;
+    return;
+  }
   if (!cloud.code) {
     // No code yet → the site stays locked until the right code is typed.
     app.innerHTML = renderJoin();
@@ -5953,7 +5977,7 @@ const actions = {
   },
 };
 
-Object.assign(actions, extraActions, weekActions, cutActions, { 'pc-google': pcGoogleAction }); // Inbox + Earning buttons (Section 11A/11B)
+Object.assign(actions, extraActions, weekActions, cutActions, { 'pc-google': pcGoogleAction, 'pop-open-main'() { if (window.appIdeasPC?.showMain) window.appIdeasPC.showMain(); else location.hash = '#/'; } }); // Inbox + Earning buttons (Section 11A/11B)
 // Idea page checklist
 Object.assign(actions, {
   'toggle-done-list'(el) {
@@ -6504,7 +6528,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11q';
+const APP_VERSION = '2026-11-11s';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {

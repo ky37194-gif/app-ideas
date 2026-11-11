@@ -152,6 +152,8 @@ function createTray() {
 }
 
 app.on('second-instance', () => showMain());
+// Alt+I popup asked for the main window (e.g. to log in first).
+ipcMain.on('show-main', () => { showMain(); if (pop && !pop.isDestroyed()) pop.close(); });
 
 // 🔐 Google login without typing a password: open the site in your normal browser (already signed in to Google),
 // you pick your account there, and the page posts Google's answer back to this app on 127.0.0.1.

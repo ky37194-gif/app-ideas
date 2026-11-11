@@ -19,7 +19,8 @@
     (function () {
       try {
         var saved = JSON.parse(localStorage.getItem('contentPlanner.v1') || '{}');
-        var theme = (saved.settings && saved.settings.theme) || 'system';
+        var mainApp = JSON.parse(localStorage.getItem('appIdeasTracker.v1') || '{}'); // inside App Ideas → use its theme
+        var theme = (mainApp.theme && mainApp.theme !== 'tick' ? mainApp.theme : null) || (saved.settings && saved.settings.theme) || 'system';
         var dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
         if (dark) document.documentElement.classList.add('dark');
       } catch (e) {}
@@ -31,7 +32,13 @@
   <script>
     tailwind.config = {
       darkMode: 'class', // dark mode turns on when <html> has class="dark"
-      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'] } } },
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'] },
+        // Same neutral greys as App Ideas
+        colors: { zinc: { 50: '#f6f7f9', 100: '#f0f2f5', 200: '#e3e6eb', 300: '#cfd4db', 400: '#9aa1ad', 500: '#6b7280', 600: '#4b5260', 700: '#272c34', 800: '#1e2228', 900: '#16191e', 950: '#0e1013' } },
+        // The planner's accent colour (was pink) → App Ideas blue
+        pink: { 50: '#eef3ff', 100: '#dde7ff', 300: '#9db9ff', 400: '#6f97ff', 500: '#3b7bff', 600: '#2f6bff', 700: '#2457d6' },
+      } },
     };
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -185,7 +192,7 @@ const BTN_PRIMARY = BTN + ' bg-zinc-900 text-white dark:bg-white dark:text-zinc-
 const BTN_GHOST = BTN + ' bg-zinc-100 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700';
 const BTN_DANGER = BTN + ' bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400';
 const ICON_BTN = 'inline-grid place-items-center w-11 h-11 rounded-xl text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 active:scale-95 transition';
-const BRAND_GRADIENT = 'linear-gradient(135deg,#ff3b3b,#ec4899 55%,#8b5cf6)';
+const BRAND_GRADIENT = 'linear-gradient(135deg,#3b7bff,#2f6bff 60%,#2457d6)'; // same blue as App Ideas
 
 /* =====================================================================
    2. HELPERS
