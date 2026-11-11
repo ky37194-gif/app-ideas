@@ -735,6 +735,15 @@
   .pop-msg { min-height: 1.2em; font-size: .85rem; font-weight: 600; color: var(--success); }
   .done-toggle { border: 0; background: none; padding: 4px 2px; font: inherit; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; }
   .done-toggle:hover { color: var(--text); }
+  .dash-cur-row { display: grid; gap: 6px; }
+  .dash-cur-head { display: flex; align-items: center; gap: 10px; }
+  .dash-cur-head .todo-check, .dash-steps .todo-check { width: 22px; height: 22px; border-radius: 6px; flex: none; }
+  .dash-cur-name { flex: 1; min-width: 0; cursor: pointer; }
+  .dash-line-text { flex: 1; min-width: 0; cursor: pointer; }
+  .dash-line-text:hover, .dash-cur-name:hover { color: var(--primary); }
+  .dash-steps { margin-left: 4px; }
+  .dash-add-form input { width: 100%; min-height: 36px; padding: 6px 12px; font-size: .9rem; border-radius: 10px; border: 1px dashed var(--border); background: transparent; color: var(--text); }
+  .dash-add-form input:focus { border-style: solid; border-color: var(--primary); background: var(--surface-2); outline: none; }
   .dash-now { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
   .dash-now .dash-cur-label { color: var(--warning); }
   .dash-now.drop-hover { outline: 2px dashed var(--warning); outline-offset: 2px; }
@@ -1810,6 +1819,19 @@ function setNow(id) {
   saveState(); render();
   toast(`⚡ Abhi: ${t.text.slice(0, 40)}`);
 }
+// Dashboard quick-add boxes: new current project, a step inside a project, or an Up next item.
+document.addEventListener('submit', e => {
+  const form = e.target;
+  if (!form.classList || !form.classList.contains('dash-add-form')) return;
+  e.preventDefault();
+  const text = form.elements.text.value.trim();
+  if (!text) return;
+  const parent = form.dataset.parent && state.todos.find(x => x.id === form.dataset.parent);
+  state.todos.push(normalizeTodo(parent ? { text, parentId: parent.id, folder: parent.folder, by: myRef() } : { text, folder: form.dataset.folder || INBOX, by: myRef() }));
+  if (parent) { collapsed.delete(parent.id); saveCollapsed(); }
+  saveState(); render();
+  document.querySelector(`.dash-add-form[data-parent="${form.dataset.parent || ''}"][data-folder="${form.dataset.folder || ''}"] input`)?.focus(); // keep adding
+});
 const nowActions = {
   'set-now'(el) { setNow(el.dataset.id); },
   'now-clear'() { const t = nowTask(); if (t) { t.now = 0; t.updatedAt = Date.now(); saveState(); render(); } },
@@ -1829,22 +1851,31 @@ function dashCurrentCard() {
   const list = state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids))
     .sort((a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt));
   // Each project (and the ⏭️ Up next box) is a drop target: drag a task's ⠿ from the Inbox onto it.
+  // A line with a tick box: ⠿ drag · ☐ done · text (tap = details) · ▶️ abhi yahi.
+  const line = (x, cls = '') => `<li class="upnext-item ${cls}"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button></li>`;
+  const addBox = (parent, placeholder, folder = '') => `<form class="dash-add-form" data-parent="${parent}" data-folder="${folder}" autocomplete="off"><input name="text" maxlength="300" required placeholder="${placeholder}" aria-label="${placeholder}"></form>`;
   const rows = list.map((t, i) => {
     const steps = descendantsOf(t.id);
-    const next = steps.find(x => !x.done);
-    return `<a class="dash-cur-row${i === 0 ? ' main' : ''}" href="#/current" data-drop-todo="${t.id}" title="Inbox se task yahan chhodo = is project ka step">
-      <span class="dash-cur-name">${esc(t.text)}<button class="now-play" data-action="set-now" data-id="${(next || t).id}" title="Abhi yahi kar raha hoon${next ? ' (agla step)' : ''}">▶️</button></span>
+    const open = childrenOf(t.id).filter(x => !x.done);
+    return `<div class="dash-cur-row${i === 0 ? ' main' : ''}" data-drop-todo="${t.id}" title="Task yahan chhodo = is project ka step">
+      <div class="dash-cur-head"><button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Project ho gaya"></button>
+        <span class="dash-cur-name" data-action="open-todo" data-id="${t.id}">${esc(t.text)}</span>
+        <button class="now-play" data-action="set-now" data-id="${(open[0] || t).id}" title="Abhi yahi kar raha hoon">▶️</button></div>
       ${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}
-      ${steps.length ? `${progressLine(steps)}${next ? `<span class="muted small">👉 Agla step: <b>${esc(next.text)}</b></span>` : ''}` : ''}
-    </a>`;
+      ${steps.length ? progressLine(steps) : ''}
+      ${open.length ? `<ul class="upnext-list dash-steps">${open.map(x => line(x)).join('')}</ul>` : ''}
+      ${addBox(t.id, '＋ Step likho… Enter')}
+    </div>`;
   }).join('');
   return `<section class="card dash-current" data-drop-list="current" title="Up next / Inbox se task yahan chhodo = naya current project">
       <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
-      ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Kisi task pe <b>🎯</b> dabao, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
+      ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Neeche likho, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
+      ${addBox('', '＋ Naya current project… Enter', CURRENT)}
     </section>
     <section class="card dash-upnext-box" data-drop-todo="${UP_NEXT}">
       <div class="row-between"><span class="dash-cur-label">⏭️ Up next${upNext.length ? ` · ${upNext.length}` : ''}</span><a class="muted small" href="#/current">Kholo ›</a></div>
-      ${upNext.length ? `<ul class="upnext-list">${[...upNext].reverse().map(x => `<li class="upnext-item"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke Current Project pe chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span style="flex:1">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button></li>`).join('')}</ul>` : ''}
+      ${upNext.length ? `<ul class="upnext-list">${[...upNext].reverse().map(x => line(x)).join('')}</ul>` : ''}
+      ${addBox(UP_NEXT, '＋ Up next me likho… Enter')}
       <div class="upnext-drop">⠿ Inbox se task yahan chhodo → Up next · Up next ka ⠿ upar Current Project pe chhodo → wahi current ban jayega</div>
     </section>
     ${dashNowCard(upNext)}`;
@@ -6675,7 +6706,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-12c';
+const APP_VERSION = '2026-11-12d';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
