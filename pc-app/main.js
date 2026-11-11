@@ -12,6 +12,8 @@ if (!app.requestSingleInstanceLock()) {
   return;
 }
 app.setAppUserModelId('com.ky.appideas.pc');
+// Google refuses sign-in inside apps that say "Electron" — present as normal Chrome instead.
+app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').replace(/\s?app-ideas-pc\/\S+/i, '');
 
 let win = null;
 let pop = null;
