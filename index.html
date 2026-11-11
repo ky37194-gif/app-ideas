@@ -1280,9 +1280,6 @@ function topBar(title, { back = '', actions = '' } = {}) {
       <button class="icon-btn phone-only" data-action="open-search" aria-label="Search everything">🔍</button>
       <h1 class="topbar-title">${title}</h1>
       ${actions}
-      <button class="icon-btn" data-action="quick-add" aria-label="Jaldi task add karo" title="⚡ Jaldi task add karo (N / Q)">⚡</button>
-      ${syncButton()}
-      <button class="icon-btn" data-action="theme" aria-label="Change theme" title="Change theme">${THEME_ICONS[state.theme]}</button>
     </header>`;
 }
 
@@ -1386,7 +1383,7 @@ function renderHome() {
     .join('');
 
   return `
-    ${topBar(folderOf(ui.folder).title, { actions: '<a class="icon-btn" href="#/quick" aria-label="Jaldi likho" title="Jaldi likho">⚡</a>' })}
+    ${topBar(folderOf(ui.folder).title)}
     <main class="page">
       ${inboxBanner()}
       <div class="folder-tabs" aria-label="Folders">${folderTabs}</div>
@@ -2761,7 +2758,7 @@ function renderQuick() {
 // and 📂 sends it to a folder / list / Earning page.
 function renderInbox() {
   return `
-    ${topBar('📥 Inbox', { back: '#/', actions: '<a class="icon-btn" href="#/quick" aria-label="Jaldi likho" title="Jaldi likho">⚡</a>' })}
+    ${topBar('📥 Inbox', { back: '#/' })}
     <main class="page">
       <p class="muted small" style="margin:0 2px 10px">Jaldi wale notes yahan aate hain (PC pe kahin bhi <b>Alt+I</b>). Line pe tap karo = <b>description, photo, andar ke kaam</b>. <b>🎯</b> = Current Project, <b>📂</b> = kisi folder / Earning page me.</p>
       ${renderTodos(INBOX)}
@@ -5925,7 +5922,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-11c';
+const APP_VERSION = '2026-11-11d';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
