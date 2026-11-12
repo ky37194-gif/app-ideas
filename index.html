@@ -751,6 +751,12 @@
   .ch-now { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--warning) 7%, var(--surface-2)); }
   .ch-now-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .ch-now-text { flex: 1; min-width: 0; font-weight: 750; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ch-box { display: grid; gap: 4px; padding: 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), var(--surface)); min-width: 0; }
+  .ch-box.up { border-color: var(--border); background: var(--surface); }
+  .ch-box.nowbox { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); background: var(--surface); gap: 10px; }
+  .ch-box.nowbox .dash-cur-label { color: var(--warning); }
+  .ch-box.drop-hover { outline: 2px dashed var(--primary); outline-offset: 2px; }
+  .ch-hint { padding: 10px 12px; border: 1px dashed var(--border); border-radius: 12px; text-align: center; font-size: .8rem; color: var(--muted); }
   .ch-plan { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
   .ch-plan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .ch-plan li { display: flex; gap: 8px; align-items: center; justify-content: space-between; min-width: 0; }
@@ -1240,6 +1246,7 @@ function normalizeTodo(raw = {}) {
     priority: !!raw.priority, // 🔥 = shows on the Priority page
     today: false, // the 📅 Today section was removed
     now: Number(raw.now) || 0, // ⚡ "abhi yahi kar raha hoon" — when you started it
+    chup: Number(raw.chup) || 0, // ⏭️ sits in the channel's Up next (else its Current Project)
     chnow: Number(raw.chnow) || 0, // ⚡ the one you're on for its YouTube / Instagram channel
     doneAt: Number(raw.doneAt) || null,
     doneBy: normPerson(raw.doneBy),
@@ -1919,10 +1926,10 @@ document.addEventListener('submit', e => {
   const text = form.elements.text.value.trim();
   if (!text) return;
   const parent = form.dataset.parent && state.todos.find(x => x.id === form.dataset.parent);
-  state.todos.push(normalizeTodo(parent ? { text, parentId: parent.id, folder: parent.folder, by: myRef() } : { text, folder: form.dataset.folder || INBOX, by: myRef() }));
+  state.todos.push(normalizeTodo(parent ? { text, parentId: parent.id, folder: parent.folder, by: myRef() } : { text, folder: form.dataset.folder || INBOX, by: myRef(), chup: form.dataset.chup ? Date.now() : 0 }));
   if (parent) { collapsed.delete(parent.id); saveCollapsed(); }
   saveState(); render();
-  document.querySelector(`.dash-add-form[data-parent="${form.dataset.parent || ''}"][data-folder="${form.dataset.folder || ''}"] input`)?.focus(); // keep adding
+  document.querySelector(`.dash-add-form[data-parent="${form.dataset.parent || ''}"][data-folder="${form.dataset.folder || ''}"]${form.dataset.chup ? '[data-chup]' : ':not([data-chup])'} input`)?.focus(); // keep adding
 });
 // Entering 🎯 Current Project from another list: note where it was, so ↩️ can send it back.
 function rememberOrigin(t, toFolder) {
@@ -4029,28 +4036,49 @@ function channelBoard({ platform = null, accountId = null } = {}) {
     .filter((a, i, arr) => arr.findIndex(x => x.id === a.id) === i);
   if (!accs.length) return '';
   const ids = new Set(state.todos.map(t => t.id));
-  const chLine = x => `<li class="upnext-item" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke order badlo / kisi aur channel pe chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}${childrenOf(x.id).length ? ` <span class="muted small">☰ ${childrenOf(x.id).filter(k => k.done).length}/${childrenOf(x.id).length}</span>` : ''}</span><button class="now-play" data-action="ch-now" data-id="${x.id}" title="Abhi isi pe kaam">▶️</button></li>`;
+  const btn = (action, id, ico, title) => `<button class="now-play" data-action="${action}" data-id="${id}" title="${title}">${ico}</button>`;
+  const sub = x => (childrenOf(x.id).length ? ` <span class="muted small">☰ ${childrenOf(x.id).filter(k => k.done).length}/${childrenOf(x.id).length}</span>` : '');
+  // Current Project style row (big first one) and Up next style row (plain line).
+  const curRow = (x, i) => `<div class="dash-cur-row${i === 0 ? ' main' : ''}" data-drop-todo="${x.id}" data-rank>
+      <div class="dash-cur-head"><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke order badlo / Up next ya kisi aur channel pe chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button>
+        <span class="dash-cur-name" data-action="open-todo" data-id="${x.id}">${esc(x.text)}${sub(x)}</span>
+        ${btn('ch-now', x.id, '▶️', 'Abhi yahi kar raha hoon')}${btn('ch-up', x.id, '⏭️', 'Up next me bhejo')}${btn('send-back', x.id, '↩️', 'Main Inbox me wapas bhejo')}</div></div>`;
+  const upRow = x => `<li class="upnext-item" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke upar Current Project pe chhodo = wahi current ban jayega" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}${sub(x)}</span>${btn('ch-now', x.id, '▶️', 'Abhi yahi kar raha hoon')}${btn('ch-up', x.id, '🎯', 'Current Project me bhejo')}${btn('send-back', x.id, '↩️', 'Main Inbox me wapas bhejo')}</li>`;
+  const addBox = (folder, placeholder, up) => `<form class="dash-add-form" data-parent="" data-folder="${folder}"${up ? ' data-chup="1"' : ''} autocomplete="off"><input name="text" maxlength="300" required placeholder="${placeholder}" aria-label="${placeholder}"></form>`;
   const cards = accs.map(a => {
     const folder = 'ch:' + a.id;
     const tasks = ordered(state.todos.filter(t => t.folder === folder && !t.done && isTopTodo(t, ids)), upNextSort);
     const now = tasks.filter(t => t.chnow).sort((x, y) => y.chnow - x.chnow)[0] || null;
     const rest = tasks.filter(t => t !== now);
-    const next = rest[0] || null;
-    const shown = dashMore.has(folder) ? rest : rest.slice(0, 5);
+    const cur = rest.filter(t => !t.chup), up = rest.filter(t => t.chup);
+    const next = up[0] || cur[0] || null;
+    const curShown = dashMore.has('c' + folder) ? cur : cur.slice(0, 2);
+    const upShown = dashMore.has('u' + folder) ? up : up.slice(0, 5);
     return `<section class="card ch-card ${a.platform}${a.pair ? ' ch-pair' : ''}" data-drop-list="${folder}">
         <div class="ch-head"><span class="ch-ico">${esc(a.icon)}</span><b>${esc(a.name)}</b><span class="ch-plat">${platIco(a.platform)}</span></div>
-        <div class="ch-now">
-          <span class="dash-cur-label" style="color:var(--warning)">⚡ Abhi</span>
-          ${now ? `<div class="ch-now-row"><span class="ch-now-text" data-action="open-todo" data-id="${now.id}">${esc(now.text)}</span>
-              <button class="btn primary small-btn" data-action="toggle-todo" data-id="${now.id}">✓</button><button class="icon-btn" data-action="ch-now-clear" data-id="${now.id}" title="Rok do">✕</button></div>`
-            : '<span class="muted small">Kuch nahi — neeche kisi kaam pe ▶️ dabao</span>'}
-          ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span><button class="btn small-btn" data-action="ch-now" data-id="${next.id}">▶️</button></div>` : ''}
-        </div>
         ${chPlan(a)}
         ${chWeek(a)}
-        <span class="dash-cur-label">📥 Inbox${rest.length ? ` · ${rest.length}` : ''}</span>
-        ${rest.length ? `<ul class="upnext-list">${shown.map(chLine).join('')}${rest.length > 5 ? `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${folder}">${dashMore.has(folder) ? '▴ Kam dikhao' : `▸ ${rest.length - 5} aur`}</button></li>` : ''}</ul>` : ''}
-        <form class="dash-add-form" data-parent="" data-folder="${folder}" autocomplete="off"><input name="text" maxlength="300" required placeholder="＋ ${esc(a.name)} ke liye kuch bhi likho… Enter" aria-label="New task"></form>
+        <div class="ch-box nowbox">
+          <span class="dash-cur-label">⚡ Abhi kar raha hoon</span>
+          ${now ? `<div class="now-task"><div class="now-main"><div class="now-title" title="${esc(now.text)}">${esc(now.text)}</div></div>
+              <div class="now-btns"><button class="btn primary small-btn" data-action="toggle-todo" data-id="${now.id}">✓ Ho gaya</button>
+              <button class="icon-btn" data-action="send-back" data-id="${now.id}" aria-label="Wapas bhejo" title="Main Inbox me wapas bhejo">↩️</button>
+              <button class="icon-btn" data-action="ch-now-clear" data-id="${now.id}" aria-label="Rok do" title="Abhi wala rok do (task wahin rahega)">✕</button></div></div>`
+            : '<p class="muted small" style="margin:6px 0">Kuch shuru nahi kiya. Neeche kisi kaam pe <b>▶️</b> dabao.</p>'}
+          ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span><button class="btn small-btn" data-action="ch-now" data-id="${next.id}">▶️ Shuru karo</button></div>` : ''}
+        </div>
+        <div class="ch-box">
+          <div class="row-between"><span class="dash-cur-label">🎯 Current Project${cur.length > 1 ? ` · ${cur.length}` : ''}</span></div>
+          ${cur.length ? curShown.map(curRow).join('') : '<p class="muted small" style="margin:6px 0">Abhi koi nahi. Neeche likho, ya Up next se 🎯 dabao.</p>'}
+          ${cur.length > 2 ? `<button type="button" class="dash-more" data-action="dash-more" data-key="c${folder}">${dashMore.has('c' + folder) ? '▴ Kam dikhao' : `▸ ${cur.length - 2} aur`}</button>` : ''}
+          ${addBox(folder, `＋ ${esc(a.name)} ka naya kaam… Enter`, false)}
+        </div>
+        <div class="ch-box up" data-drop-list="chup:${folder}">
+          <div class="row-between"><span class="dash-cur-label">⏭️ Up next${up.length ? ` · ${up.length}` : ''}</span></div>
+          ${up.length ? `<ul class="upnext-list">${upShown.map(upRow).join('')}${up.length > 5 ? `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="u${folder}">${dashMore.has('u' + folder) ? '▴ Kam dikhao' : `▸ ${up.length - 5} aur`}</button></li>` : ''}</ul>` : ''}
+          ${addBox(folder, '＋ Up next me likho… Enter', true)}
+          <div class="ch-hint">⠿ Current Project ka kaam yahan chhodo → Up next · Up next ka ⠿ upar Current Project pe chhodo → wahi current ban jayega</div>
+        </div>
       </section>`;
   }).join('');
   // Right side: what the Content Planner has coming up for these channels.
@@ -4107,7 +4135,25 @@ function chWeek(a) {
       ${open ? rows : ''}
     </div>`;
 }
+// Move a channel task between its Current Project and its Up next (stays in that channel).
+function chPlace(id, folder, up) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t) return;
+  const group = [t, ...descendantsOf(t.id)];
+  const before = group.map(x => ({ x, folder: x.folder, prevFolder: x.prevFolder, chup: x.chup, chnow: x.chnow }));
+  const now = Date.now();
+  if (t.folder !== folder) rememberOrigin(t, folder);
+  group.forEach(x => { x.folder = folder; x.updatedAt = now; });
+  t.parentId = null; t.chup = up ? now : 0; t.chnow = 0;
+  saveState(); render();
+  toast(up ? '⏭️ Up next me chala gaya' : '🎯 Current Project me chala gaya', () => {
+    const t2 = Date.now();
+    before.forEach(b => Object.assign(b.x, { folder: b.folder, prevFolder: b.prevFolder, chup: b.chup, chnow: b.chnow, updatedAt: t2 }));
+    saveState(); render();
+  });
+}
 const channelActions = {
+  'ch-up'(el) { const t = state.todos.find(x => x.id === el.dataset.id); if (t) chPlace(t.id, t.folder, !t.chup); },
   'ch-idea-done'(el) {
     const d = smData();
     const i = d && Array.isArray(d.ideas) && d.ideas.find(x => x.id === el.dataset.id);
@@ -4852,6 +4898,8 @@ function endTdDrag(e, cancel) {
   else if (d.over.dataset.dropTodo && d.where && d.where !== 'into') reorderTodo(d.id, d.over.dataset.dropTodo, d.where); // ↕️ order
   else if (d.over.dataset.dropTodo) moveTodoInto(d.id, d.over.dataset.dropTodo); // → sub-task of that task
   else if (d.over.dataset.dropPage) moveTodoToEarn(d.id, d.over.dataset.dropPage); // → into that Earning page
+  else if (d.over.dataset.dropList.startsWith('chup:')) chPlace(d.id, d.over.dataset.dropList.slice(5), true); // → a channel's ⏭️ Up next
+  else if (d.over.dataset.dropList.startsWith('ch:')) chPlace(d.id, d.over.dataset.dropList, false); // → a channel's 🎯 Current Project
   else moveTodoTo(d.id, d.over.dataset.dropList);
 }
 document.addEventListener('pointerup', e => endTdDrag(e, false));
