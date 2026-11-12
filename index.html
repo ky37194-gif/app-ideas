@@ -751,6 +751,10 @@
   .ch-now { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--warning) 7%, var(--surface-2)); }
   .ch-now-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .ch-now-text { flex: 1; min-width: 0; font-weight: 750; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ch-plan { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+  .ch-plan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .ch-plan li { display: flex; gap: 8px; align-items: center; justify-content: space-between; min-width: 0; }
+  .ch-plan li > span:first-child { min-width: 0; }
   .ch-right { position: sticky; top: 76px; }
   .ch-ideas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .ch-ideas a { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: inherit; text-decoration: none; }
@@ -4042,6 +4046,7 @@ function channelBoard({ platform = null, accountId = null } = {}) {
             : '<span class="muted small">Kuch nahi — neeche kisi kaam pe ▶️ dabao</span>'}
           ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span><button class="btn small-btn" data-action="ch-now" data-id="${next.id}">▶️</button></div>` : ''}
         </div>
+        ${chPlan(a)}
         ${chWeek(a)}
         <span class="dash-cur-label">📥 Inbox${rest.length ? ` · ${rest.length}` : ''}</span>
         ${rest.length ? `<ul class="upnext-list">${shown.map(chLine).join('')}${rest.length > 5 ? `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${folder}">${dashMore.has(folder) ? '▴ Kam dikhao' : `▸ ${rest.length - 5} aur`}</button></li>` : ''}</ul>` : ''}
@@ -4067,6 +4072,23 @@ function channelBoard({ platform = null, accountId = null } = {}) {
       </div>
     </div>`;
 }
+// 🎯 How often to post + 📌 what to post next (topics from the Content Planner; tick when posted).
+function chPlan(a) {
+  const rows = (a.targets || []).filter(t => SM_FORMATS[t.format]).map(t => {
+    const days = Array.isArray(t.days) && t.days.length && t.days.length < 7 ? t.days.map(x => WEEK_DAYS_HI[x]).join(', ') : 'roz';
+    return `<li><span>${SM_FORMATS[t.format]}</span><span class="muted small">${t.per === 'week' ? `hafte mein ${t.count}` : `roz ${t.count}`} · ${days}${t.time ? ' · ' + fmtT(t.time) : ''}</span></li>`;
+  }).join('');
+  const d = smData();
+  const all = (d && Array.isArray(d.ideas) ? d.ideas : []).map((i, k) => [i, k])
+    .filter(([i]) => i.status !== 'posted' && (i.accountIds || []).includes(a.id))
+    .sort(([x, kx], [y, ky]) => ((x.date || '9999') < (y.date || '9999') ? -1 : (x.date || '9999') > (y.date || '9999') ? 1 : kx - ky));
+  const topics = all.slice(0, 3);
+  if (!rows && !topics.length) return '';
+  return `<div class="ch-plan">
+      ${rows ? `<div><b class="small">🎯 Kitna post karna hai</b><ul style="margin-top:4px">${rows}</ul></div>` : ''}
+      ${topics.length ? `<div><b class="small">📌 Kya post karna hai (topic)</b><ul style="margin-top:4px">${topics.map(([i], k) => `<li><span><span class="muted small">${k === 0 ? 'Agla video:' : 'Uske baad:'}</span> ${esc(i.title || 'Untitled')}</span><button class="todo-check" data-action="ch-idea-done" data-id="${esc(i.id)}" aria-label="Post ho gaya" title="Post ho gaya"></button></li>`).join('')}</ul>${all.length > 3 ? `<a class="muted small" href="#/sm">▸ ${all.length - 3} aur topic · Content Planner</a>` : ''}</div>` : ''}
+    </div>`;
+}
 // 🗓️ This channel's week, right inside its folder: day by day, tick when done.
 function chWeek(a) {
   const accs = smAccounts(), today = dayIdx();
@@ -4086,6 +4108,15 @@ function chWeek(a) {
     </div>`;
 }
 const channelActions = {
+  'ch-idea-done'(el) {
+    const d = smData();
+    const i = d && Array.isArray(d.ideas) && d.ideas.find(x => x.id === el.dataset.id);
+    if (!i) return;
+    i.status = 'posted'; i.postedAt = todayStr(Date.now()); i.updatedAt = Date.now();
+    try { localStorage.setItem('contentPlanner.v1', JSON.stringify(d)); } catch { /* ignore */ }
+    render();
+    toast('✅ Post ho gaya — ' + (i.title || ''));
+  },
   'ch-week-toggle'(el) { ui.chWeekOpen = ui.chWeekOpen || {}; ui.chWeekOpen[el.dataset.id] = ui.chWeekOpen[el.dataset.id] === false; render(); },
   'ch-now'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
@@ -6233,6 +6264,73 @@ const YT_PLANS = [
     blocks: [['callout', 'German channel · naya (0 subscribers). Plan abhi banana hai — yahan likho.']], tasks: [], ideas: [] },
 ];
 
+/* 🗓️ Ready-made week for each channel: [day 0=Mon, from, to, kind, what] + posting frequency [format, count, per, days, time].
+   Added once with fixed ids (tap any slot to change its time / text; delete = it stays deleted). German channels: no plan yet. */
+const YT_SCHEDULE = {
+  'yt-pharmastreet': {
+    targets: [['yt-long', 1, 'week', [2], '19:00'], ['yt-short', 3, 'week', [3, 4, 5], '19:00']],
+    slots: [
+      [0, '19:00', '19:30', 'script', 'Agle hafte ka topic tay karo + script (Claude Code se)'],
+      [1, '19:00', '19:30', 'script', 'Video render hone do · 3 Shorts ki script likho'],
+      [2, '19:00', '19:45', 'post', 'LAMBI VIDEO upload (15-25 min) — title, description, chapters, tags, thumbnail'],
+      [3, '19:00', '19:20', 'post', 'Short #1 upload'],
+      [4, '19:00', '19:20', 'post', 'Short #2 upload'],
+      [4, '19:20', '19:40', 'reply', 'Saare comments ka jawab do'],
+      [5, '19:00', '19:20', 'post', 'Short #3 upload'],
+      [5, '19:20', '19:40', 'other', 'Analytics — kaunsi video chali aur kyun, agla topic usi se'],
+    ],
+  },
+  'ig-pharmastreet': {
+    targets: [['ig-reel', 3, 'week', [3, 4, 5], '19:30'], ['ig-story', 2, 'week', [0, 2], '19:30']],
+    slots: [
+      [0, '19:30', '19:40', 'story', 'Story: aaj ka ek MCQ / mnemonic'],
+      [2, '19:45', '20:00', 'story', 'Story: nayi lambi video aa gayi — link'],
+      [3, '19:20', '19:35', 'post', 'Reel: Short #1 yahan bhi daalo'],
+      [4, '19:40', '19:55', 'post', 'Reel: Short #2 yahan bhi daalo'],
+      [5, '19:40', '19:55', 'post', 'Reel: Short #3 yahan bhi daalo'],
+    ],
+  },
+  'yt-m2m': {
+    targets: [['yt-long', 1, 'week', [3], '20:15'], ['yt-short', 1, 'week', [4], '20:15']],
+    slots: [
+      [0, '20:15', '20:45', 'script', 'Topic tay karo — Claude Code mein ek line: script + animation'],
+      [1, '20:15', '20:45', 'other', 'Script padh ke HAR fact check karo (English channel par ek galti bhi bhaari)'],
+      [2, '20:15', '21:00', 'edit', 'Video render dekho + thumbnail banao'],
+      [3, '20:15', '20:45', 'post', 'ANIMATED EXPLAINER upload (8-15 min) — title, description, chapters, tags'],
+      [4, '20:15', '20:35', 'post', 'Usi video se 1 Short banao aur upload karo'],
+      [4, '20:35', '20:50', 'reply', 'Comments ka jawab do'],
+      [5, '20:15', '20:35', 'other', "Analytics — khaas kar 'traffic source: search'"],
+    ],
+  },
+  'ig-m2m': {
+    targets: [['ig-reel', 1, 'week', [4], '20:50']],
+    slots: [[4, '20:50', '21:00', 'post', 'Reel: wahi Short yahan bhi daalo']],
+  },
+  'yt-sog': {
+    targets: [['yt-long', 1, 'week', [4], '21:00'], ['yt-short', 4, 'week', [0, 4, 5, 6], '21:00']],
+    slots: [
+      [0, '21:00', '21:30', 'script', 'Hafte ke 5 Shorts ke topic + script'],
+      [0, '21:30', '21:40', 'post', 'Short upload'],
+      [1, '21:00', '22:00', 'shoot', 'Saare Shorts ek saath shoot'],
+      [2, '21:00', '21:45', 'shoot', 'Lambi video (10-15 min) shoot'],
+      [3, '21:00', '22:00', 'edit', 'Edit + thumbnail'],
+      [4, '21:00', '21:30', 'post', 'LAMBI VIDEO upload + ek Short'],
+      [5, '21:00', '21:15', 'post', 'Short upload (roz ek, ek saath nahi)'],
+      [6, '21:00', '21:10', 'post', 'Short upload'],
+      [6, '21:10', '21:30', 'reply', 'Comments + analytics dekho'],
+    ],
+  },
+  'ig-sog': {
+    targets: [['ig-reel', 3, 'week', [4, 5, 6], '21:30']],
+    slots: [
+      [4, '21:30', '21:40', 'post', 'Reel: Short yahan bhi daalo'],
+      [5, '21:15', '21:25', 'post', 'Reel: Short yahan bhi daalo'],
+      [6, '21:30', '21:40', 'post', 'Reel: Short yahan bhi daalo'],
+    ],
+  },
+};
+const YT_TGT_KEY = 'ytTargets.v1';
+
 // The planner (same site, in an iframe) reads this to keep these channels in its own list too.
 window.YT_PLANS = YT_PLANS;
 const ytAccount = (acc, platform = 'youtube') => ({ ...acc, platform, hashtagSets: [], updatedAt: 1,
@@ -6268,6 +6366,30 @@ function ensureYtChannels() {
         caption: '', hashtags: '', ytTitle: '', ytDescription: '', ytTags: '', postedAt: null, createdAt: now - k, updatedAt: 1 });
     });
   });
+  // Posting frequency (once per device, only where you never set your own targets).
+  let tgtDone = true;
+  try { tgtDone = !!localStorage.getItem(YT_TGT_KEY); } catch { /* ignore */ }
+  if (!tgtDone) {
+    Object.entries(YT_SCHEDULE).forEach(([id, sc]) => {
+      const a = d.accounts.find(x => x.id === id);
+      const t = a && Array.isArray(a.targets) ? a.targets : [];
+      if (a && (t.length === 0 || (t.length === 1 && t[0].id === id + '-t1'))) {
+        a.targets = sc.targets.map(([format, count, per, days, time], k) => ({ id: `${id}-t${k + 2}`, format, count, per, days, time }));
+        a.updatedAt = now; smChanged = true;
+      }
+    });
+    try { localStorage.setItem(YT_TGT_KEY, '1'); } catch { /* ignore */ }
+  }
+  // 🗓️ Week slots (fixed ids → never duplicated; a slot you deleted stays deleted).
+  state.week = Array.isArray(state.week) ? state.week : [];
+  let weekChanged = false;
+  Object.entries(YT_SCHEDULE).forEach(([id, sc]) => sc.slots.forEach(([day, start, end, kind, text], k) => {
+    const sid = `${id}-w${k + 1}`;
+    if (state.week.some(x => x.id === sid) || (state.deleted && state.deleted[sid])) return;
+    state.week.push(normalizeSlot({ id: sid, days: [day], start, end, accountId: id, kind, text, updatedAt: now }));
+    weekChanged = true;
+  }));
+  if (weekChanged) saveState();
   if (smChanged) { try { localStorage.setItem('contentPlanner.v1', JSON.stringify(d)); } catch { /* ignore */ } }
   // 2) 💰 Earning: ❤️ Passion → 📺 YouTube → one page per channel with its plan.
   let pagesChanged = false;
