@@ -742,6 +742,7 @@
   .ch-card { display: grid; gap: 10px; border-left: 4px solid var(--border); min-width: 0; }
   .ch-card > * { min-width: 0; }
   .ch-card.youtube { border-left-color: #ef4444; }
+  .ch-card.ch-pair { margin-left: 22px; margin-top: -4px; } /* a YouTube channel's own Instagram, right under it */
   .ch-card.instagram { border-left-color: #ec4899; }
   .ch-card.drop-hover { outline: 2px dashed var(--primary); outline-offset: 2px; }
   .ch-head { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; }
@@ -1676,7 +1677,11 @@ const SM_DEFAULT_ACCOUNTS = [
 function smData() { try { return JSON.parse(localStorage.getItem('contentPlanner.v1')) || null; } catch { return null; } }
 function smAccounts() {
   const d = smData();
-  const list = d && Array.isArray(d.accounts) && d.accounts.length ? d.accounts : SM_DEFAULT_ACCOUNTS;
+  let list = d && Array.isArray(d.accounts) && d.accounts.length ? d.accounts : SM_DEFAULT_ACCOUNTS;
+  // 📺 Your YouTube channels (YT_PLANS) always show, on top, in that order — unless you deleted one in the planner.
+  const gone = (d && d.deleted) || {};
+  const mine = ytPairs().map(([a, platform]) => list.find(x => x.id === a.id) || (gone[a.id] ? null : ytAccount(a, platform))).filter(Boolean);
+  list = [...mine, ...list.filter(a => !mine.includes(a))];
   return list.map(a => ({ id: a.id, name: a.name || 'Account', platform: a.platform === 'youtube' ? 'youtube' : 'instagram', icon: a.icon || '⭐', targets: Array.isArray(a.targets) ? a.targets : [] }));
 }
 const platIco = p => (p === 'youtube' ? '▶️ YT' : '📸 IG');
@@ -4014,7 +4019,10 @@ function renderEarnHome() {
 
 /* ----- ❤️ Passion board: one card per channel / page ----- */
 function channelBoard({ platform = null, accountId = null } = {}) {
-  const accs = smAccounts().filter(a => (!platform || a.platform === platform) && (!accountId || a.id === accountId));
+  const all = smAccounts();
+  const accs = all.filter(a => (!platform || a.platform === platform) && (!accountId || a.id === accountId))
+    .flatMap(a => { const ig = a.platform === 'youtube' && igOf(a.id) && all.find(x => x.id === igOf(a.id).id); return ig ? [a, { ...ig, pair: true }] : [a]; })
+    .filter((a, i, arr) => arr.findIndex(x => x.id === a.id) === i);
   if (!accs.length) return '';
   const ids = new Set(state.todos.map(t => t.id));
   const chLine = x => `<li class="upnext-item" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke order badlo / kisi aur channel pe chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}${childrenOf(x.id).length ? ` <span class="muted small">☰ ${childrenOf(x.id).filter(k => k.done).length}/${childrenOf(x.id).length}</span>` : ''}</span><button class="now-play" data-action="ch-now" data-id="${x.id}" title="Abhi isi pe kaam">▶️</button></li>`;
@@ -4025,7 +4033,7 @@ function channelBoard({ platform = null, accountId = null } = {}) {
     const rest = tasks.filter(t => t !== now);
     const next = rest[0] || null;
     const shown = dashMore.has(folder) ? rest : rest.slice(0, 5);
-    return `<section class="card ch-card ${a.platform}" data-drop-list="${folder}">
+    return `<section class="card ch-card ${a.platform}${a.pair ? ' ch-pair' : ''}" data-drop-list="${folder}">
         <div class="ch-head"><span class="ch-ico">${esc(a.icon)}</span><b>${esc(a.name)}</b><span class="ch-plat">${platIco(a.platform)}</span></div>
         <div class="ch-now">
           <span class="dash-cur-label" style="color:var(--warning)">⚡ Abhi</span>
@@ -6058,7 +6066,7 @@ const YT_PLAN_MONEY = [
 ];
 const YT_PLANS = [
   {
-    acc: { id: 'yt-pharmastreet', name: 'Pharma Street', icon: '💊', color: 'red' },
+    acc: { id: 'yt-pharmastreet', name: 'Pharma Street', icon: '💊', color: 'red' }, ig: { id: 'ig-pharmastreet', name: 'Pharma Street', icon: '📸', color: 'insta' },
     blocks: [
       ['callout', 'Hindi channel · 252 subscribers · 21 videos · @pharmastreet7876 — sabse pehle yahi monetize hoga. Agle 6 mahine mehnat ka sabse bada hissa yahan.'],
       ['h2', '🎯 Ye channel kis liye hai'],
@@ -6105,7 +6113,7 @@ const YT_PLANS = [
     ],
   },
   {
-    acc: { id: 'yt-m2m', name: 'Molecule to Medicine', icon: '🧬', color: 'coral' },
+    acc: { id: 'yt-m2m', name: 'Molecule to Medicine', icon: '🧬', color: 'coral' }, ig: { id: 'ig-m2m', name: 'Molecule to Medicine', icon: '📸', color: 'insta' },
     blocks: [
       ['callout', 'English channel · naya (0 subscribers) · @themoleculetomedicine — duniya bhar ke liye, lamba khel. 6-12 mahine lagenge.'],
       ['h2', '🎯 Ye channel kis liye hai'],
@@ -6152,7 +6160,7 @@ const YT_PLANS = [
     ],
   },
   {
-    acc: { id: 'yt-sog', name: 'Science of Gains', icon: '💪', color: 'crimson' },
+    acc: { id: 'yt-sog', name: 'Science of Gains', icon: '💪', color: 'crimson' }, ig: { id: 'ig-sog', name: 'Science of Gains', icon: '📸', color: 'insta' },
     blocks: [
       ['callout', 'Fitness channel · naya · @scienceofgainsindia — sabse zyada muqabla, isliye teesri priority. Jab pharma wale channel chal padein tab.'],
       ['h2', '🎯 Ye channel kis liye hai'],
@@ -6199,49 +6207,76 @@ const YT_PLANS = [
     ],
   },
   // German channels: no plan yet — just their own card + page.
-  { acc: { id: 'yt-germanlearners', name: 'German learners', icon: '🇩🇪', color: 'red' },
+  { acc: { id: 'yt-germanlearners', name: 'German learners', icon: '🇩🇪', color: 'red' }, ig: { id: 'ig-germanlearners', name: 'German learners', icon: '📸', color: 'insta' },
     blocks: [['callout', 'German channel · naya (0 subscribers). Plan abhi banana hai — yahan likho.']], tasks: [], ideas: [] },
-  { acc: { id: 'yt-germankuldeep', name: 'German with Kuldeep', icon: '📗', color: 'crimson' },
+  { acc: { id: 'yt-germankuldeep', name: 'German with Kuldeep', icon: '📗', color: 'crimson' }, ig: { id: 'ig-germankuldeep', name: 'German with Kuldeep', icon: '📸', color: 'insta' },
     blocks: [['callout', 'German channel · naya (0 subscribers). Plan abhi banana hai — yahan likho.']], tasks: [], ideas: [] },
 ];
 
-function importYtPlans() {
-  if (!canEarn() || !earnCloud.code) { toast('🔒 Pehle Earning unlock karo, phir ye link dobara kholo'); location.hash = '#/earn'; return; }
+// The planner (same site, in an iframe) reads this to keep these channels in its own list too.
+window.YT_PLANS = YT_PLANS;
+const ytAccount = (acc, platform = 'youtube') => ({ ...acc, platform, hashtagSets: [], updatedAt: 1,
+  targets: [{ id: acc.id + '-t1', format: platform === 'youtube' ? 'yt-long' : 'ig-reel', count: 1, per: 'week', days: [0, 1, 2, 3, 4, 5, 6], time: '' }] });
+// Each YouTube channel's own Instagram, in order: YT, its IG, next YT, its IG…
+const ytPairs = () => YT_PLANS.flatMap(p => [[p.acc, 'youtube'], ...(p.ig ? [[p.ig, 'instagram']] : [])]);
+const igOf = ytId => (YT_PLANS.find(p => p.acc.id === ytId) || {}).ig || null;
+
+/* Runs by itself once per device as soon as Earning is unlocked (and again from #/import-yt).
+   Adds whatever is missing; something you deleted yourself stays deleted. */
+const YT_DONE_KEY = 'ytChannels.v1';
+function ensureYtChannels() {
+  if (!canEarn() || !earnCloud.code) return false;
   const now = Date.now();
-  // 1) 📣 Content Planner: the 3 channels + their video topics as ideas (they go to the cloud when the planner opens).
+  // 1) 📣 Content Planner list: the channels + their video topics.
   let d = smData();
   if (!d) d = { version: 5, accounts: SM_DEFAULT_ACCOUNTS.map(a => ({ ...a, updatedAt: 0, hashtagSets: [], targets: [] })), ideas: [], dailyTasks: [], taskLog: {}, deleted: {} };
   d.accounts = Array.isArray(d.accounts) ? d.accounts : [];
   d.ideas = Array.isArray(d.ideas) ? d.ideas : [];
+  const gone = d.deleted && typeof d.deleted === 'object' ? d.deleted : {};
+  let smChanged = false;
+  ytPairs().forEach(([a, platform]) => {
+    if (!gone[a.id] && !d.accounts.some(x => x.id === a.id)) { d.accounts.push(ytAccount(a, platform)); smChanged = true; }
+  });
   YT_PLANS.forEach(({ acc, ideas }) => {
-    if (!d.accounts.some(a => a.id === acc.id)) {
-      d.accounts.push({ ...acc, platform: 'youtube', hashtagSets: [], updatedAt: now,
-        targets: [{ id: acc.id + '-t1', format: 'yt-long', count: 1, per: 'week', days: [0, 1, 2, 3, 4, 5, 6], time: '' }] });
-    }
     ideas.forEach((title, k) => {
       const id = `${acc.id}-v${k + 1}`;
-      if (d.ideas.some(i => i.id === id)) return;
+      if (gone[id] || d.ideas.some(i => i.id === id)) return;
+      smChanged = true;
       d.ideas.push({ id, title, description: '', notes: '', accountIds: [acc.id], formats: acc.id === 'yt-sog' ? ['yt-long', 'yt-short'] : ['yt-long'],
         status: 'idea', priority: k < 2 ? 'high' : 'medium', tags: [], seriesName: '', seriesPart: null, date: '', time: '', links: [],
-        caption: '', hashtags: '', ytTitle: '', ytDescription: '', ytTags: '', postedAt: null, createdAt: now - k, updatedAt: now });
+        caption: '', hashtags: '', ytTitle: '', ytDescription: '', ytTags: '', postedAt: null, createdAt: now - k, updatedAt: 1 });
     });
   });
-  try { localStorage.setItem('contentPlanner.v1', JSON.stringify(d)); } catch { /* ignore */ }
-  // 2) 💰 Earning: ❤️ Passion → 📺 YouTube → one page per channel with the full plan.
+  if (smChanged) { try { localStorage.setItem('contentPlanner.v1', JSON.stringify(d)); } catch { /* ignore */ } }
+  // 2) 💰 Earning: ❤️ Passion → 📺 YouTube → one page per channel with its plan.
+  let pagesChanged = false;
   const mk = (id, icon, title, parentId, order, blocks = []) => {
-    if (!findPage(id)) { delete earn.deleted[id]; earn.pages.push(normalizePage({ id, icon, title, parentId, order, blocks, by: myRef(), createdAt: now, updatedAt: now })); }
+    if (findPage(id) || earn.deleted[id]) return;
+    earn.pages.push(normalizePage({ id, icon, title, parentId, order, blocks, by: myRef(), createdAt: now, updatedAt: now }));
+    pagesChanged = true;
   };
   mk(CAT_PASSION, '❤️', 'Passion Projects', null, 1);
   mk('cat-yt', '📺', 'YouTube', CAT_PASSION, 0);
   YT_PLANS.forEach(({ acc, blocks }, i) => mk('ch-' + acc.id, acc.icon, acc.name, 'cat-yt', i, blocks.map(([type, text]) => newBlock(type, text))));
-  saveEarn();
-  // 3) Each channel's 📥 Inbox: the "agla kadam" tasks.
-  YT_PLANS.forEach(({ acc, tasks }) => tasks.forEach((text, k) => {
-    const id = `${acc.id}-task${k + 1}`;
-    if (!state.todos.some(t => t.id === id)) state.todos.push(normalizeTodo({ id, text, folder: 'ch:' + acc.id, order: k, by: myRef(), createdAt: now + k, updatedAt: now }));
-  }));
-  saveState();
-  toast('📥 5 YouTube channel aa gaye: 💊 Pharma Street, 🧬 Molecule to Medicine, 💪 Science of Gains (plan ke saath) + 🇩🇪 German learners, 📗 German with Kuldeep');
+  YT_PLANS.forEach(({ acc, ig }) => ig && mk('ch-' + ig.id, ig.icon, ig.name + ' — Instagram', 'ch-' + acc.id, 0));
+  if (pagesChanged) saveEarn();
+  // 3) Each channel's 📥 Inbox: the "agla kadam" tasks (only the first time on this device).
+  let firstTime = false;
+  try { firstTime = !localStorage.getItem(YT_DONE_KEY); localStorage.setItem(YT_DONE_KEY, '1'); } catch { /* ignore */ }
+  if (firstTime) {
+    YT_PLANS.forEach(({ acc, tasks }) => tasks.forEach((text, k) => {
+      const id = `${acc.id}-task${k + 1}`;
+      if (!state.todos.some(t => t.id === id)) state.todos.push(normalizeTodo({ id, text, folder: 'ch:' + acc.id, order: k, by: myRef(), createdAt: now + k, updatedAt: now }));
+    }));
+    saveState();
+  }
+  return smChanged || pagesChanged;
+}
+function importYtPlans() {
+  if (!canEarn() || !earnCloud.code) { toast('🔒 Pehle Earning unlock karo, phir ye link dobara kholo'); location.hash = '#/earn'; return; }
+  try { localStorage.removeItem(YT_DONE_KEY); } catch { /* ignore */ }
+  ensureYtChannels();
+  toast('📺 YouTube channels: 💊 Pharma Street, 🧬 Molecule to Medicine, 💪 Science of Gains, 🇩🇪 German learners, 📗 German with Kuldeep');
   location.hash = '#/earn/cat-yt';
 }
 
@@ -6272,6 +6307,7 @@ function render() {
     mountGoogleButtons();
     return;
   }
+  ensureYtChannels(); // 📺 your YouTube channels are always there
   if (page === 'today' || page === 'inbox' || page === 'misc') { location.hash = '#/dashboard'; return; } // merged into Dashboard + Inbox
   if (page === 'pcauth') { app.innerHTML = renderPcAuth(id, parseRoute().extra); document.title = 'PC app me login'; mountPcAuth(id, parseRoute().extra); return; } // 📅 Today was merged into the Inbox
   document.body.classList.toggle('pop-mode', page === 'pop');

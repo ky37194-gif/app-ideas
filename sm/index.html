@@ -392,6 +392,15 @@ function migrate(raw) {
   return raw;
 }
 
+// Your App Ideas YouTube channels go first, in their order (inside App Ideas only).
+function myChannelsFirst(accounts) {
+  let plans = [];
+  try { plans = (window.parent !== window && window.parent.YT_PLANS) || []; } catch (e) { plans = []; }
+  const order = plans.flatMap(p => [p.acc.id, ...(p.ig ? [p.ig.id] : [])]);
+  const rank = id => { const i = order.indexOf(id); return i < 0 ? 999 : i; };
+  return accounts.sort((a, b) => rank(a.id) - rank(b.id));
+}
+
 // Makes sure data loaded from storage / an imported file has every field we expect
 function normalizeData(raw) {
   const base = defaultData();
@@ -435,13 +444,29 @@ function normalizeData(raw) {
     taskLog[day] = Array.isArray(v) ? { ids: v, at: 0 } : { ids: arr(v && v.ids), at: (v && v.at) || 0 };
   });
   const deleted = raw.deleted && typeof raw.deleted === 'object' ? raw.deleted : {};
+  // Inside App Ideas: your YouTube channels (App Ideas → YT_PLANS) are always in the list, on top, with their video topics.
+  let plans = [];
+  try { plans = (window.parent !== window && window.parent.YT_PLANS) || []; } catch (e) { plans = []; }
+  plans.forEach(({ acc, ig, ideas: topics }) => {
+    [[acc, 'youtube'], ...(ig ? [[ig, 'instagram']] : [])].forEach(([a, platform]) => {
+      if (deleted[a.id] || accounts.some(x => x.id === a.id)) return;
+      accounts.push({ id: a.id, name: a.name, platform, color: COLORS[a.color] ? a.color : 'red', icon: a.icon, updatedAt: 1, hashtagSets: [],
+        targets: [{ id: a.id + '-t1', format: platform === 'youtube' ? 'yt-long' : 'ig-reel', count: 1, per: 'week', days: ALL_DAYS, time: '' }] });
+    });
+    (topics || []).forEach((title, k) => {
+      const id = `${acc.id}-v${k + 1}`;
+      if (deleted[id] || ideas.some(i => i.id === id)) return;
+      ideas.push(blankIdea({ id, title, accountIds: [acc.id], formats: acc.id === 'yt-sog' ? ['yt-long', 'yt-short'] : ['yt-long'], priority: k < 2 ? 'high' : 'medium', createdAt: Date.now() - k, updatedAt: 1 }));
+    });
+  });
+  myChannelsFirst(accounts);
   return { version: DATA_VERSION, accounts, ideas, dailyTasks, taskLog, deleted, settings: { ...base.settings, ...(raw.settings || {}) } };
 }
 
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? normalizeData(JSON.parse(raw)) : defaultData();
+    return normalizeData(raw ? JSON.parse(raw) : defaultData());
   } catch (e) {
     console.warn('Could not load saved data', e);
     return defaultData();
@@ -530,7 +555,7 @@ function mergeData(local, remote) {
   return {
     ...local, // keeps this device's settings
     version: DATA_VERSION,
-    accounts: mergeList(local.accounts, remote.accounts, deleted),
+    accounts: myChannelsFirst(mergeList(local.accounts, remote.accounts, deleted)),
     ideas: mergeList(local.ideas, remote.ideas, deleted).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
     dailyTasks: mergeList(local.dailyTasks, remote.dailyTasks, deleted),
     taskLog,
