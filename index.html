@@ -689,6 +689,18 @@
   .todo:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
   .todo-text { display: flex; flex-direction: column; gap: 3px; padding: 4px 0; }
   .todo-text .tt { font-weight: 550; line-height: 1.35; }
+  /* Text gets the full row width: action buttons float over the right edge on hover (PC), or sit on their own line (touch). */
+  .todo { position: relative; flex-wrap: wrap; }
+  .todo-acts { display: flex; align-items: center; gap: 2px; flex: none; }
+  @media (hover: hover) {
+    .todo-acts { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); padding-left: 10px;
+      background: linear-gradient(90deg, transparent, var(--surface) 10px); opacity: 0; pointer-events: none; transition: opacity .12s; }
+    .todo:hover .todo-acts, .todo:focus-within .todo-acts, .todo.selected .todo-acts { opacity: 1; pointer-events: auto; }
+    [data-theme="tick"] .todo .todo-acts .icon-btn { opacity: 1; }
+  }
+  @media (hover: none) {
+    .todo-acts { flex-basis: 100%; justify-content: flex-end; }
+  }
   .tt-row { display: block; }
   .todo-desc { font-size: .8rem; line-height: 1.4; color: var(--muted); font-weight: 400; white-space: pre-line;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -2087,12 +2099,14 @@ function todoRow(t) {
         <button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="${t.done ? 'Done. Tap to undo' : 'Mark done'}">${t.done ? '✓' : ''}</button>
         <span class="todo-text" data-action="open-todo" data-id="${t.id}" title="Kholo — description, photos, andar ke kaam"><span class="tt-row"><span class="tt">${esc(t.text)}</span>${t.images.length ? `<span class="todo-extra">🖼️${t.images.length}</span>` : ''}</span>${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}${all.length ? progressLine(all) : ''}</span>
         ${t.by ? avatar(t.by) : ''}
+        <span class="todo-acts">
         ${t.id === UP_NEXT ? '' : prioButton(t) + todayButton(t) + currentButton(t)}
         ${t.id === UP_NEXT ? '' : t.folder === INBOX && !t.parentId
           ? `<button class="icon-btn" data-action="inbox-move" data-id="${t.id}" aria-label="Folder me daalo" title="📂 Kisi folder / list / Earning page me daalo">📂</button>`
           : canEarn() ? `<button class="icon-btn" data-action="todo-to-earn" data-id="${t.id}" aria-label="Earning me bhejo" title="💰 Earning me bhejo">📂</button>` : ''}
         <button class="icon-btn todo-sub" data-action="add-subtodo" data-id="${t.id}" aria-label="Iske andar task add karo" title="Andar task add karo">＋</button>
         <button class="icon-btn todo-del" data-action="delete-todo" data-id="${t.id}" aria-label="Delete">✕</button>
+        </span>
       </div>
       ${(kids.length && isOpen) || adding ? `<ul class="todo-list todo-children">
         ${isOpen ? [...kids].reverse().map(todoRow).join('') : ''}
