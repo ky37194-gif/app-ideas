@@ -842,7 +842,12 @@
   .dash-cur-row { display: grid; gap: 4px; padding: 10px 2px; text-decoration: none; color: inherit; border-top: 1px solid var(--border); }
   .dash-cur-row:first-of-type { border-top: 0; }
   .dash-cur-name { font-weight: 700; font-size: 1rem; }
-  .dash-cur-row.main .dash-cur-name { font-size: 1.3rem; font-weight: 800; }
+  .dash-cur-row.main .dash-cur-name { font-size: 1.15rem; font-weight: 800; line-height: 1.3; }
+  /* Dashboard lines: buttons compact so the text gets the room. */
+  .dash-cur-head { gap: 6px; }
+  .dash-cur-head .now-play, .upnext-item .now-play, .dash-now .now-play { margin-left: 0; padding: 2px 3px; }
+  .upnext-item { gap: 6px; }
+  .dash-cur-name, .dash-line-text { word-break: break-word; line-height: 1.3; }
   .dash-cur-row:hover .dash-cur-name { color: var(--primary); }
   /* Dashboard: left = 🎯 Current + ⏭️ Up next, right = 📥 Inbox */
   .dash-page { max-width: 1400px; }
