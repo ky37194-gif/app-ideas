@@ -5982,7 +5982,7 @@ function renameSideHustle() {
   const cat = earnCloud.code && findPage(CAT_EARN);
   if (cat && cat.title.trim() === 'Earning') { cat.title = 'Digital Business'; cat.icon = '💼'; cat.updatedAt = Date.now(); saveEarn(); }
   const pas = earnCloud.code && findPage(CAT_PASSION);
-  if (pas && pas.title.trim() === 'Passion + Earning') { pas.title = 'Passion Projects'; pas.updatedAt = Date.now(); saveEarn(); }
+  if (pas && pas.title.trim() === 'Passion + Earning') { pas.title = 'Creator Studio'; pas.icon = '🎬'; pas.updatedAt = Date.now(); saveEarn(); }
   const p = earnCloud.code && findPage('side-hustle');
   if (!p || p.title.trim() !== 'Bana ke Becho') return;
   p.title = 'Digital Products';
@@ -6018,7 +6018,7 @@ function earnCategorize() {
     return findPage(id);
   };
   make(CAT_EARN, '💼', 'Digital Business', null, 0);
-  make(CAT_PASSION, '❤️', 'Passion Projects', null, 1);
+  make(CAT_PASSION, '🎬', 'Creator Studio', null, 1);
   EARN_CATS.forEach(([id, icon, title], i) => make(id, icon, title, CAT_EARN, i));
   PASSION_CATS.forEach(([id, icon, title], i) => make(id, icon, title, CAT_PASSION, i));
   // Every YT channel / IG page from the Content Planner gets its own page.
@@ -6037,7 +6037,7 @@ function earnCategorize() {
   earn.pages.filter(p => isTopPage(p) && p.id !== CAT_EARN && p.id !== CAT_PASSION).forEach(p => { p.parentId = CAT_EARN; p.order = null; p.updatedAt = now; });
   saveEarn();
   render();
-  toast('💸 Earning ab 2 category me hai: Earning + ❤️ Passion. Galat jagah gaya page ⠿ se khiskao.');
+  toast('💸 Earning ab 2 category me hai: Earning + 🎬 Creator Studio. Galat jagah gaya page ⠿ se khiskao.');
 }
 
 /* ----- 📥 One-time import: the 3 YouTube channel plans (Pharma Street, Molecule to Medicine, Science of Gains) -----
@@ -6224,6 +6224,7 @@ const igOf = ytId => (YT_PLANS.find(p => p.acc.id === ytId) || {}).ig || null;
 /* Runs by itself once per device as soon as Earning is unlocked (and again from #/import-yt).
    Adds whatever is missing; something you deleted yourself stays deleted. */
 const YT_DONE_KEY = 'ytChannels.v1';
+const YT_TOP_KEY = 'ytChannelsTop.v1';
 function ensureYtChannels() {
   if (!canEarn() || !earnCloud.code) return false;
   const now = Date.now();
@@ -6255,10 +6256,22 @@ function ensureYtChannels() {
     earn.pages.push(normalizePage({ id, icon, title, parentId, order, blocks, by: myRef(), createdAt: now, updatedAt: now }));
     pagesChanged = true;
   };
-  mk(CAT_PASSION, '❤️', 'Passion Projects', null, 1);
+  mk(CAT_PASSION, '🎬', 'Creator Studio', null, 1);
+  // The old name "Passion Projects" → 🎬 Creator Studio (only if you never renamed it yourself).
+  const cat = findPage(CAT_PASSION);
+  if (cat && cat.title === 'Passion Projects') { cat.title = 'Creator Studio'; if (cat.icon === '❤️') cat.icon = '🎬'; cat.updatedAt = now; pagesChanged = true; }
   mk('cat-yt', '📺', 'YouTube', CAT_PASSION, 0);
   YT_PLANS.forEach(({ acc, blocks }, i) => mk('ch-' + acc.id, acc.icon, acc.name, 'cat-yt', i, blocks.map(([type, text]) => newBlock(type, text))));
   YT_PLANS.forEach(({ acc, ig }) => ig && mk('ch-' + ig.id, ig.icon, ig.name + ' — Instagram', 'ch-' + acc.id, 0));
+  // Once per device: your 5 channels = #1…#5 inside 📺 YouTube, older pages after them (drag ⠿ to change later).
+  let topDone = true;
+  try { topDone = !!localStorage.getItem(YT_TOP_KEY); } catch { /* ignore */ }
+  if (!topDone && findPage('cat-yt')) {
+    const mine = YT_PLANS.map(p => findPage('ch-' + p.acc.id)).filter(Boolean);
+    const rest = childPages('cat-yt').filter(p => !mine.includes(p));
+    [...mine, ...rest].forEach((p, i) => { if (p.order !== i) { p.order = i; p.updatedAt = now; pagesChanged = true; } });
+    try { localStorage.setItem(YT_TOP_KEY, '1'); } catch { /* ignore */ }
+  }
   if (pagesChanged) saveEarn();
   // 3) Each channel's 📥 Inbox: the "agla kadam" tasks (only the first time on this device).
   let firstTime = false;
