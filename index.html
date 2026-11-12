@@ -1717,7 +1717,7 @@ function postedThisWeek(accountId, format) {
   return d.ideas.filter(i => i.status === 'posted' && (i.postedAt || i.date || '') >= from && (i.accountIds || []).includes(accountId) && (i.formats || []).includes(format)).length;
 }
 
-function slotCard(s, day, accs) {
+function slotCard(s, day, accs, hideAcc = false) {
   const a = accs.find(x => x.id === s.accountId);
   const date = slotDate(day);
   const done = s.done.includes(date);
@@ -1727,7 +1727,7 @@ function slotCard(s, day, accs) {
       <button class="wk-slot-body" data-action="wk-edit" data-id="${s.id}" title="Badlo / hatao">
         <span class="wk-time">${fmtT(s.start)}${s.end ? '–' + fmtT(s.end) : ''}${live ? ' <b class="wk-now">● Abhi</b>' : ''}</span>
         <span class="wk-what">${KIND[s.kind].ico} ${esc(s.text || KIND[s.kind].label)}</span>
-        ${a ? `<span class="wk-acc">${esc(accName(a))}</span>` : ''}
+        ${a && !hideAcc ? `<span class="wk-acc">${esc(accName(a))}</span>` : ''}
       </button>
     </div>`;
 }
@@ -1779,9 +1779,9 @@ function renderWeek() {
     ${bottomNav('week')}`;
 }
 
-function openSlotSheet(slot, day) {
+function openSlotSheet(slot, day, acc) {
   const accs = smAccounts();
-  const s = slot || normalizeSlot({ days: [Number(day) || 0], accountId: ui.weekAcc || '', kind: 'shoot' });
+  const s = slot || normalizeSlot({ days: [Number(day) || 0], accountId: acc || ui.weekAcc || '', kind: 'shoot' });
   const sheet = document.getElementById('sheet');
   sheet.innerHTML = `
     <form id="wk-form" class="sheet-inner" data-id="${slot ? s.id : ''}" autocomplete="off">
@@ -1825,7 +1825,7 @@ document.addEventListener('submit', e => {
 
 const weekActions = {
   'wk-acc'(el) { ui.weekAcc = el.dataset.value; render(); },
-  'wk-new'(el) { openSlotSheet(null, el.dataset.day); },
+  'wk-new'(el) { openSlotSheet(null, el.dataset.day, el.dataset.acc); },
   'wk-edit'(el) { const s = state.week.find(x => x.id === el.dataset.id); if (s) openSlotSheet(s); },
   'wk-del'(el) {
     const s = state.week.find(x => x.id === el.dataset.id);
@@ -4042,6 +4042,7 @@ function channelBoard({ platform = null, accountId = null } = {}) {
             : '<span class="muted small">Kuch nahi — neeche kisi kaam pe ▶️ dabao</span>'}
           ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span><button class="btn small-btn" data-action="ch-now" data-id="${next.id}">▶️</button></div>` : ''}
         </div>
+        ${chWeek(a)}
         <span class="dash-cur-label">📥 Inbox${rest.length ? ` · ${rest.length}` : ''}</span>
         ${rest.length ? `<ul class="upnext-list">${shown.map(chLine).join('')}${rest.length > 5 ? `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${folder}">${dashMore.has(folder) ? '▴ Kam dikhao' : `▸ ${rest.length - 5} aur`}</button></li>` : ''}</ul>` : ''}
         <form class="dash-add-form" data-parent="" data-folder="${folder}" autocomplete="off"><input name="text" maxlength="300" required placeholder="＋ ${esc(a.name)} ke liye kuch bhi likho… Enter" aria-label="New task"></form>
@@ -4066,7 +4067,26 @@ function channelBoard({ platform = null, accountId = null } = {}) {
       </div>
     </div>`;
 }
+// 🗓️ This channel's week, right inside its folder: day by day, tick when done.
+function chWeek(a) {
+  const accs = smAccounts(), today = dayIdx();
+  const open = ui.chWeekOpen?.[a.id] !== false;
+  const total = WEEK_DAYS.reduce((n, _, i) => n + slotsOn(i, a.id).length, 0);
+  const doneN = WEEK_DAYS.reduce((n, _, i) => n + slotsOn(i, a.id).filter(s => s.done.includes(slotDate(i))).length, 0);
+  const rows = WEEK_DAYS.map((d, i) => {
+    const list = slotsOn(i, a.id);
+    return `<div class="wk-day${i === today ? ' today' : ''}" style="margin-bottom:6px">
+        <div class="wk-day-head"><span>${WEEK_DAYS_HI[i]}${i === today ? ' · aaj' : ''}</span><button class="icon-btn" data-action="wk-new" data-day="${i}" data-acc="${esc(a.id)}" aria-label="${d} ka kaam daalo" title="${WEEK_DAYS_HI[i]} ka kaam daalo">＋</button></div>
+        ${list.map(s => slotCard(s, i, accs, true)).join('') || '<div class="wk-empty">—</div>'}
+      </div>`;
+  }).join('');
+  return `<div class="ch-week">
+      <button type="button" class="dash-more" data-action="ch-week-toggle" data-id="${esc(a.id)}" style="font-weight:700">${open ? '▾' : '▸'} 🗓️ Hafte ka plan${total ? ` · ${doneN}/${total} ho gaye` : ''}</button>
+      ${open ? rows : ''}
+    </div>`;
+}
 const channelActions = {
+  'ch-week-toggle'(el) { ui.chWeekOpen = ui.chWeekOpen || {}; ui.chWeekOpen[el.dataset.id] = ui.chWeekOpen[el.dataset.id] === false; render(); },
   'ch-now'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
