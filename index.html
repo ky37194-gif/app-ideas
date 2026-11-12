@@ -6032,6 +6032,219 @@ function earnCategorize() {
   toast('💸 Earning ab 2 category me hai: Earning + ❤️ Passion. Galat jagah gaya page ⠿ se khiskao.');
 }
 
+/* ----- 📥 One-time import: the 3 YouTube channel plans (Pharma Street, Molecule to Medicine, Science of Gains) -----
+   Open #/import-yt while logged in → each channel is added to the 📣 Content Planner, gets its own page
+   under ❤️ Passion → 📺 YouTube with the full plan, its "agla kadam" tasks in its 📥 Inbox, and the
+   video topics as Content Planner ideas. Fixed ids → opening it again doesn't make copies. */
+const YT_PLAN_MONETIZE = [
+  ['h2', '💰 Monetize kaise hoga'],
+  ['callout', 'YouTube ke niyam badalte rehte hain — final faisle se pehle YouTube ka apna page ek baar khud dekh lena.'],
+  ['bullet', 'Pehla level (Membership, Super Thanks, Super Chat — ads nahi): 500 subscribers + 90 din mein 3 public videos + 3,000 watch hours ya 30 lakh Shorts views'],
+  ['bullet', 'Ads (YPP — ads + YouTube Premium ka hissa): 1,000 subscribers + 4,000 valid public watch hours (12 mahine mein) ya 1,000 subscribers + 1 crore Shorts views (90 din mein)'],
+  ['bullet', 'Baaki shartein (inke bina application reject): 2-Step Verification on, AdSense account juda hua, koi active strike nahi'],
+  ['quote', '4,000 watch hours = 2,40,000 minute. Lambi video (15-25 min) har hafte zaroori — Shorts ke minute in 4,000 hours mein nahi gine jate.'],
+  ['bullet', '4 min video, poori dekhi → ~60,000 views chahiye'],
+  ['bullet', '10 min, aadhi (5 min) dekhi → ~48,000 views'],
+  ['bullet', '20 min, aadhi (10 min) dekhi → ~24,000 views'],
+  ['bullet', '30 min, aadhi (15 min) dekhi → ~16,000 views'],
+];
+const YT_PLAN_MONEY = [
+  ['h2', '💸 Paisa kahan se aayega'],
+  ['bullet', 'Ads — YPP ke baad. India education content: aksar Rs 20-120 per 1,000 views (1 lakh views ≈ Rs 2,000-12,000). Shuru mein chhota.'],
+  ['bullet', 'Apne notes / PDF bechna — 500 subscribers ke baad bhi ho sakta hai. Sabse zyada kamai: 200 log × Rs 199 = Rs 39,800, YouTube ka hissa nahi.'],
+  ['bullet', 'Membership / Super Thanks — 500 subscribers ke baad. Chhoti par pakki aamdani.'],
+  ['bullet', 'Sponsorship — ~5,000-10,000 subscribers ke baad. Ek video ka Rs 5,000-50,000.'],
+  ['bullet', 'Coaching / batch — jab log tumhe jaanne lagein. Sabse bada potential, sabse zyada waqt.'],
+];
+const YT_PLANS = [
+  {
+    acc: { id: 'yt-pharmastreet', name: 'Pharma Street', icon: '💊', color: 'red' },
+    blocks: [
+      ['callout', 'Hindi channel · 252 subscribers · 21 videos · @pharmastreet7876 — sabse pehle yahi monetize hoga. Agle 6 mahine mehnat ka sabse bada hissa yahan.'],
+      ['h2', '🎯 Ye channel kis liye hai'],
+      ['bullet', 'Kiske liye: D.Pharm, B.Pharm, M.Pharm aur nursing students'],
+      ['bullet', 'Bhasha: Hindi (technical shabd English mein, jaise class mein)'],
+      ['bullet', 'Vaada: poora B.Pharm aur M.Pharm syllabus, free'],
+      ['bullet', 'Alag kya hai: ratta nahi, mechanism samajhna — animation ke saath'],
+      ...YT_PLAN_MONETIZE,
+      ['h2', '🧱 Content ka dhaancha (har hafte, bina naga)'],
+      ['bullet', '1 lambi lecture video (15-25 min) — watch hours ka asli source, unit-wise syllabus'],
+      ['bullet', '2-3 Shorts (under 60 sec) — naye subscriber; ek concept, ek mnemonic, ek MCQ'],
+      ['bullet', '1 exam-focused video (8-12 min) — important questions, MCQs, last minute revision'],
+      ['h2', '📅 Pehle 8 hafte (har hafte 1 lambi + 3 Shorts)'],
+      ['num', 'General Pharmacology — routes of administration, ADME'],
+      ['num', 'Autonomic Nervous System — poora overview'],
+      ['num', 'Cholinergic drugs — agonists aur antagonists'],
+      ['num', 'Adrenergic drugs — receptors se effects tak'],
+      ['num', 'CVS drugs — antihypertensives'],
+      ['num', 'Pharmaceutics — tablet manufacturing'],
+      ['num', 'Pharmaceutical Chemistry — drug design basics'],
+      ['num', 'Semester exam special — important questions'],
+      ['quote', 'Topic ka niyam: jo exam mein aata hai aur students Google par search karte hain. Unki zaroorat se chuno, apni pasand se nahi.'],
+      ['h2', '🗓️ Har hafte ka routine (~3 ghante)'],
+      ['bullet', 'Somvar (30 min): agle hafte ka topic tay karo, Claude Code se script + animation banwao'],
+      ['bullet', 'Mangalvar (30 min): video render hone do, beech mein 3 Shorts ki script likho'],
+      ['bullet', 'Budhvar (45 min): lambi video upload — title, description, chapters, tags, thumbnail'],
+      ['bullet', 'Guruvar (20 min): Shorts upload (ek-ek karke, saath mein nahi)'],
+      ['bullet', 'Shukravar (20 min): har comment ka jawab do'],
+      ['bullet', 'Shanivar (20 min): Analytics — kaunsi video chali aur kyun, agla topic usi hisaab se'],
+      ['bullet', 'Ravivar: chhutti. Burnout se channel marte hain.'],
+      ...YT_PLAN_MONEY,
+    ],
+    tasks: [
+      'Google account par 2-Step Verification chalu karo (iske bina monetization nahi)',
+      'Purani 21 videos ke title aur description theek karo (search traffic aata hai)',
+      "Playlist banao: 'B.Pharm Pharmacology - Complete'",
+      'Har video ke end mein next video ka link daalo (End screen)',
+    ],
+    ideas: [
+      'General Pharmacology — routes of administration, ADME', 'Autonomic Nervous System — poora overview',
+      'Cholinergic drugs — agonists aur antagonists', 'Adrenergic drugs — receptors se effects tak',
+      'CVS drugs — antihypertensives', 'Pharmaceutics — tablet manufacturing',
+      'Pharmaceutical Chemistry — drug design basics', 'Semester exam special — important questions',
+    ],
+  },
+  {
+    acc: { id: 'yt-m2m', name: 'Molecule to Medicine', icon: '🧬', color: 'coral' },
+    blocks: [
+      ['callout', 'English channel · naya (0 subscribers) · @themoleculetomedicine — duniya bhar ke liye, lamba khel. 6-12 mahine lagenge.'],
+      ['h2', '🎯 Ye channel kis liye hai'],
+      ['bullet', 'Kiske liye: duniya bhar ke pharmacy, medical aur life-science students'],
+      ['bullet', 'Bhasha: poori English'],
+      ['bullet', 'Vaada: har dawa ka mechanism, animation ke saath, first principles se'],
+      ['bullet', 'Alag kya hai: 3Blue1Brown jaisi animation, par pharmacology par — ye abhi bahut kam log kar rahe hain'],
+      ...YT_PLAN_MONETIZE,
+      ['bullet', 'Faida: US / UK / Europe ke views par ads ka rate kai guna — aksar Rs 200-600 per 1,000 views'],
+      ['h2', '🧱 Content ka dhaancha (har hafte ek cheez, par behtareen)'],
+      ['bullet', '1 animated explainer (8-15 min) — channel ki jaan: ek drug, ek mechanism, poori tarah samjhaya'],
+      ['bullet', '1-2 Shorts (under 60 sec) — usi video ka sabse achha 40 second ka tukda'],
+      ['h2', '🎬 Pehle 10 videos ("mechanism of action of [drug]")'],
+      ['num', 'Atropine — competitive antagonism ka sabse saaf udaharan'],
+      ['num', 'Propranolol (beta blockers) — har exam mein, har jagah search'],
+      ['num', 'Aspirin (COX inhibition) — duniya ki sabse jaani-pehchani dawa'],
+      ['num', 'Insulin — receptor se glucose tak (diabetes, bada audience)'],
+      ['num', 'Morphine — opioid receptors (bahut search hota hai)'],
+      ['num', 'Antibiotics — penicillin kaise maarta hai (bacteria ki deewar)'],
+      ['num', 'Agonist vs Antagonist — basic concept, lambe samay tak chalega'],
+      ['num', 'Pharmacokinetics — ADME (har course mein hai)'],
+      ['num', 'Statins — cholesterol (sabse zyada likhi jaane wali dawa)'],
+      ['num', 'Drug discovery — molecule se medicine tak (channel ke naam wala topic)'],
+      ['h2', '🗓️ Har hafte ka routine'],
+      ['bullet', 'Somvar (30 min): topic tay karo, Claude Code mein ek line — script + animation'],
+      ['bullet', 'Mangalvar (30 min): script padh kar har fact check karo — English channel par ek galti bhi bhaari'],
+      ['bullet', 'Budhvar (45 min): video render, dekho, thumbnail banao'],
+      ['bullet', 'Guruvar (30 min): upload — title, description, chapters, tags'],
+      ['bullet', 'Shukravar (30 min): usi video se Shorts, comments ka jawab'],
+      ['bullet', "Shanivar (20 min): Analytics — khaas kar 'traffic source: search'"],
+      ['bullet', 'Ravivar: chhutti'],
+      ...YT_PLAN_MONEY,
+      ['bullet', 'Sabse badi kamai aage chalkar course se — duniya bhar ke students dollar mein pay karte hain (10,000+ subscribers ke baad)'],
+      ['h2', '🧠 Sach jo samajhna zaroori hai'],
+      ['bullet', 'Pehle 3 mahine mein shayad 100 subscriber bhi na milein. Ye normal hai.'],
+      ['bullet', 'English market mein muqabla zyada, par pharmacology par achhi animation wale bahut kam — yahi mauka hai.'],
+      ['bullet', 'Ek achhi video har hafte, do saal tak — koi shortcut nahi.'],
+    ],
+    tasks: ['Pehli video: Atropine — mechanism of action (animated explainer)'],
+    ideas: [
+      'Atropine — mechanism of action', 'Propranolol — beta blockers', 'Aspirin — COX inhibition',
+      'Insulin — receptor to glucose', 'Morphine — opioid receptors', 'Antibiotics — how penicillin kills bacteria',
+      'Agonist vs Antagonist', 'Pharmacokinetics — ADME', 'Statins — cholesterol', 'Drug discovery — from molecule to medicine',
+    ],
+  },
+  {
+    acc: { id: 'yt-sog', name: 'Science of Gains', icon: '💪', color: 'crimson' },
+    blocks: [
+      ['callout', 'Fitness channel · naya · @scienceofgainsindia — sabse zyada muqabla, isliye teesri priority. Jab pharma wale channel chal padein tab.'],
+      ['h2', '🎯 Ye channel kis liye hai'],
+      ['bullet', 'Kiske liye: gym jaane wale, khaas kar beginners'],
+      ['bullet', 'Vaada: evidence se baat, bro-science se nahi'],
+      ['bullet', 'Asli hathiyaar: tum pharmacy padhte ho — supplements, steroids, fat burners, protein ka asli science'],
+      ['h2', '✨ Alag kaise dikhoge — "ek pharmacy wala fitness samjha raha hai"'],
+      ['bullet', "'Ye supplement lo' → ye body mein kaise kaam karta hai, research kya kehti hai"],
+      ['bullet', "'Fat burner se weight ghatao' → fat burner mein kya hota hai, asal mein kya karta hai"],
+      ['bullet', "'Protein zaroori hai' → kitna, kab, kyun — kidney par asar ka sach"],
+      ['bullet', "'Steroid mat lo' → steroid body mein kya karta hai, nuksan kaise hota hai"],
+      ['callout', '⚠️ Kabhi kisi ko dawa ya steroid lene ki salah mat dena. Samjhana aur salah dena alag hai — health content par YouTube sakht hai.'],
+      ...YT_PLAN_MONETIZE,
+      ['h2', '🧱 Content ka dhaancha (Shorts par zyada zor)'],
+      ['bullet', 'Shorts (under 60 sec) — hafte mein 4-5'],
+      ['bullet', 'Lambi video (10-15 min) — hafte mein 1'],
+      ['h2', '🎬 Pehle 8 videos'],
+      ['num', 'Whey protein — body mein kaise kaam karta hai'],
+      ['num', 'Creatine — sabse zyada research wala supplement'],
+      ['num', 'Fat burner ka sach'],
+      ['num', 'Beginner ke liye poora week ka workout plan'],
+      ['num', 'Diet — calorie aur protein ka hisaab kaise lagayein'],
+      ['num', 'Pre-workout mein kya hota hai'],
+      ['num', 'Muscle banta kaise hai — science'],
+      ['num', 'Supplement jo paise ki barbaadi hain'],
+      ['h2', '🗓️ Har hafte ka routine'],
+      ['bullet', 'Somvar (30 min): hafte ke 5 Shorts ke topic aur script'],
+      ['bullet', 'Mangalvar (60 min): saare Shorts ek saath shoot'],
+      ['bullet', 'Budhvar (45 min): lambi video shoot'],
+      ['bullet', 'Guruvar (60 min): edit, thumbnail'],
+      ['bullet', 'Shukravar (30 min): lambi video upload + ek Short'],
+      ['bullet', 'Shanivar (15 min): baaki Shorts (roz ek, ek saath nahi)'],
+      ['bullet', 'Ravivar (20 min): comments, analytics, chhutti'],
+      ...YT_PLAN_MONEY,
+      ['bullet', 'Fitness mein affiliate aur personal coaching se ads se zyada kamai — par bharosa banne mein waqt lagta hai.'],
+      ['h2', '🤝 Ek imaandaar salah'],
+      ['quote', 'Teen channel = hafte mein ~9 ghante. Pehle 6 mahine Pharma Street par poora zor, Molecule to Medicine par hafte mein ek video, aur ye fitness channel tab jab pehle do chal padein. Teen adhoore channel se ek chalta hua channel behtar hai.'],
+    ],
+    tasks: ['Shuru tab karna jab Pharma Street + Molecule to Medicine chal padein (teesri priority)'],
+    ideas: [
+      'Whey protein — body mein kaise kaam karta hai', 'Creatine — sabse zyada research wala supplement', 'Fat burner ka sach',
+      'Beginner ke liye poora week ka workout plan', 'Diet — calorie aur protein ka hisaab', 'Pre-workout mein kya hota hai',
+      'Muscle banta kaise hai — science', 'Supplement jo paise ki barbaadi hain',
+    ],
+  },
+  // German channels: no plan yet — just their own card + page.
+  { acc: { id: 'yt-germanlearners', name: 'German learners', icon: '🇩🇪', color: 'red' },
+    blocks: [['callout', 'German channel · naya (0 subscribers). Plan abhi banana hai — yahan likho.']], tasks: [], ideas: [] },
+  { acc: { id: 'yt-germankuldeep', name: 'German with Kuldeep', icon: '📗', color: 'crimson' },
+    blocks: [['callout', 'German channel · naya (0 subscribers). Plan abhi banana hai — yahan likho.']], tasks: [], ideas: [] },
+];
+
+function importYtPlans() {
+  if (!canEarn() || !earnCloud.code) { toast('🔒 Pehle Earning unlock karo, phir ye link dobara kholo'); location.hash = '#/earn'; return; }
+  const now = Date.now();
+  // 1) 📣 Content Planner: the 3 channels + their video topics as ideas (they go to the cloud when the planner opens).
+  let d = smData();
+  if (!d) d = { version: 5, accounts: SM_DEFAULT_ACCOUNTS.map(a => ({ ...a, updatedAt: 0, hashtagSets: [], targets: [] })), ideas: [], dailyTasks: [], taskLog: {}, deleted: {} };
+  d.accounts = Array.isArray(d.accounts) ? d.accounts : [];
+  d.ideas = Array.isArray(d.ideas) ? d.ideas : [];
+  YT_PLANS.forEach(({ acc, ideas }) => {
+    if (!d.accounts.some(a => a.id === acc.id)) {
+      d.accounts.push({ ...acc, platform: 'youtube', hashtagSets: [], updatedAt: now,
+        targets: [{ id: acc.id + '-t1', format: 'yt-long', count: 1, per: 'week', days: [0, 1, 2, 3, 4, 5, 6], time: '' }] });
+    }
+    ideas.forEach((title, k) => {
+      const id = `${acc.id}-v${k + 1}`;
+      if (d.ideas.some(i => i.id === id)) return;
+      d.ideas.push({ id, title, description: '', notes: '', accountIds: [acc.id], formats: acc.id === 'yt-sog' ? ['yt-long', 'yt-short'] : ['yt-long'],
+        status: 'idea', priority: k < 2 ? 'high' : 'medium', tags: [], seriesName: '', seriesPart: null, date: '', time: '', links: [],
+        caption: '', hashtags: '', ytTitle: '', ytDescription: '', ytTags: '', postedAt: null, createdAt: now - k, updatedAt: now });
+    });
+  });
+  try { localStorage.setItem('contentPlanner.v1', JSON.stringify(d)); } catch { /* ignore */ }
+  // 2) 💰 Earning: ❤️ Passion → 📺 YouTube → one page per channel with the full plan.
+  const mk = (id, icon, title, parentId, order, blocks = []) => {
+    if (!findPage(id)) { delete earn.deleted[id]; earn.pages.push(normalizePage({ id, icon, title, parentId, order, blocks, by: myRef(), createdAt: now, updatedAt: now })); }
+  };
+  mk(CAT_PASSION, '❤️', 'Passion Projects', null, 1);
+  mk('cat-yt', '📺', 'YouTube', CAT_PASSION, 0);
+  YT_PLANS.forEach(({ acc, blocks }, i) => mk('ch-' + acc.id, acc.icon, acc.name, 'cat-yt', i, blocks.map(([type, text]) => newBlock(type, text))));
+  saveEarn();
+  // 3) Each channel's 📥 Inbox: the "agla kadam" tasks.
+  YT_PLANS.forEach(({ acc, tasks }) => tasks.forEach((text, k) => {
+    const id = `${acc.id}-task${k + 1}`;
+    if (!state.todos.some(t => t.id === id)) state.todos.push(normalizeTodo({ id, text, folder: 'ch:' + acc.id, order: k, by: myRef(), createdAt: now + k, updatedAt: now }));
+  }));
+  saveState();
+  toast('📥 5 YouTube channel aa gaye: 💊 Pharma Street, 🧬 Molecule to Medicine, 💪 Science of Gains (plan ke saath) + 🇩🇪 German learners, 📗 German with Kuldeep');
+  location.hash = '#/earn/cat-yt';
+}
+
 function render() {
   const app = document.getElementById('app');
   const { page, id } = parseRoute();
@@ -6095,6 +6308,8 @@ function render() {
     try { window.AndroidBridge?.showKeyboard?.(); } catch { /* older app */ }
   } else if (page === 'account') {
     app.innerHTML = renderAccount();
+  } else if (page === 'import-yt') {
+    importYtPlans(); return;
   } else if (page === 'week') {
     app.innerHTML = renderWeek();
   } else if (page === 'inbox') {
