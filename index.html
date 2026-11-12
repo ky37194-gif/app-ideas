@@ -753,8 +753,7 @@
   .ch-now-text { flex: 1; min-width: 0; font-weight: 750; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .ch-box { display: grid; gap: 4px; padding: 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), var(--surface)); min-width: 0; }
   .ch-box.up { border-color: var(--border); background: var(--surface); }
-  .ch-box.nowbox { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); background: var(--surface); gap: 10px; }
-  .ch-box.nowbox .dash-cur-label { color: var(--warning); }
+  .ch-box.nowbox { gap: 10px; }
   .ch-box.drop-hover { outline: 2px dashed var(--primary); outline-offset: 2px; }
   .ch-hint { padding: 10px 12px; border: 1px dashed var(--border); border-radius: 12px; text-align: center; font-size: .8rem; color: var(--muted); }
   .ch-plan { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
@@ -784,9 +783,8 @@
   @media (hover: hover) { .dash-cur-row .dash-add-form { display: none; } .dash-cur-row:hover .dash-add-form, .dash-cur-row:focus-within .dash-add-form { display: block; } }
   .dash-left > .card { margin-bottom: 14px; }
   .dash-add-form input:focus { border-style: solid; border-color: var(--primary); background: var(--surface-2); outline: none; }
-  .dash-now { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
-  .dash-now .dash-cur-label { color: var(--warning); }
-  .dash-now.drop-hover { outline: 2px dashed var(--warning); outline-offset: 2px; }
+  .dash-now { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), var(--surface)); }
+  .dash-now.drop-hover { outline: 2px dashed var(--primary); outline-offset: 2px; }
   .dash-now > * { min-width: 0; } /* long text never pushes the card wider */
   .now-task { display: grid; gap: 10px; }
   .now-main { min-width: 0; }
