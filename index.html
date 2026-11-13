@@ -382,6 +382,13 @@
   .dash-page .upnext-item { padding: 3px 0; }
   .dash-page .now-title { font-size: 1.2rem; }
   .dash-page .dash-add-form input, .dash-feat-form input { min-height: 40px; font-size: 1rem; }
+  .dash-cat { margin-top: 10px; padding: 4px 0 0 12px; border-left: 3px solid color-mix(in srgb, var(--primary) 45%, var(--border)); }
+  .dash-cat-head { display: flex; align-items: center; gap: 8px; font-weight: 750; font-size: .95rem; color: var(--muted); text-decoration: none; padding: 2px 0; }
+  .dash-cat-head .name { flex: 1; min-width: 0; }
+  .dash-cat-head:hover { color: var(--primary); }
+  .dash-cat .dash-cur-row { padding: 8px 2px; }
+  .dash-cat .dash-cur-row:first-of-type { border-top: 0; }
+  @media (hover: hover) { .dash-feat-form { display: none; } .dash-cur-row:hover .dash-feat-form, .dash-cur-row:focus-within .dash-feat-form { display: block; } }
   .dash-feat-form input { width: 100%; padding: 6px 12px; border-radius: 10px; border: 1px dashed var(--border); background: transparent; color: var(--text); }
   .dash-feat-form input:focus { border-style: solid; border-color: var(--primary); background: var(--surface-2); outline: none; }
   .proj-row.built .proj-row-t { color: var(--muted); text-decoration: line-through; }
@@ -4360,14 +4367,18 @@ function dashEarnCard() {
   return groups.map(({ g, items }) => `
     <section class="card dash-current dash-earn">
       <div class="row-between"><span class="dash-cur-label">${esc(g.icon)} ${esc(g.title || 'Untitled')} · 🎯 ${items.length}</span><a class="muted small" href="#/earn/${g.id}">Kholo ›</a></div>
-      ${items.map(({ cat, p }) => {
+      ${[...new Set(items.map(x => x.cat))].map(cat => `
+      <div class="dash-cat">
+        <a class="dash-cat-head" href="#/earn/${cat.id}"><span>${esc(cat.icon)}</span><span class="name">${esc(cat.title || 'Untitled')}</span><span class="muted small">›</span></a>
+      ${items.filter(x => x.cat === cat).map(({ p }) => {
         const st = projStat(p), pct = st.n ? Math.round(st.done / st.n * 100) : 0, open = openFeatures(p), key = 'feat:' + p.id, all = dashMore.has(key);
         return `<div class="dash-cur-row main">
-          <div class="dash-cur-head"><a class="dash-cur-name" href="#/earn/${p.id}" style="color:inherit;text-decoration:none">${esc(cat.icon)} ${esc(p.title || 'Untitled')}</a><span class="muted small" style="flex:none">${esc(cat.title || '')}${st.n ? ` · ☑ ${st.done}/${st.n}` : ''}</span></div>
+          <div class="dash-cur-head"><a class="dash-cur-name" href="#/earn/${p.id}" style="color:inherit;text-decoration:none">${esc(p.title || 'Untitled')}</a>${st.n ? `<span class="muted small" style="flex:none">☑ ${st.done}/${st.n}</span>` : ''}</div>
           ${st.n ? `<div class="progress" style="height:6px"><div style="width:${pct}%;height:100%;background:var(--primary)"></div></div>` : ''}
           ${open.length ? `<ul class="upnext-list dash-steps">${(all ? open : open.slice(0, 6)).map(b => feat(p, b)).join('')}${open.length > 6 ? `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${key}">${all ? '▴ Kam dikhao' : `▸ ${open.length - 6} aur features`}</button></li>` : ''}</ul>` : ''}
           <form class="dash-feat-form" data-page="${p.id}" autocomplete="off"><input name="text" maxlength="300" required placeholder="＋ Feature likho… Enter" aria-label="Naya feature"></form>
         </div>`; }).join('')}
+      </div>`).join('')}
     </section>`).join('');
 }
 document.addEventListener('submit', e => {
@@ -8005,7 +8016,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13j';
+const APP_VERSION = '2026-11-13k';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {

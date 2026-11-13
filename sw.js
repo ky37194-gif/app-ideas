@@ -2,7 +2,7 @@
    Your files (index.html, icons…): try the network first (so updates arrive), else use the saved copy.
    Cloud sync (/api/…) always goes to the network, never the cache. */
 
-const CACHE = 'app-ideas-v35';
+const CACHE = 'app-ideas-v36';
 
 const APP_FILES = [
   './',
