@@ -361,8 +361,13 @@
   .proj-row { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px;
     background: var(--surface); color: inherit; text-decoration: none; }
   .proj-row:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
-  .proj-set-cur { min-height: 28px; padding: 0 10px; font-size: .8rem; flex: none; }
-  @media (hover: hover) { .proj-set-cur { opacity: 0; pointer-events: none; } .proj-row:hover .proj-set-cur { opacity: 1; pointer-events: auto; } }
+  .proj-acts { display: flex; gap: 4px; flex: none; }
+  .proj-btn { min-height: 28px; padding: 0 10px; font-size: .8rem; }
+  @media (hover: hover) { .proj-acts { opacity: 0; pointer-events: none; transition: opacity .12s; }
+    .proj-row:hover .proj-acts, .proj-cur:hover .proj-acts { opacity: 1; pointer-events: auto; } }
+  .proj-row.built .proj-row-t { color: var(--muted); text-decoration: line-through; }
+  .cat-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 22px; align-items: start; }
+  @media (max-width: 860px) { .cat-cols { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
   .proj-row-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dump-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
   .dump-item { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
@@ -3686,6 +3691,8 @@ function normalizePage(raw = {}) {
     icon: String(raw.icon || '📄').slice(0, 8),
     title: String(raw.title || ''),
     order: Number.isFinite(raw.order) ? raw.order : null, // your own rank among sibling pages (0 = top focus)
+    ...(Number(raw.cur) ? { cur: Number(raw.cur) } : {}),     // 🎯 one of the (max 3) current projects
+    ...(Number(raw.built) ? { built: Number(raw.built) } : {}), // ✅ ban gaya
     blocks: (Array.isArray(raw.blocks) ? raw.blocks : []).map(b => {
       const blk = {
         id: b.id || uid(),
@@ -4305,24 +4312,48 @@ document.getElementById('sheet')?.addEventListener('close', () => {
   render();
 });
 // Projects of a category: #1 = current project (big), the rest = small plain rows. ⠿ drag re-ranks.
-function projectList(kids) {
-  const stat = p => { const t = p.blocks.filter(b => b.type === 'todo' && b.text.trim()); return t.length ? `☑ ${t.filter(b => b.checked).length}/${t.length}` : ''; };
-  const [cur, ...rest] = kids;
-  const t = cur.blocks.filter(b => b.type === 'todo' && b.text.trim()), pct = t.length ? Math.round(t.filter(b => b.checked).length / t.length * 100) : 0;
+const MAX_CUR = 3;
+const projStat = p => { const t = p.blocks.filter(b => b.type === 'todo' && b.text.trim()); return { n: t.length, done: t.filter(b => b.checked).length }; };
+function projectList(kids, cat) {
+  const ico = esc(cat.icon);
+  const live = kids.filter(p => !p.built), built = kids.filter(p => p.built).sort((a, b) => b.built - a.built);
+  let cur = live.filter(p => p.cur).slice(0, MAX_CUR);
+  if (!cur.length && live.length) cur = [live[0]]; // nothing marked yet → #1 is current
+  const rest = live.filter(p => !cur.includes(p));
+  const drag = p => `<span class="pg-drag" data-drag-page="${p.id}" title="Pakad ke upar / neeche chhodo = rank badlo" aria-label="Drag">⠿</span>`;
+  const statTxt = p => { const st = projStat(p); return st.n ? `☑ ${st.done}/${st.n}` : ''; };
+  const curCard = p => { const st = projStat(p), pct = st.n ? Math.round(st.done / st.n * 100) : 0; return `
+    <a class="card proj-cur" href="#/earn/${p.id}" data-drop-page="${p.id}" data-rank data-no-into>
+      <div class="row-between"><span class="proj-tag">🎯 Current project</span>
+        <span class="row" style="gap:4px"><span class="proj-acts">
+          <button class="btn proj-btn" data-action="proj-built" data-id="${p.id}" title="Ban gaya — neeche ✅ me chala jayega">✅ Ban gaya</button>
+          <button class="btn proj-btn" data-action="proj-unset-current" data-id="${p.id}" title="Current se hatao">✕</button>
+        </span>${drag(p)}</span></div>
+      <div class="proj-cur-title">${ico} ${esc(p.title || 'Untitled')}</div>
+      ${pagePreview(p) ? `<p class="card-desc" style="margin:4px 0 0">${esc(pagePreview(p))}</p>` : ''}
+      ${st.n ? `<div class="row" style="gap:10px;align-items:center;margin-top:10px"><div class="progress" style="flex:1"><div style="width:${pct}%;height:100%;background:var(--primary)"></div></div><span class="small">${statTxt(p)}</span></div>` : ''}
+    </a>`; };
+  const row = p => `
+      <a class="proj-row" href="#/earn/${p.id}" data-drop-page="${p.id}" data-rank data-no-into>
+        ${drag(p)}
+        <span class="proj-row-t">${ico} ${esc(p.title || 'Untitled')}</span>
+        <span class="muted small">${statTxt(p)}</span>
+        <span class="proj-acts">
+          <button class="btn proj-btn" data-action="proj-set-current" data-id="${p.id}" data-cat="${cat.id}" title="Current project banao (max ${MAX_CUR})">🎯 Set as current</button>
+          <button class="btn proj-btn" data-action="proj-built" data-id="${p.id}" title="Ban gaya — neeche ✅ me chala jayega">✅ Ban gaya</button>
+        </span>
+      </a>`;
   return `
-    <a class="card proj-cur" href="#/earn/${cur.id}" data-drop-page="${cur.id}" data-rank>
-      <div class="row-between"><span class="proj-tag">🎯 Current project</span><span class="pg-drag" data-drag-page="${cur.id}" title="Pakad ke upar / neeche chhodo = rank badlo" aria-label="Drag">⠿</span></div>
-      <div class="proj-cur-title">${esc(cur.icon)} ${esc(cur.title || 'Untitled')}</div>
-      ${pagePreview(cur) ? `<p class="card-desc" style="margin:4px 0 0">${esc(pagePreview(cur))}</p>` : ''}
-      ${t.length ? `<div class="row" style="gap:10px;align-items:center;margin-top:10px"><div class="progress" style="flex:1"><div style="width:${pct}%;height:100%;background:var(--primary)"></div></div><span class="small">${stat(cur)}</span></div>` : ''}
-    </a>
-    ${rest.length ? `<div class="proj-rows">${rest.map(p => `
-      <a class="proj-row" href="#/earn/${p.id}" data-drop-page="${p.id}" data-rank>
-        <span class="pg-drag" data-drag-page="${p.id}" title="Pakad ke upar / neeche chhodo = rank badlo" aria-label="Drag">⠿</span>
-        <span class="proj-row-t">${esc(p.icon)} ${esc(p.title || 'Untitled')}</span>
-        <span class="muted small">${stat(p)}</span>
-        <button class="btn proj-set-cur" data-action="proj-set-current" data-id="${p.id}" data-first="${cur.id}" title="Isko current project banao">🎯 Set as current</button>
-      </a>`).join('')}</div>` : ''}`;
+    ${cur.map(curCard).join('')}
+    ${rest.length ? `<div class="proj-rows">${rest.map(row).join('')}</div>` : ''}
+    ${built.length ? `
+      <button class="done-toggle" data-action="proj-toggle-built" style="margin:10px 2px 6px">${ui.showBuilt ? '▾' : '▸'} ✅ Ban gaye (${built.length})</button>
+      ${ui.showBuilt ? `<div class="proj-rows">${built.map(p => `
+        <a class="proj-row built" href="#/earn/${p.id}">
+          <span class="proj-row-t">✅ ${esc(p.title || 'Untitled')}</span>
+          <span class="muted small">${timeAgo(p.built)}</span>
+          <span class="proj-acts"><button class="btn proj-btn" data-action="proj-unbuilt" data-id="${p.id}" title="Wapas projects me">↩ Wapas</button></span>
+        </a>`).join('')}</div>` : ''}` : ''}`;
 }
 function dumpSection(page, heading = '💡 Jaldi likho <span class="muted small">— koi bhi idea, baad me ➜ se category / project me bhejo</span>') {
   const list = page.dump || [];
@@ -4362,14 +4393,19 @@ function renderEarnPage(page) {
         : page.id === 'cat-ig' ? channelBoard({ platform: 'instagram' })
         : page.id.startsWith('ch-') && smAccounts().some(a => 'ch-' + a.id === page.id) ? channelBoard({ accountId: page.id.slice(3) })
         : plannerCards(page)}
-      ${page.parentId && parent && !parent.parentId ? dumpSection(page, `💡 Ideas (${(page.dump || []).length}) <span class="muted small">— jo aaye likho · 🚀 = project banao · ➜ = kahin aur bhejo</span>`) : ''}
+      ${!isCat && page.parentId && parent && !parent.parentId ? dumpSection(page, `💡 Ideas (${(page.dump || []).length})`) : ''}
       ${isCat ? `
-        <h3 style="margin:14px 0 8px">🚀 Projects (${kids.length})</h3>
-        <form id="proj-form" class="proj-add" data-parent="${page.id}" autocomplete="off">
-          <input name="text" required maxlength="200" placeholder="Naya project likho… Enter dabao" aria-label="Naya project">
-          <button type="submit" class="btn primary">+ Add</button>
-        </form>
-        ${kids.length ? projectList(kids) : ''}
+        <div class="cat-cols">
+          <section>${dumpSection(page, `💡 Ideas (${(page.dump || []).length}) <span class="muted small">— 🚀 = project banao</span>`)}</section>
+          <section>
+            <h3 style="margin:14px 0 8px">🚀 Projects (${kids.filter(k => !k.built).length})</h3>
+            <form id="proj-form" class="proj-add" data-parent="${page.id}" autocomplete="off">
+              <input name="text" required maxlength="200" placeholder="Naya project likho… Enter dabao" aria-label="Naya project">
+              <button type="submit" class="btn primary">+ Add</button>
+            </form>
+            ${kids.length ? projectList(kids, page) : ''}
+          </section>
+        </div>
         ${page.blocks.length ? '<h3 style="margin:18px 0 0">📝 Notes</h3>' : ''}`
       : kids.length ? `
         <div class="row-between" style="margin:14px 0 8px"><h3 style="margin:0">📁 Andar (${kids.length})</h3>
@@ -4378,7 +4414,7 @@ function renderEarnPage(page) {
       ${isProj ? '<h3 style="margin:18px 0 0">✨ Features <span class="muted small">— ☐ = feature · ＋ / Tab = sub-task · photo paste karo</span></h3>' : ''}
       <div id="blocks" class="blocks">${blocksHTML(page)}</div>
       <div class="row" style="gap:6px;flex-wrap:wrap${isCat ? ';display:none' : ''}">
-        ${isProj ? '<button class="add-block" data-action="earn-add-feature" style="flex:1">☐ Feature jodo</button>' : ''}
+        ${isProj ? '<button class="add-block" data-action="earn-add-feature" style="flex:1 1 100%;font-weight:600">☐ Feature jodo</button>' : ''}
         <button class="add-block" data-action="earn-add-block" style="flex:1">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
         <button class="add-block" data-action="earn-add-photo" style="flex:none" title="Photo daalo (paste / drag-drop bhi chalta hai)">🖼️ Photo</button>
       </div>
@@ -4554,6 +4590,7 @@ function blockEnter(el) {
     b.indent--; if (!b.indent) delete b.indent;
     touchPage(page); redrawBlocks(b.id, 0); return;
   }
+  if (b.type === 'todo' && !text.trim() && isEarnProject(page)) { focusBlock(b.id, 0); return; }
   if (b.type !== 'p' && b.type !== 'code' && !text.trim()) {
     b.type = 'p'; b.checked = false; b.text = '';
     touchPage(page); redrawBlocks(b.id, 0); return;
@@ -4924,7 +4961,10 @@ function pgDropTarget(x, y) {
   const t = el && el.closest('[data-drop-page],[data-drop-root]');
   if (!t || !pgDrag || t.dataset.dropPage === pgDrag.id) return null;
   let where = 'into';
-  if (t.hasAttribute('data-rank')) {
+  if (t.hasAttribute('data-no-into')) {
+    const r = t.getBoundingClientRect();
+    where = y < r.top + r.height / 2 ? 'before' : 'after';
+  } else if (t.hasAttribute('data-rank')) {
     const r = t.getBoundingClientRect();
     const edge = Math.min(r.height * 0.3, 22);
     if (y < r.top + edge) where = 'before';
@@ -5441,6 +5481,7 @@ const extraActions = {
   'earn-add-feature'() {
     const page = curPage();
     if (!page) return;
+    page.blocks = page.blocks.filter(b => !((b.type === 'p' || b.type === 'todo') && !b.text.trim()));
     const last = page.blocks[page.blocks.length - 1];
     if (last && last.type === 'todo' && !last.text && !last.indent) { focusBlock(last.id, 0); return; }
     const nb = newBlock('todo');
@@ -5460,7 +5501,31 @@ const extraActions = {
     touchPage(page); redrawBlocks(nb.id, 0);
   },
 
-  'proj-set-current'(el) { reorderPage(el.dataset.id, el.dataset.first, 'before'); },
+  'proj-set-current'(el) {
+    const p = findPage(el.dataset.id); if (!p) return;
+    const sibs = childPages(p.parentId).filter(x => !x.built);
+    const marked = sibs.filter(x => x.cur);
+    const now = Date.now();
+    if (!marked.length && sibs[0] && sibs[0] !== p) { sibs[0].cur = now - 1; sibs[0].updatedAt = now; marked.push(sibs[0]); } // keep the shown one
+    if (marked.length >= MAX_CUR) { toast(`🎯 Max ${MAX_CUR} current project — pehle kisi ek ko ✕ se hatao`); return; }
+    p.cur = now; p.updatedAt = now; saveEarn(); render();
+    toast(`🎯 "${p.title || 'Untitled'}" ab current hai`);
+  },
+  'proj-unset-current'(el) {
+    const p = findPage(el.dataset.id); if (!p) return;
+    const now = Date.now();
+    const sibs = childPages(p.parentId).filter(x => !x.built);
+    if (!sibs.some(x => x.cur)) { toast('Pehle kisi aur ko 🎯 Set as current karo'); return; }
+    delete p.cur; p.updatedAt = now; saveEarn(); render();
+  },
+  'proj-built'(el) {
+    const p = findPage(el.dataset.id); if (!p) return;
+    const now = Date.now();
+    p.built = now; delete p.cur; p.updatedAt = now; saveEarn(); render();
+    toast(`✅ "${p.title || 'Untitled'}" ban gaya!`, () => { delete p.built; p.updatedAt = Date.now(); saveEarn(); render(); });
+  },
+  'proj-unbuilt'(el) { const p = findPage(el.dataset.id); if (!p) return; delete p.built; p.updatedAt = Date.now(); saveEarn(); render(); },
+  'proj-toggle-built'() { ui.showBuilt = !ui.showBuilt; render(); },
   'idea-open'(el) { openIdeaSheet(el.dataset.page, el.dataset.id); },
   'idea-item-toggle'(el) {
     const d = ideaOf(); const x = d && d.items.find(i => i.id === el.dataset.id);
@@ -7780,7 +7845,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13e';
+const APP_VERSION = '2026-11-13f';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {

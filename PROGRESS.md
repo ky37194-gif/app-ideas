@@ -21,3 +21,5 @@ Next: user check kare live site pe.
 NOTE: har deploy pe index.html me APP_VERSION bhi badlo (warna open app/PC tray app auto-reload nahi karta). 2026-11-13a set.
 - 2026-11-13: Har category page (teeno groups, Social Media bhi) me 💡 Ideas section (page.dump). Idea click = sheet (title, desc, ☑ todo list, Item jodo, progress) — openIdeaSheet. 🚀 = idea → project (features saath). Category pages pe Yahan likho/Photo/Shortcut hint hide. Projects ab list: #1 bada "🎯 Current project" card, baaki chhoti rows (projectList). APP_VERSION 2026-11-13d, sw v29.
 - 2026-11-13: proj-row hover pe '🎯 Set as current' (reorderPage before #1). APP_VERSION e, sw v30.
+- 2026-11-13: Category page = 2 columns (💡 Ideas | 🚀 Projects). Projects: max 3 🎯 current (page.cur), ✅ Ban gaya (page.built) → neeche "Ban gaye" fold, ↩ Wapas. Rows me category ka icon. Project rows drag = sirf rank (data-no-into, andar nahi jata). Project editor: empty feature pe Enter = feature hi rehta, Feature jodo empty lines saaf karta. Social Media ko user baad me batayega (abhi untouched). APP_VERSION f, sw v31.
+- Local test: scratchpad cdp.mjs + headless Edge (port 9333) + python http.server 8765.
