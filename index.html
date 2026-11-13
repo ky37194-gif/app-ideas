@@ -2067,10 +2067,7 @@ function dashCurrentCard() {
     return (openAll ? items : items.slice(0, n)).map(render).join('')
       + `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${key}">${openAll ? '▴ Kam dikhao' : `▸ ${items.length - n} aur ${unit}`}</button></li>`;
   };
-  const rowsShown = (() => {
-    if (list.length <= 2 || dashMore.has('projects')) return list;
-    return list.slice(0, 2);
-  })();
+  const rowsShown = list; // every current project shows on the Dashboard (no "▸ N aur projects")
   const rows = rowsShown.map((t, i) => {
     const steps = descendantsOf(t.id);
     const open = ordered(childrenOf(t.id).filter(x => !x.done), stepSort);
@@ -2084,8 +2081,7 @@ function dashCurrentCard() {
       ${open.length ? `<ul class="upnext-list dash-steps">${fold('steps:' + t.id, open, 5, x => line(x), 'steps')}</ul>` : ''}
       ${addBox(t.id, '＋ Step likho… Enter')}
     </div>`;
-  }).join('') + (list.length > 2
-    ? `<button type="button" class="dash-more" data-action="dash-more" data-key="projects">${dashMore.has('projects') ? '▴ Kam dikhao' : `▸ ${list.length - 2} aur projects`}</button>` : '');
+  }).join('');
   return `<section class="card dash-current" data-drop-list="current" title="Up next / Inbox se task yahan chhodo = naya current project">
       <div class="row-between"><span class="dash-cur-label">🎯 Current Project${list.length > 1 ? ` · ${list.length}` : ''}</span><a class="muted small" href="#/current">Sab dekho ›</a></div>
       ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Neeche likho, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
@@ -8004,7 +8000,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13h';
+const APP_VERSION = '2026-11-13i';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
