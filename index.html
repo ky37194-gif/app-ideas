@@ -2091,13 +2091,7 @@ function dashCurrentCard() {
       ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Neeche likho, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
       ${addBox('', '＋ Naya current project… Enter', CURRENT)}
     </section>
-    ${dashNowCard(upNext)}
-    <section class="card dash-upnext-box" data-drop-todo="${UP_NEXT}">
-      <div class="row-between"><span class="dash-cur-label">⏭️ Up next${upNext.length ? ` · ${upNext.length}` : ''}</span><a class="muted small" href="#/current">Kholo ›</a></div>
-      ${upNext.length ? `<ul class="upnext-list">${fold('upnext', upNext, 5, x => line(x), 'tasks')}</ul>` : ''}
-      ${addBox(UP_NEXT, '＋ Up next me likho… Enter')}
-      <div class="upnext-drop">⠿ Inbox se task yahan chhodo → Up next · Up next ka ⠿ upar Current Project pe chhodo → wahi current ban jayega</div>
-    </section>`;
+    ${dashNowCard(upNext)}`; // ⏭️ Up next box removed from the Dashboard (still under 🎯 Current Project page)
 }
 
 // Tasks from other lists marked ☀️ for today.
@@ -8010,7 +8004,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13g';
+const APP_VERSION = '2026-11-13h';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
