@@ -689,13 +689,13 @@
   .todo:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
   .todo-text { display: flex; flex-direction: column; gap: 3px; padding: 4px 0; }
   .todo-text .tt { font-weight: 550; line-height: 1.35; }
-  /* Text gets the full row width: action buttons float over the right edge on hover (PC), or sit on their own line (touch). */
+  /* Text gets the full row width: action buttons float over the right edge on right-click (PC), or sit on their own line (touch). */
   .todo { position: relative; flex-wrap: wrap; }
   .todo-acts { display: flex; align-items: center; gap: 2px; flex: none; }
   @media (hover: hover) {
     .todo-acts { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); padding-left: 10px;
       background: linear-gradient(90deg, transparent, var(--surface) 10px); opacity: 0; pointer-events: none; transition: opacity .12s; }
-    .todo:hover .todo-acts, .todo:focus-within .todo-acts, .todo.selected .todo-acts { opacity: 1; pointer-events: auto; }
+    .todo.acts-open .todo-acts { opacity: 1; pointer-events: auto; }
     [data-theme="tick"] .todo .todo-acts .icon-btn { opacity: 1; }
   }
   @media (hover: none) {
@@ -2109,6 +2109,7 @@ function todoRow(t) {
         ${t.id === UP_NEXT ? '' : t.folder === INBOX && !t.parentId
           ? `<button class="icon-btn" data-action="inbox-move" data-id="${t.id}" aria-label="Folder me daalo" title="📂 Kisi folder / list / Earning page me daalo">📂</button>`
           : canEarn() ? `<button class="icon-btn" data-action="todo-to-earn" data-id="${t.id}" aria-label="Earning me bhejo" title="💰 Earning me bhejo">📂</button>` : ''}
+        <button class="icon-btn todo-copy" data-action="copy-todo" data-id="${t.id}" aria-label="Copy" title="📋 Text copy karo">📋</button>
         <button class="icon-btn todo-sub" data-action="add-subtodo" data-id="${t.id}" aria-label="Iske andar task add karo" title="Andar task add karo">＋</button>
         <button class="icon-btn todo-del" data-action="delete-todo" data-id="${t.id}" aria-label="Delete">✕</button>
         </span>
@@ -4243,6 +4244,19 @@ function blocksHTML(page) {
   let n = 0;
   return page.blocks.map(b => { n = b.type === 'num' ? n + 1 : 0; return blockHTML(b, n); }).join('');
 }
+
+// Task rows (PC): right-click a task → its buttons (🔥 🎯 📂 📋 ＋ ✕) show; click elsewhere / Esc hides them.
+const closeTodoActs = except => document.querySelectorAll('.todo.acts-open').forEach(r => r !== except && r.classList.remove('acts-open'));
+document.addEventListener('contextmenu', e => {
+  if (!matchMedia('(hover: hover)').matches) return;
+  const row = e.target.closest?.('.todo');
+  if (!row || e.target.closest('input, textarea, [contenteditable="true"]')) return;
+  e.preventDefault();
+  closeTodoActs(row);
+  row.classList.toggle('acts-open');
+});
+document.addEventListener('click', e => { if (!e.target.closest?.('.todo.acts-open .todo-acts')) closeTodoActs(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTodoActs(); });
 
 // Right-click (or long-press) a line in an Earning page → its menu (type, move, delete, send to page).
 document.addEventListener('contextmenu', e => {
@@ -6803,6 +6817,12 @@ const actions = {
   },
 
   'cancel-subtodo'() { ui.addSubTo = null; render(); },
+
+  'copy-todo'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (t) copyText(t.desc.trim() ? `${t.text}
+${t.desc.trim()}` : t.text);
+  },
 
   'delete-todo'(el) {
     const inside = descendantsOf(el.dataset.id);
