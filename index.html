@@ -394,6 +394,9 @@
   .dash-page .now-title { font-size: 1.2rem; }
   .dash-page .dash-add-form input, .dash-feat-form input { min-height: 40px; font-size: 1rem; }
   .dash-line-text.is-now { color: var(--primary); font-weight: 700; }
+  .flag-btn { flex: none; border: 0; background: none; cursor: pointer; font-size: .95rem; width: 26px; height: 26px; border-radius: 6px; padding: 0; color: var(--muted); opacity: .45; }
+  .flag-btn.on { opacity: 1; }
+  .flag-btn:hover { opacity: 1; background: var(--surface-2); }
   .todo-acts .act-lbl { font-size: .72rem; font-weight: 700; }
   .todo-acts .prio-btn:has(.act-lbl) { width: auto; padding: 0 8px; white-space: nowrap; }
   .dash-line-text.is-now::before { content: '⚡ '; }
@@ -1349,6 +1352,7 @@ function normalizeTodo(raw = {}) {
     priority: !!raw.priority, // 🔥 = shows on the Priority page
     today: false, // the 📅 Today section was removed
     now: Number(raw.now) || 0, // ⚡ "abhi yahi kar raha hoon" — when you started it
+    flag: [1, 2, 3].includes(Number(raw.flag)) ? Number(raw.flag) : 0, // 🔴 1 / 🟡 2 / 🟢 3 priority flag (current projects)
     chup: Number(raw.chup) || 0, // ⏭️ sits in the channel's Up next (else its Current Project)
     chnow: Number(raw.chnow) || 0, // ⚡ the one you're on for its YouTube / Instagram channel
     doneAt: Number(raw.doneAt) || null,
@@ -1961,6 +1965,10 @@ const weekActions = {
 };
 
 /* ----- Your own order (drag) for tasks; unordered ones follow in their usual order ----- */
+// 🚩 Priority flags on current projects: 🔴 1 = sabse pehle, 🟡 2, 🟢 3, none = last. Click cycles.
+const FLAGS = { 1: ['🔴', 'High'], 2: ['🟡', 'Medium'], 3: ['🟢', 'Low'] };
+const byFlag = (a, b) => (a.flag || 9) - (b.flag || 9);
+const flagBtn = (x, attr) => `<button class="flag-btn${x.flag ? ' on' : ''}" data-action="cycle-flag" ${attr} title="Priority flag: ${x.flag ? FLAGS[x.flag][1] : 'koi nahi'} — click = 🔴 → 🟡 → 🟢 → hatao" aria-label="Priority flag">${x.flag ? FLAGS[x.flag][0] : '⚑'}</button>`;
 const ordered = (arr, fallback) => [...arr].sort((a, b) => ((a.order ?? 1e15) - (b.order ?? 1e15)) || fallback(a, b));
 const projectSort = (a, b) => (b.priority - a.priority) || (b.createdAt - a.createdAt);
 const stepSort = (a, b) => a.createdAt - b.createdAt;
@@ -2081,6 +2089,18 @@ function sendBack(id) {
 const nowActions = {
   'send-back'(el) { sendBack(el.dataset.id); },
   'set-now'(el) { setNow(el.dataset.id); },
+  'cycle-flag'(el) {
+    const next = f => (f || 0) >= 3 ? 0 : (f || 0) + 1;
+    if (el.dataset.page) {
+      const p = findPage(el.dataset.page); if (!p) return;
+      const f = next(p.flag); if (f) p.flag = f; else delete p.flag;
+      p.updatedAt = Date.now(); saveEarn();
+    } else {
+      const t = state.todos.find(x => x.id === el.dataset.id); if (!t) return;
+      t.flag = next(t.flag); t.updatedAt = Date.now(); saveState();
+    }
+    render();
+  },
   // ⚡ Current task → 🎯 Current Project (it was meant to be a project).
   'now-to-project'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
@@ -2108,7 +2128,7 @@ const dashMore = new Set();
 function dashCurrentCard() {
   const ids = new Set(state.todos.map(t => t.id));
   const upNext = ordered(childrenOf(UP_NEXT).filter(x => !x.done), upNextSort);
-  const list = ordered(state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids)), projectSort);
+  const list = ordered(state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids)), projectSort).sort(byFlag);
   // Each project (and the ⏭️ Up next box) is a drop target: drag a task's ⠿ from the Inbox onto it.
   // A line with a tick box: ⠿ drag · ☐ done · text (tap = details) · ▶️ abhi yahi.
   const line = (x, cls = '') => `<li class="upnext-item ${cls}" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text${nowTask() === x ? ' is-now' : ''}" data-action="set-now" data-id="${x.id}" title="Click = current task">${esc(x.text)}</span><button class="now-play" data-action="open-todo" data-id="${x.id}" title="Details kholo">📝</button><button class="now-play" data-action="send-back" data-id="${x.id}" title="Yahan se hatao — jahan se aaya tha wahin wapas">↩️</button></li>`;
@@ -2126,7 +2146,7 @@ function dashCurrentCard() {
     const open = ordered(childrenOf(t.id).filter(x => !x.done), stepSort);
     return `<div class="dash-cur-row${i === 0 ? ' main' : ''}" data-drop-todo="${t.id}" data-rank title="Task yahan chhodo = is project ka step · upar/neeche chhodo = order">
       <div class="dash-cur-head"><span class="pg-drag todo-drag" data-drag-todo="${t.id}" title="Pakad ke kisi project ke upar / neeche chhodo = order badlo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Project ho gaya"></button>
-        <span class="dash-cur-name" data-action="set-now" data-id="${t.id}" title="Click = current task">${esc(t.text)}</span>
+        ${flagBtn(t, `data-id="${t.id}"`)}<span class="dash-cur-name" data-action="set-now" data-id="${t.id}" title="Click = current task">${esc(t.text)}</span>
         <button class="now-play" data-action="open-todo" data-id="${t.id}" title="Details kholo">📝</button>
         <button class="now-play" data-action="send-back" data-id="${t.id}" title="Current Project se hatao — jahan se aaya tha wahin wapas">↩️</button></div>
       ${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}
@@ -3767,6 +3787,7 @@ function normalizePage(raw = {}) {
     order: Number.isFinite(raw.order) ? raw.order : null, // your own rank among sibling pages (0 = top focus)
     ...(Number(raw.cur) ? { cur: Number(raw.cur) } : {}),     // 🎯 one of the (max 3) current projects
     ...(Number(raw.built) ? { built: Number(raw.built) } : {}), // ✅ ban gaya
+    ...([1, 2, 3].includes(Number(raw.flag)) ? { flag: Number(raw.flag) } : {}), // 🔴 / 🟡 / 🟢 priority flag
     blocks: (Array.isArray(raw.blocks) ? raw.blocks : []).map(b => {
       const blk = {
         id: b.id || uid(),
@@ -4420,10 +4441,10 @@ function dashEarnCard() {
       ${[...new Set(items.map(x => x.cat))].map(cat => `
       <div class="dash-cat">
         <a class="dash-cat-head" href="#/earn/${cat.id}"><span>${esc(cat.icon)}</span><span class="name">${esc(cat.title || 'Untitled')}</span><span class="muted small">›</span></a>
-      ${items.filter(x => x.cat === cat).map(({ p }) => {
+      ${items.filter(x => x.cat === cat).sort((a, b) => byFlag(a.p, b.p)).map(({ p }) => {
         const st = projStat(p), pct = st.n ? Math.round(st.done / st.n * 100) : 0, open = openFeatures(p), key = 'feat:' + p.id, all = dashMore.has(key);
         return `<div class="dash-cur-row main">
-          <div class="dash-cur-head"><a class="dash-cur-name" href="#/earn/${p.id}" style="color:inherit;text-decoration:none">${esc(p.title || 'Untitled')}</a>${st.n ? `<span class="muted small" style="flex:none">☑ ${st.done}/${st.n}</span>` : ''}</div>
+          <div class="dash-cur-head">${flagBtn(p, `data-page="${p.id}"`)}<a class="dash-cur-name" href="#/earn/${p.id}" style="color:inherit;text-decoration:none">${esc(p.title || 'Untitled')}</a>${st.n ? `<span class="muted small" style="flex:none">☑ ${st.done}/${st.n}</span>` : ''}</div>
           ${st.n ? `<div class="progress" style="height:6px"><div style="width:${pct}%;height:100%;background:var(--primary)"></div></div>` : ''}
           ${open.length ? `<ul class="upnext-list dash-steps">${(all ? open : open.slice(0, 6)).map(b => feat(p, b)).join('')}${open.length > 6 ? `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${key}">${all ? '▴ Kam dikhao' : `▸ ${open.length - 6} aur features`}</button></li>` : ''}</ul>` : ''}
           <form class="dash-feat-form" data-page="${p.id}" autocomplete="off"><input name="text" maxlength="300" required placeholder="＋ Feature likho… Enter" aria-label="Naya feature"></form>
@@ -8118,7 +8139,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13p';
+const APP_VERSION = '2026-11-13q';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {

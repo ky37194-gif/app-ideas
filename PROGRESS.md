@@ -32,3 +32,4 @@ NOTE: har deploy pe index.html me APP_VERSION bhi badlo (warna open app/PC tray 
 - 2026-11-13: ⚡ Current tasks card: 'Next / Shuru karo' hataya. Dashboard pe kisi bhi task / project / feature pe click = current task (todo.now ya earn block.now — normalizePage me 'now' field add). 📝 = details. APP_VERSION m, sw v38.
 - 2026-11-13: Task right-click me alag buttons: '🎯 Project' (Current Project) aur '⚡ Task' (current task, setNow). APP_VERSION n, sw v39.
 - 2026-11-13: 'Kahan daalein?' sheet me 💰 Earning tree: section → category (▸ khulta) → 💡 Idea banao / 🚀 Naya project / project → feature (moveTodoToCat, earnMoveTree). ⚡ Current tasks card me '🎯 Project banao' (now-to-project). APP_VERSION p, sw v41.
+- 2026-11-13: Current projects pe 🚩 3 flags (🔴 High / 🟡 Medium / 🟢 Low, click cycle, cycle-flag action) — todo.flag + page.flag; Dashboard me flag ke hisaab se sort. APP_VERSION q, sw v42.
