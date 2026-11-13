@@ -4633,14 +4633,12 @@ function renderEarnPage(page) {
       <div class="row" style="gap:6px;flex-wrap:wrap${isCat ? ';display:none' : ''}">
         ${isProj ? '<button class="add-block" data-action="earn-add-feature" style="flex:1 1 100%;font-weight:600">☐ Feature jodo</button>' : ''}
         <button class="add-block" data-action="earn-add-block" style="flex:1">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
-        <button class="add-block" data-action="earn-add-photo" style="flex:none" title="Photo daalo (paste / drag-drop bhi chalta hai)">🖼️ Photo</button>
       </div>
       <section class="subpages">
         <div class="drop-root" ${page.parentId && findPage(page.parentId) ? `data-drop-page="${page.parentId}"` : 'data-drop-root'}>⬆️ Yahan chhodo — is folder se bahar nikalo</div>
         ${kids.length || isCat || isProj ? '' : `<button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>`}
         ${page.id.startsWith('ideas-folder-') && kids.some(k => !isFeatureList(k)) ? `<button class="btn block" data-action="earn-features-only" data-id="${page.id}" style="margin:6px 0 10px">🧹 Har idea page me sirf features rakho (baaki sab hatao)</button>` : ''}
       </section>
-      <p class="hint" style="margin-top:22px${isCat ? ';display:none' : ''}">Shortcut: <b>#</b> heading · <b>-</b> list · <b>1.</b> number · <b>[]</b> checkbox · <b>&gt;</b> quote · <b>---</b> line · <b>/</b> sab options · <b>⋮⋮</b> se block badlo / hatao</p>
     </main>`;
 }
 
@@ -5430,7 +5428,14 @@ document.addEventListener('beforeinput', e => {
 
 document.addEventListener('paste', e => {
   const el = e.target.closest?.('.blk-text, #pg-title') || e.target.parentElement?.closest('.blk-text, #pg-title');
-  if (el && el.tagName !== 'TEXTAREA') onBlockPaste(e, el);
+  if (el && el.tagName !== 'TEXTAREA') { onBlockPaste(e, el); return; }
+  // Earning page, not typing anywhere → Ctrl+V a photo = it goes at the end of the page.
+  if (parseRoute().page !== 'earn' || !curPage() || ui.openTodo || e.target.closest?.('input, textarea, [contenteditable], dialog')) return;
+  const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  const page = curPage();
+  addEarnImages(page.blocks[page.blocks.length - 1]?.id || '', files);
 });
 
 /* ----- Searchable Earning page picker (used by tasks, Inbox notes, lines and pages) ----- */
@@ -7620,7 +7625,6 @@ function renderTodoPanel() {
       <textarea id="tp-desc" class="tp-desc" data-id="${t.id}" placeholder="📝 Description / notes likho…  (photo paste bhi kar sakte ho)" aria-label="Description">${esc(t.desc)}</textarea>
       <div class="tp-images">
         ${t.images.map((src, i) => `<div class="tp-img"><img src="${src}" alt="Photo ${i + 1}" data-action="tp-view-img" data-i="${i}"><button class="tp-img-del" data-action="tp-del-img" data-i="${i}" aria-label="Photo hatao">✕</button></div>`).join('')}
-        <label class="tp-img-add" title="Photo daalo"><input id="tp-img-input" type="file" accept="image/*" multiple hidden>🖼️<span>Photo</span></label>
       </div>
       <h3 class="sheet-sub">Andar ke kaam (${kids.length})</h3>
       <ul class="tp-subs">${kids.map(k => `
@@ -7826,7 +7830,8 @@ document.addEventListener('change', e => {
   if (e.target.id === 'tp-img-input' && e.target.files.length) { addTodoImages(ui.openTodo, e.target.files); e.target.value = ''; }
 });
 document.addEventListener('paste', e => {
-  if (e.target.id !== 'tp-desc' && e.target.id !== 'tp-title') return;
+  // Task panel open → Ctrl+V a photo anywhere in it (no button needed).
+  if (e.target.id !== 'tp-desc' && e.target.id !== 'tp-title' && !(ui.openTodo && (e.target.closest?.('#todo-panel') || e.target === document.body))) return;
   const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
   if (!files.length) return;
   e.preventDefault();
@@ -8139,7 +8144,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13q';
+const APP_VERSION = '2026-11-13r';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
