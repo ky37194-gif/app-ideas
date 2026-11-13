@@ -383,6 +383,8 @@
   .dash-page .now-title { font-size: 1.2rem; }
   .dash-page .dash-add-form input, .dash-feat-form input { min-height: 40px; font-size: 1rem; }
   .dash-line-text.is-now { color: var(--primary); font-weight: 700; }
+  .todo-acts .act-lbl { font-size: .72rem; font-weight: 700; }
+  .todo-acts .prio-btn:has(.act-lbl) { width: auto; padding: 0 8px; white-space: nowrap; }
   .dash-line-text.is-now::before { content: '⚡ '; }
   .dash-cat { margin-top: 10px; padding: 4px 0 0 12px; border-left: 3px solid color-mix(in srgb, var(--primary) 45%, var(--border)); }
   .dash-cat-head { display: flex; align-items: center; gap: 8px; font-weight: 750; font-size: .95rem; color: var(--muted); text-decoration: none; padding: 2px 0; }
@@ -2186,7 +2188,7 @@ function todoRow(t) {
         <span class="todo-text" data-action="open-todo" data-id="${t.id}" title="Kholo — description, photos, andar ke kaam"><span class="tt-row"><span class="tt">${esc(t.text)}</span>${t.images.length ? `<span class="todo-extra">🖼️${t.images.length}</span>` : ''}</span>${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}${all.length ? progressLine(all) : ''}</span>
         ${t.by ? avatar(t.by) : ''}
         <span class="todo-acts">
-        ${t.id === UP_NEXT ? '' : prioButton(t) + todayButton(t) + currentButton(t)}
+        ${t.id === UP_NEXT ? '' : prioButton(t) + todayButton(t) + currentButton(t).replace('>🎯</button>', '>🎯 <span class="act-lbl">Project</span></button>') + nowButton(t)}
         ${t.id === UP_NEXT ? '' : t.folder === INBOX && !t.parentId
           ? `<button class="icon-btn" data-action="inbox-move" data-id="${t.id}" aria-label="Folder me daalo" title="📂 Kisi folder / list / Earning page me daalo">📂</button>`
           : canEarn() ? `<button class="icon-btn" data-action="todo-to-earn" data-id="${t.id}" aria-label="Earning me bhejo" title="💰 Earning me bhejo">📂</button>` : ''}
@@ -3650,6 +3652,13 @@ function currentButton(t) {
   const on = t.folder === CURRENT;
   const label = on ? 'Current Project se hatao (wapas purani list me)' : 'Current Project me daalo — abhi isi pe kaam chal raha hai';
   return `<button class="icon-btn prio-btn ${on ? 'on' : ''}" data-action="toggle-current" data-id="${t.id}" aria-label="${label}" title="${label}">🎯</button>`;
+}
+// ⚡ Current task (the one thing you're doing right now) — separate from 🎯 Current Project.
+function nowButton(t) {
+  if (t.done) return '';
+  const on = nowTask() === t;
+  const label = on ? 'Current task se hatao' : 'Current task banao — Dashboard ke upar ⚡ me aa jayega';
+  return `<button class="icon-btn prio-btn ${on ? 'on' : ''}" data-action="${on ? 'now-clear' : 'set-now'}" data-id="${t.id}" aria-label="${label}" title="${label}">⚡ <span class="act-lbl">Task</span></button>`;
 }
 function prioButton(t) {
   const label = t.priority ? 'Priority hatao' : 'Priority banao';
@@ -8047,7 +8056,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13m';
+const APP_VERSION = '2026-11-13n';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
