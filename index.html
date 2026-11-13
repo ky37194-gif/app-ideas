@@ -388,7 +388,7 @@
   .dash-cat-head:hover { color: var(--primary); }
   .dash-cat .dash-cur-row { padding: 8px 2px; }
   .dash-cat .dash-cur-row:first-of-type { border-top: 0; }
-  @media (hover: hover) { .dash-feat-form { display: none; } .dash-cur-row:hover .dash-feat-form, .dash-cur-row:focus-within .dash-feat-form { display: block; } }
+  @media (hover: hover) { .dash-page .dash-feat-form, .dash-page .dash-cur-row .dash-add-form { display: none !important; } } /* PC: no add box popping up on hover (Alt+F / project page se likho) */
   .dash-feat-form input { width: 100%; padding: 6px 12px; border-radius: 10px; border: 1px dashed var(--border); background: transparent; color: var(--text); }
   .dash-feat-form input:focus { border-style: solid; border-color: var(--primary); background: var(--surface-2); outline: none; }
   .proj-row.built .proj-row-t { color: var(--muted); text-decoration: line-through; }
@@ -8016,7 +8016,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13k';
+const APP_VERSION = '2026-11-13l';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
