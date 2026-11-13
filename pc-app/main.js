@@ -20,6 +20,8 @@ app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').re
 
 let win = null;
 let pop = null;
+let feat = null;
+let featKey = '';
 let tray = null;
 let hotkey = '';
 let quitting = false;
@@ -69,8 +71,8 @@ function createWindow() {
   win.removeMenu();
   handleLinks(win.webContents);
   load(win, SITE);
-  // Started with Windows (--hidden) → stay in the tray until you need it.
-  win.once('ready-to-show', () => { if (!process.argv.includes('--hidden')) win.show(); });
+  // Started with Windows (--hidden) or from the ✨ feature shortcut (--feat) → stay in the tray.
+  win.once('ready-to-show', () => { if (!process.argv.includes('--hidden') && !process.argv.includes('--feat')) win.show(); });
   // Closing the window keeps the app in the tray, so Alt+I still works.
   win.on('close', (e) => {
     if (!quitting) { e.preventDefault(); win.hide(); }
@@ -122,7 +124,36 @@ function openPop() {
   });
 }
 
+// Alt+F (or the "✨ Feature likho" desktop shortcut): pick a 🎯 current project → type a feature → Enter.
+function openFeat() {
+  if (feat && !feat.isDestroyed()) {
+    if (feat.isVisible() && feat.isFocused()) { feat.close(); return; }
+    feat.show(); feat.focus(); return;
+  }
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const W = 640, H = 300;
+  feat = new BrowserWindow({
+    width: W, height: H,
+    x: Math.round(area.x + (area.width - W) / 2), y: Math.round(area.y + area.height / 4),
+    title: '✨ Feature likho', icon: ICON,
+    resizable: true, minimizable: false, maximizable: false, fullscreenable: false,
+    skipTaskbar: true, alwaysOnTop: true, backgroundColor: '#0b0f19', autoHideMenuBar: true, show: false,
+    webPreferences: { contextIsolation: true, spellcheck: true, preload: PRELOAD },
+  });
+  feat.removeMenu();
+  handleLinks(feat.webContents);
+  load(feat, SITE + '#/feat');
+  feat.once('ready-to-show', () => { feat.show(); feat.focus(); });
+  feat.on('closed', () => {
+    feat = null;
+    if (win && !win.isDestroyed()) win.webContents.executeJavaScript('typeof earnSyncNow === "function" && earnSyncNow()').catch(() => {});
+  });
+}
+
 function registerHotkey() {
+  for (const [accel, label] of [['Alt+F', 'Alt+F'], ['Control+Shift+F', 'Ctrl+Shift+F']]) {
+    try { if (globalShortcut.register(accel, openFeat)) { featKey = label; break; } } catch {}
+  }
   for (const [accel, label] of [['Alt+I', 'Alt+I'], ['Control+Shift+I', 'Ctrl+Shift+I']]) {
     try { if (globalShortcut.register(accel, openPop)) { hotkey = label; return; } } catch {}
   }
@@ -133,6 +164,7 @@ function trayMenu() {
   return Menu.buildFromTemplate([
     { label: 'App Ideas kholo', click: () => showMain() },
     { label: `⚡ Inbox me likho${hotkey ? `   (${hotkey})` : ''}`, click: openPop },
+    { label: `✨ Current project me feature likho${featKey ? `   (${featKey})` : ''}`, click: openFeat },
     { label: '📥 Inbox', click: () => showMain('#/inbox') },
     { label: '🎯 Current Project', click: () => showMain('#/current') },
     { label: '👤 Account / Google login', click: () => showMain('#/account') },
@@ -151,7 +183,8 @@ function createTray() {
   tray.on('click', () => showMain());
 }
 
-app.on('second-instance', () => showMain());
+// Desktop shortcut "✨ Feature likho" starts the app with --feat → just the small feature window.
+app.on('second-instance', (_e, argv) => { if (argv.includes('--feat')) openFeat(); else showMain(); });
 // Alt+I popup asked for the main window (e.g. to log in first).
 ipcMain.on('show-main', () => { showMain(); if (pop && !pop.isDestroyed()) pop.close(); });
 
@@ -244,6 +277,7 @@ app.whenReady().then(() => {
   registerHotkey();
   createTray();
   createWindow();
+  if (process.argv.includes('--feat')) openFeat();
 });
 
 app.on('before-quit', () => { quitting = true; });

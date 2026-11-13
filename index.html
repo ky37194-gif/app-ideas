@@ -364,11 +364,34 @@
   .proj-acts { display: flex; gap: 4px; flex: none; }
   .proj-btn { min-height: 28px; padding: 0 10px; font-size: .8rem; }
   @media (hover: hover) { .proj-acts { opacity: 0; pointer-events: none; transition: opacity .12s; }
-    .proj-row:hover .proj-acts, .proj-cur:hover .proj-acts { opacity: 1; pointer-events: auto; } }
+    .proj-row:hover .proj-acts, .proj-cur:hover .proj-acts, .acts-open .proj-acts { opacity: 1; pointer-events: auto; } }
+  .proj-row.acts-open, .proj-cur.acts-open { border-color: var(--primary); }
+  .proj-bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 0; }
+  /* ✨ Alt+F feature popup */
+  .feat-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .feat-chip { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); border-radius: 99px; padding: 4px 10px; font: inherit; font-size: .8rem; cursor: pointer; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feat-chip.on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 22%, var(--surface)); font-weight: 700; }
+  .feat-chip b { color: var(--primary); }
+  .feat-recent { margin: 0; padding: 0; list-style: none; font-size: .85rem; color: var(--muted); display: grid; gap: 2px; }
+  .feat-recent li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 📊 Dashboard: bigger, easier to read */
+  .dash-page .dash-cur-label { font-size: .9rem; }
+  .dash-page .dash-cur-name { font-size: 1.12rem; }
+  .dash-page .dash-cur-row.main .dash-cur-name { font-size: 1.3rem; }
+  .dash-page .dash-line-text { font-size: 1.06rem; }
+  .dash-page .upnext-item { padding: 3px 0; }
+  .dash-page .now-title { font-size: 1.2rem; }
+  .dash-page .dash-add-form input, .dash-feat-form input { min-height: 40px; font-size: 1rem; }
+  .dash-feat-form input { width: 100%; padding: 6px 12px; border-radius: 10px; border: 1px dashed var(--border); background: transparent; color: var(--text); }
+  .dash-feat-form input:focus { border-style: solid; border-color: var(--primary); background: var(--surface-2); outline: none; }
   .proj-row.built .proj-row-t { color: var(--muted); text-decoration: line-through; }
   .cat-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 22px; align-items: start; }
   @media (max-width: 860px) { .cat-cols { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
   .proj-row-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Row buttons float over the row's right end (no hidden width pushing the row past the edge) */
+  .proj-row { position: relative; min-width: 0; }
+  @media (hover: hover) { .proj-row .proj-acts { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding-left: 10px;
+    background: linear-gradient(90deg, transparent, var(--surface) 12px); } }
   .dump-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
   .dump-item { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
   .dump-item .dt { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; }
@@ -1510,7 +1533,8 @@ function bottomNav(active) {
   return `
     <nav class="bottom-nav" aria-label="Main">
       <button type="button" class="nav-search pc-only" data-action="open-search">🔍 <span>Search…</span><kbd>Ctrl K</kbd></button>
-      <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard" data-drop-list="inbox"><span class="ico">📊</span>Dashboard + Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
+      <a class="nav-item ${active === 'dashboard' ? 'active' : ''}" href="#/dashboard"><span class="ico">📊</span>Dashboard</a>
+      <a class="nav-item ${active === 'inbox' ? 'active' : ''}" href="#/inbox" data-drop-list="inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       ${canEarn() ? `<a class="nav-item ${active === 'earn' && !parseRoute().id ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>${earnNavSubs()}` : ''}
       ${earnCloud.code && findPage(CAT_PASSION) ? '' /* both live under ❤️ Passion + Earning in the Earning list */ : `
@@ -1950,7 +1974,7 @@ function dashNowCard(upNext) {
   const next = upNext.find(x => !t || x.id !== t.id) || null;
   const where = t && t.parentId && state.todos.find(x => x.id === t.parentId);
   return `<section class="card dash-now" data-drop-now="1" title="Koi bhi task yahan chhodo = abhi yahi kar raha hoon">
-      <span class="dash-cur-label">⚡ Abhi kar raha hoon</span>
+      <span class="dash-cur-label">⚡ Current tasks</span>
       ${t ? `<div class="now-task">
           <div class="now-main"><div class="now-title" title="${esc(t.text)}">${esc(t.text)}</div>${where ? `<div class="muted small">${esc(where.text.replace(/^⏭️\s*/, '⏭️ ').slice(0, 60))} me</div>` : ''}</div>
           <div class="now-btns"><button class="btn primary small-btn" data-action="now-done" data-id="${t.id}">✓ Ho gaya</button>
@@ -2868,13 +2892,12 @@ function renderDashboard() {
   }).join('');
 
   return `
-    ${topBar('📊 Dashboard + 📥 Inbox')}
+    ${topBar('📊 Dashboard')}
     <main class="page dash-page">
       <div class="dash-split">
         <div class="dash-left">${dashCurrentCard()}</div>
-        <div class="dash-right">
-          <h2 class="section-title" style="margin-top:0">📥 Inbox <span class="muted small" style="font-weight:500">· tap = details · ⠿ = kahin bhi le jao · Alt+I</span></h2>
-          ${renderTodos(INBOX)}
+        <div class="dash-right">${dashEarnCard() || `<p class="muted small" style="margin:6px 2px">💰 Earning ke 🎯 current projects yahan dikhenge${canEarn() && !earnCloud.code ? ' — pehle Earning unlock karo' : ''}.</p>`}
+          ${myInbox().length ? `<a class="card inbox-banner" href="#/inbox"><span class="big">📥</span><span style="flex:1"><b>Inbox me ${myInbox().length} note${myInbox().length === 1 ? '' : 's'}</b></span><span class="muted">›</span></a>` : ''}
         </div>
       </div>
     </main>
@@ -4094,10 +4117,10 @@ function renderEarnHome() {
 }
 
 /* ----- ❤️ Passion board: one card per channel / page ----- */
-function channelBoard({ platform = null, accountId = null } = {}) {
+function channelBoard({ platform = null, accountId = null, noPair = false } = {}) {
   const all = smAccounts();
   const accs = all.filter(a => (!platform || a.platform === platform) && (!accountId || a.id === accountId))
-    .flatMap(a => { const ig = a.platform === 'youtube' && igOf(a.id) && all.find(x => x.id === igOf(a.id).id); return ig ? [a, { ...ig, pair: true }] : [a]; })
+    .flatMap(a => { const ig = !noPair && a.platform === 'youtube' && igOf(a.id) && all.find(x => x.id === igOf(a.id).id); return ig ? [a, { ...ig, pair: true }] : [a]; })
     .filter((a, i, arr) => arr.findIndex(x => x.id === a.id) === i);
   if (!accs.length) return '';
   const ids = new Set(state.todos.map(t => t.id));
@@ -4124,7 +4147,7 @@ function channelBoard({ platform = null, accountId = null } = {}) {
         ${chPlan(a)}
         ${chWeek(a)}
         <div class="ch-box nowbox">
-          <span class="dash-cur-label">⚡ Abhi kar raha hoon</span>
+          <span class="dash-cur-label">⚡ Current tasks</span>
           ${now ? `<div class="now-task"><div class="now-main"><div class="now-title" title="${esc(now.text)}">${esc(now.text)}</div></div>
               <div class="now-btns"><button class="btn primary small-btn" data-action="toggle-todo" data-id="${now.id}">✓ Ho gaya</button>
               <button class="icon-btn" data-action="send-back" data-id="${now.id}" aria-label="Wapas bhejo" title="Main Inbox me wapas bhejo">↩️</button>
@@ -4314,6 +4337,113 @@ document.getElementById('sheet')?.addEventListener('close', () => {
 // Projects of a category: #1 = current project (big), the rest = small plain rows. ⠿ drag re-ranks.
 const MAX_CUR = 3;
 const projStat = p => { const t = p.blocks.filter(b => b.type === 'todo' && b.text.trim()); return { n: t.length, done: t.filter(b => b.checked).length }; };
+// 🎯 Current projects of one category (marked ones, else #1) — same rule as the category page.
+function curOfCat(cat) {
+  const live = childPages(cat.id).filter(p => !p.built);
+  const cur = live.filter(p => p.cur).slice(0, MAX_CUR);
+  return cur.length || !isEarnCategory(cat) ? cur : live.slice(0, 1);
+}
+const isCurProject = p => !!p && isEarnProject(p) && curOfCat(findPage(p.parentId)).includes(p);
+// Every section (📱 Apps, 🛍️ DPA, 📣 Social…) with its current projects.
+function earnCurrentGroups() {
+  if (!canEarn() || !earnCloud.code) return [];
+  return earn.pages.filter(p => !p.parentId).sort(byRank((a, b) => a.createdAt - b.createdAt))
+    .map(g => ({ g, items: childPages(g.id).flatMap(cat => curOfCat(cat).map(p => ({ cat, p }))) }))
+    .filter(x => x.items.length);
+}
+const openFeatures = p => p.blocks.filter(b => b.type === 'todo' && !b.indent && !b.checked && b.text.trim());
+function addFeature(page, text) {
+  page.blocks = page.blocks.filter(b => !((b.type === 'p' || b.type === 'todo') && !b.text.trim()));
+  page.blocks.push(newBlock('todo', text));
+  page.updatedAt = Date.now();
+  saveEarn();
+}
+function dashEarnCard() {
+  const groups = earnCurrentGroups();
+  if (!groups.length) return '';
+  const feat = (p, b) => `<li class="upnext-item"><button class="todo-check" data-action="dash-feat-done" data-page="${p.id}" data-id="${b.id}" aria-label="Feature ho gaya"></button><a class="dash-line-text" href="#/earn/${p.id}" style="color:inherit;text-decoration:none">${esc(b.text)}</a></li>`;
+  return groups.map(({ g, items }) => `
+    <section class="card dash-current dash-earn">
+      <div class="row-between"><span class="dash-cur-label">${esc(g.icon)} ${esc(g.title || 'Untitled')} · 🎯 ${items.length}</span><a class="muted small" href="#/earn/${g.id}">Kholo ›</a></div>
+      ${items.map(({ cat, p }) => {
+        const st = projStat(p), pct = st.n ? Math.round(st.done / st.n * 100) : 0, open = openFeatures(p), key = 'feat:' + p.id, all = dashMore.has(key);
+        return `<div class="dash-cur-row main">
+          <div class="dash-cur-head"><a class="dash-cur-name" href="#/earn/${p.id}" style="color:inherit;text-decoration:none">${esc(cat.icon)} ${esc(p.title || 'Untitled')}</a><span class="muted small" style="flex:none">${esc(cat.title || '')}${st.n ? ` · ☑ ${st.done}/${st.n}` : ''}</span></div>
+          ${st.n ? `<div class="progress" style="height:6px"><div style="width:${pct}%;height:100%;background:var(--primary)"></div></div>` : ''}
+          ${open.length ? `<ul class="upnext-list dash-steps">${(all ? open : open.slice(0, 6)).map(b => feat(p, b)).join('')}${open.length > 6 ? `<li class="dash-more-li"><button type="button" class="dash-more" data-action="dash-more" data-key="${key}">${all ? '▴ Kam dikhao' : `▸ ${open.length - 6} aur features`}</button></li>` : ''}</ul>` : ''}
+          <form class="dash-feat-form" data-page="${p.id}" autocomplete="off"><input name="text" maxlength="300" required placeholder="＋ Feature likho… Enter" aria-label="Naya feature"></form>
+        </div>`; }).join('')}
+    </section>`).join('');
+}
+document.addEventListener('submit', e => {
+  const form = e.target;
+  if (!form.classList || !form.classList.contains('dash-feat-form')) return;
+  e.preventDefault();
+  const text = form.elements.text.value.trim(), page = findPage(form.dataset.page);
+  if (!text || !page) return;
+  addFeature(page, text); render();
+  document.querySelector(`.dash-feat-form[data-page="${page.id}"] input`)?.focus(); // keep adding
+});
+
+/* ----- ✨ Alt+F popup (PC) / desktop shortcut: a feature straight into a current project ----- */
+const FEAT_PICK_KEY = 'app-ideas-feat-pick';
+const featItems = () => earnCurrentGroups().flatMap(x => x.items);
+function featPick() {
+  const items = featItems();
+  let id = ''; try { id = localStorage.getItem(FEAT_PICK_KEY) || ''; } catch { /* ignore */ }
+  return (items.find(x => x.p.id === id) || items[0] || {}).p || null;
+}
+function setFeatPick(id) { try { localStorage.setItem(FEAT_PICK_KEY, id); } catch { /* ignore */ } }
+function renderFeatPop() {
+  const head = `<div class="pop-head"><span class="pop-dot"></span>✨ Feature likho<span class="pop-keys"><kbd>Enter</kbd> save · <kbd>Tab</kbd> agla project · <kbd>Esc</kbd> band</span></div>`;
+  if (!canEarn() || !earnCloud.code) return `<div class="pop">${head}<p class="muted">🔒 Pehle main app me 💰 Earning unlock karo.</p><button class="btn primary" data-action="pop-open-main">App kholo</button></div>`;
+  const items = featItems(), cur = featPick();
+  if (!cur) return `<div class="pop">${head}<p class="muted">Abhi koi 🎯 current project nahi. Earning me kisi project pe right-click → 🎯 Set as current.</p><button class="btn primary" data-action="pop-open-main">App kholo</button></div>`;
+  const open = openFeatures(cur);
+  return `
+    <form id="feat-form" class="pop" autocomplete="off">
+      ${head}
+      <div class="feat-chips">${items.map(({ cat, p }, i) => `<button type="button" class="feat-chip${p === cur ? ' on' : ''}" data-action="feat-pick" data-id="${p.id}" tabindex="-1" title="${esc(cat.title || '')}">${i < 9 ? `<b>${i + 1}</b> ` : ''}${esc(cat.icon)} ${esc(p.title || 'Untitled')}</button>`).join('')}</div>
+      <input id="feat-text" name="text" maxlength="300" required placeholder="${esc(cur.title || 'Project')} ka naya feature… Enter" aria-label="Naya feature">
+      <div id="pop-msg" class="pop-msg"></div>
+      ${open.length ? `<ul class="feat-recent">${open.slice(-4).reverse().map(b => `<li>☐ ${esc(b.text)}</li>`).join('')}${open.length > 4 ? `<li class="muted">+${open.length - 4} aur</li>` : ''}</ul>` : '<p class="muted small" style="margin:0">Abhi koi feature nahi — pehla likho.</p>'}
+    </form>`;
+}
+async function saveFeat() {
+  const inp = document.getElementById('feat-text');
+  const p = featPick(), text = inp ? inp.value.trim() : '';
+  if (!p || !text || inp.dataset.busy) return;
+  addFeature(p, text);
+  inp.value = '';
+  render();
+  const m = () => document.getElementById('pop-msg');
+  if (m()) m().textContent = '☁️ Saving…';
+  clearTimeout(earnSync.timer);
+  for (let i = 0; earnSync.running && i < 60; i++) await new Promise(r => setTimeout(r, 150));
+  await earnSyncNow();
+  if (m()) m().textContent = earnSync.error ? '✅ Jud gaya (internet aate hi sync hoga)' : `✅ "${p.title || 'Project'}" me jud gaya — aur likho, ya Esc`;
+  document.getElementById('feat-text')?.focus();
+}
+document.addEventListener('keydown', e => {
+  if (parseRoute().page !== 'feat') return;
+  if (e.key === 'Escape') { e.preventDefault(); window.close(); return; }
+  const items = featItems(), cur = featPick();
+  if (e.key === 'Tab' && items.length) {
+    e.preventDefault();
+    const i = items.findIndex(x => x.p === cur);
+    setFeatPick(items[(i + (e.shiftKey ? -1 : 1) + items.length) % items.length].p.id); render(); return;
+  }
+  if ((e.altKey || e.ctrlKey) && /^[1-9]$/.test(e.key) && items[+e.key - 1]) { e.preventDefault(); setFeatPick(items[+e.key - 1].p.id); render(); return; }
+  if (e.key === 'Enter' && !e.isComposing && e.target.id === 'feat-text') { e.preventDefault(); saveFeat(); }
+});
+// Another window (the Alt+F popup) added a feature → show it here too.
+window.addEventListener('storage', e => {
+  if (e.key !== EARN_KEY || !earnCloud.code || ['pop', 'feat'].includes(parseRoute().page)) return;
+  const a = document.activeElement;
+  if (a && (a.isContentEditable || /INPUT|TEXTAREA/.test(a.tagName))) return; // don't redraw under your typing
+  earn = mergeEarn(earn, loadEarn());
+  render();
+});
 function projectList(kids, cat) {
   const ico = esc(cat.icon);
   const live = kids.filter(p => !p.built), built = kids.filter(p => p.built).sort((a, b) => b.built - a.built);
@@ -4388,10 +4518,14 @@ function renderEarnPage(page) {
       <button class="pg-icon" data-action="earn-icon" aria-label="Icon badlo" title="Icon badlo">${esc(page.icon)}</button>
       <div id="pg-title" class="pg-title" contenteditable="${CE}" data-ph="Untitled" role="textbox" aria-label="Page title">${esc(page.title)}</div>
       <div class="muted small">${page.by ? avatar(page.by) + ' ' : ''}Last edit ${timeAgo(page.updatedAt)}</div>
-      ${page.id === CAT_PASSION ? channelBoard()
+      ${isProj && !page.built ? `<div class="proj-bar">${isCurProject(page)
+        ? `<span class="proj-tag" style="align-self:center">🎯 Current project</span><button class="btn proj-btn" data-action="proj-unset-current" data-id="${page.id}">✕ Current se hatao</button>`
+        : `<button class="btn primary proj-btn" data-action="proj-set-current" data-id="${page.id}">🎯 Set as current</button>`}
+        <button class="btn proj-btn" data-action="proj-built" data-id="${page.id}">✅ Ban gaya</button></div>` : ''}
+      ${page.id === CAT_PASSION ? plannerCards(page)
         : page.id === 'cat-yt' ? channelBoard({ platform: 'youtube' })
         : page.id === 'cat-ig' ? channelBoard({ platform: 'instagram' })
-        : page.id.startsWith('ch-') && smAccounts().some(a => 'ch-' + a.id === page.id) ? channelBoard({ accountId: page.id.slice(3) })
+        : page.id.startsWith('ch-') && smAccounts().some(a => 'ch-' + a.id === page.id) ? channelBoard({ accountId: page.id.slice(3), noPair: true })
         : plannerCards(page)}
       ${!isCat && page.parentId && parent && !parent.parentId ? dumpSection(page, `💡 Ideas (${(page.dump || []).length})`) : ''}
       ${isCat ? `
@@ -4407,8 +4541,14 @@ function renderEarnPage(page) {
           </section>
         </div>
         ${page.blocks.length ? '<h3 style="margin:18px 0 0">📝 Notes</h3>' : ''}`
+      : page.id === CAT_PASSION && findPage('cat-yt') ? `
+        <div class="row-between" style="margin:14px 0 8px"><h3 style="margin:0">📺 YouTube channels (${childPages('cat-yt').length})</h3>
+          <button class="btn small-btn" data-action="earn-new" data-parent="cat-yt">＋ Naya channel</button></div>
+        <div class="earn-kids">${childPages('cat-yt').map(earnCard).join('')}</div>
+        ${kids.some(k => k.id !== 'cat-yt') ? `<h3 style="margin:14px 0 8px">📁 Aur (${kids.filter(k => k.id !== 'cat-yt').length})</h3>
+        <div class="earn-kids">${kids.filter(k => k.id !== 'cat-yt').map(earnCard).join('')}</div>` : ''}`
       : kids.length ? `
-        <div class="row-between" style="margin:14px 0 8px"><h3 style="margin:0">📁 Andar (${kids.length})</h3>
+        <div class="row-between" style="margin:14px 0 8px"><h3 style="margin:0">${page.parentId === 'cat-yt' ? '📸 Instagram pages' : '📁 Andar'} (${kids.length})</h3>
           <button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Naya page</button></div>
         <div class="earn-kids">${kids.map(earnCard).join('')}</div>` : ''}
       ${isProj ? '<h3 style="margin:18px 0 0">✨ Features <span class="muted small">— ☐ = feature · ＋ / Tab = sub-task · photo paste karo</span></h3>' : ''}
@@ -4443,6 +4583,15 @@ document.addEventListener('contextmenu', e => {
   row.classList.toggle('acts-open');
 });
 document.addEventListener('click', e => { if (!e.target.closest?.('.todo.acts-open .todo-acts')) closeTodoActs(); });
+// Project rows / current card (Earning category page): right-click → 🎯 Set as current, ✅ Ban gaya…
+document.addEventListener('contextmenu', e => {
+  const row = e.target.closest?.('.proj-row, .proj-cur');
+  if (!row) return;
+  e.preventDefault();
+  document.querySelectorAll('.proj-row.acts-open, .proj-cur.acts-open').forEach(r => r !== row && r.classList.remove('acts-open'));
+  row.classList.toggle('acts-open');
+});
+document.addEventListener('click', e => { if (!e.target.closest?.('.acts-open .proj-acts')) document.querySelectorAll('.proj-row.acts-open, .proj-cur.acts-open').forEach(r => r.classList.remove('acts-open')); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTodoActs(); });
 
 // Right-click (or long-press) a line in an Earning page → its menu (type, move, delete, send to page).
@@ -5524,6 +5673,12 @@ const extraActions = {
     p.built = now; delete p.cur; p.updatedAt = now; saveEarn(); render();
     toast(`✅ "${p.title || 'Untitled'}" ban gaya!`, () => { delete p.built; p.updatedAt = Date.now(); saveEarn(); render(); });
   },
+  'dash-feat-done'(el) {
+    const p = findPage(el.dataset.page), b = p && p.blocks.find(x => x.id === el.dataset.id); if (!b) return;
+    b.checked = true; p.updatedAt = Date.now(); saveEarn(); render();
+    toast(`✅ ${b.text.slice(0, 40)}`, () => { b.checked = false; p.updatedAt = Date.now(); saveEarn(); render(); });
+  },
+  'feat-pick'(el) { setFeatPick(el.dataset.id); render(); },
   'proj-unbuilt'(el) { const p = findPage(el.dataset.id); if (!p) return; delete p.built; p.updatedAt = Date.now(); saveEarn(); render(); },
   'proj-toggle-built'() { ui.showBuilt = !ui.showBuilt; render(); },
   'idea-open'(el) { openIdeaSheet(el.dataset.page, el.dataset.id); },
@@ -6873,6 +7028,16 @@ function render() {
     document.getElementById('pop-text')?.focus();
     return;
   }
+  if (page === 'feat') {
+    // Alt+F window / desktop shortcut: pick a 🎯 current project → type a feature → Enter.
+    const keep = document.getElementById('feat-text')?.value || '';
+    document.body.classList.add('pop-mode');
+    app.innerHTML = renderFeatPop();
+    document.title = '✨ Feature likho';
+    const inp = document.getElementById('feat-text');
+    if (inp) { inp.value = keep; inp.focus(); }
+    return;
+  }
   if (!cloud.code) {
     // No code yet → the site stays locked until the right code is typed.
     app.innerHTML = renderJoin();
@@ -6881,7 +7046,7 @@ function render() {
     return;
   }
   ensureYtChannels(); // 📺 your YouTube channels are always there
-  if (page === 'today' || page === 'inbox' || page === 'misc') { location.hash = '#/dashboard'; return; } // merged into Dashboard + Inbox
+  if (page === 'today' || page === 'misc') { location.hash = '#/dashboard'; return; } // merged into Dashboard
   if (page === 'pcauth') { app.innerHTML = renderPcAuth(id, parseRoute().extra); document.title = 'PC app me login'; mountPcAuth(id, parseRoute().extra); return; } // 📅 Today was merged into the Inbox
   document.body.classList.toggle('pop-mode', page === 'pop');
   if (page === 'pop') {
@@ -7845,7 +8010,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13f';
+const APP_VERSION = '2026-11-13g';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
