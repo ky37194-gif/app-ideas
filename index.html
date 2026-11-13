@@ -382,6 +382,8 @@
   .dash-page .upnext-item { padding: 3px 0; }
   .dash-page .now-title { font-size: 1.2rem; }
   .dash-page .dash-add-form input, .dash-feat-form input { min-height: 40px; font-size: 1rem; }
+  .dash-line-text.is-now { color: var(--primary); font-weight: 700; }
+  .dash-line-text.is-now::before { content: '⚡ '; }
   .dash-cat { margin-top: 10px; padding: 4px 0 0 12px; border-left: 3px solid color-mix(in srgb, var(--primary) 45%, var(--border)); }
   .dash-cat-head { display: flex; align-items: center; gap: 8px; font-weight: 750; font-size: .95rem; color: var(--muted); text-decoration: none; padding: 2px 0; }
   .dash-cat-head .name { flex: 1; min-width: 0; }
@@ -1980,21 +1982,35 @@ function reorderTodo(id, targetId, where) {
 
 /* ----- ⚡ Abhi kar raha hoon: one task you're doing right now + the next one ----- */
 const nowTask = () => state.todos.filter(t => t.now && !t.done).sort((a, b) => b.now - a.now)[0] || null;
-function dashNowCard(upNext) {
-  const t = nowTask();
-  const next = upNext.find(x => !t || x.id !== t.id) || null;
-  const where = t && t.parentId && state.todos.find(x => x.id === t.parentId);
-  return `<section class="card dash-now" data-drop-now="1" title="Koi bhi task yahan chhodo = abhi yahi kar raha hoon">
+// ⚡ The one current task: a to-do (t.now) or an Earning project's feature (block.now) — newest wins.
+function nowFeature() {
+  let best = null;
+  if (canEarn() && earnCloud.code) earn.pages.forEach(p => p.blocks.forEach(b => { if (b.now && !b.checked && (!best || b.now > best.b.now)) best = { p, b }; }));
+  return best;
+}
+function clearFeatureNow(except) {
+  earn.pages.forEach(p => { let ch = false; p.blocks.forEach(b => { if (b.now && b !== except) { delete b.now; ch = true; } }); if (ch) p.updatedAt = Date.now(); });
+}
+function dashNowCard() {
+  const t = nowTask(), f = nowFeature();
+  const useF = f && (!t || f.b.now > t.now);
+  const where = !useF && t && t.parentId && state.todos.find(x => x.id === t.parentId);
+  const cat = useF && findPage(f.p.parentId);
+  const title = useF ? f.b.text : t && t.text;
+  const sub = useF ? `${cat ? esc(cat.icon) + ' ' + esc(cat.title || '') + ' › ' : ''}<a href="#/earn/${f.p.id}" style="color:inherit">${esc(f.p.title || 'Untitled')}</a>`
+    : where ? esc(where.text.replace(/^⏭️\s*/, '⏭️ ').slice(0, 60)) + ' me' : '';
+  return `<section class="card dash-now" data-drop-now="1" title="Koi bhi task yahan chhodo = current task">
       <span class="dash-cur-label">⚡ Current tasks</span>
-      ${t ? `<div class="now-task">
-          <div class="now-main"><div class="now-title" title="${esc(t.text)}">${esc(t.text)}</div>${where ? `<div class="muted small">${esc(where.text.replace(/^⏭️\s*/, '⏭️ ').slice(0, 60))} me</div>` : ''}</div>
-          <div class="now-btns"><button class="btn primary small-btn" data-action="now-done" data-id="${t.id}">✓ Ho gaya</button>
-          <button class="icon-btn" data-action="send-back" data-id="${t.id}" aria-label="Wapas bhejo" title="Hatao — jahan se aaya tha wahin wapas">↩️</button>
-          <button class="icon-btn" data-action="now-clear" aria-label="Rok do" title="Abhi wala rok do (task wahin rahega)">✕</button></div>
+      ${title ? `<div class="now-task">
+          <div class="now-main"><div class="now-title" title="${esc(title)}">${esc(title)}</div>${sub ? `<div class="muted small">${sub}</div>` : ''}</div>
+          <div class="now-btns">${useF
+            ? `<button class="btn primary small-btn" data-action="feat-now-done" data-page="${f.p.id}" data-id="${f.b.id}">✓ Ho gaya</button>
+               <button class="icon-btn" data-action="feat-now-clear" aria-label="Hatao" title="Current se hatao (feature wahin rahega)">✕</button>`
+            : `<button class="btn primary small-btn" data-action="now-done" data-id="${t.id}">✓ Ho gaya</button>
+               <button class="icon-btn" data-action="send-back" data-id="${t.id}" aria-label="Wapas bhejo" title="Hatao — jahan se aaya tha wahin wapas">↩️</button>
+               <button class="icon-btn" data-action="now-clear" aria-label="Rok do" title="Current se hatao (task wahin rahega)">✕</button>`}</div>
         </div>`
-        : '<p class="muted small" style="margin:6px 0">Kuch shuru nahi kiya. Kisi project / Up next pe <b>▶️</b> dabao, ya ⠿ se task yahan chhodo.</p>'}
-      ${next ? `<div class="now-next"><span class="muted small">👉 Next:</span><span class="now-next-text">${esc(next.text)}</span>
-          <button class="btn small-btn" data-action="set-now" data-id="${next.id}">▶️ Shuru karo</button></div>` : ''}
+        : '<p class="muted small" style="margin:6px 0">Koi current task nahi. Neeche kisi bhi task / feature pe <b>click</b> karo — wo yahan aa jayega.</p>'}
     </section>`;
 }
 function setNow(id) {
@@ -2003,6 +2019,7 @@ function setNow(id) {
   const now = Date.now();
   state.todos.forEach(x => { if (x.now && x !== t) { x.now = 0; x.updatedAt = now; } });
   t.now = now; t.updatedAt = now;
+  if (nowFeature()) { clearFeatureNow(); saveEarn(); }
   if (t.done) { t.done = false; t.doneAt = null; }
   saveState(); render();
   toast(`⚡ Abhi: ${t.text.slice(0, 40)}`);
@@ -2069,7 +2086,7 @@ function dashCurrentCard() {
   const list = ordered(state.todos.filter(t => t.folder === CURRENT && !t.done && t.id !== UP_NEXT && isTopTodo(t, ids)), projectSort);
   // Each project (and the ⏭️ Up next box) is a drop target: drag a task's ⠿ from the Inbox onto it.
   // A line with a tick box: ⠿ drag · ☐ done · text (tap = details) · ▶️ abhi yahi.
-  const line = (x, cls = '') => `<li class="upnext-item ${cls}" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text" data-action="open-todo" data-id="${x.id}">${esc(x.text)}</span><button class="now-play" data-action="set-now" data-id="${x.id}" title="Abhi yahi kar raha hoon">▶️</button><button class="now-play" data-action="send-back" data-id="${x.id}" title="Yahan se hatao — jahan se aaya tha wahin wapas">↩️</button></li>`;
+  const line = (x, cls = '') => `<li class="upnext-item ${cls}" data-drop-todo="${x.id}" data-rank><span class="pg-drag todo-drag" data-drag-todo="${x.id}" title="Pakad ke kahin bhi chhodo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${x.id}" aria-label="Ho gaya"></button><span class="dash-line-text${nowTask() === x ? ' is-now' : ''}" data-action="set-now" data-id="${x.id}" title="Click = current task">${esc(x.text)}</span><button class="now-play" data-action="open-todo" data-id="${x.id}" title="Details kholo">📝</button><button class="now-play" data-action="send-back" data-id="${x.id}" title="Yahan se hatao — jahan se aaya tha wahin wapas">↩️</button></li>`;
   const addBox = (parent, placeholder, folder = '') => `<form class="dash-add-form" data-parent="${parent}" data-folder="${folder}" autocomplete="off"><input name="text" maxlength="300" required placeholder="${placeholder}" aria-label="${placeholder}"></form>`;
   // Long lists stay short: first N shown, the rest folded under "▸ N aur" (tap to open / close).
   const fold = (key, items, n, render, unit) => {
@@ -2084,8 +2101,8 @@ function dashCurrentCard() {
     const open = ordered(childrenOf(t.id).filter(x => !x.done), stepSort);
     return `<div class="dash-cur-row${i === 0 ? ' main' : ''}" data-drop-todo="${t.id}" data-rank title="Task yahan chhodo = is project ka step · upar/neeche chhodo = order">
       <div class="dash-cur-head"><span class="pg-drag todo-drag" data-drag-todo="${t.id}" title="Pakad ke kisi project ke upar / neeche chhodo = order badlo" aria-label="Drag">⠿</span><button class="todo-check" data-action="toggle-todo" data-id="${t.id}" aria-label="Project ho gaya"></button>
-        <span class="dash-cur-name" data-action="open-todo" data-id="${t.id}">${esc(t.text)}</span>
-        <button class="now-play" data-action="set-now" data-id="${(open[0] || t).id}" title="Abhi yahi kar raha hoon">▶️</button>
+        <span class="dash-cur-name" data-action="set-now" data-id="${t.id}" title="Click = current task">${esc(t.text)}</span>
+        <button class="now-play" data-action="open-todo" data-id="${t.id}" title="Details kholo">📝</button>
         <button class="now-play" data-action="send-back" data-id="${t.id}" title="Current Project se hatao — jahan se aaya tha wahin wapas">↩️</button></div>
       ${t.desc.trim() ? `<span class="todo-desc">${esc(t.desc.trim())}</span>` : ''}
       ${steps.length ? progressLine(steps) : ''}
@@ -2895,7 +2912,7 @@ function renderDashboard() {
   return `
     ${topBar('📊 Dashboard')}
     <main class="page dash-page with-top">
-      <div class="dash-top">${dashNowCard(ordered(childrenOf(UP_NEXT).filter(x => !x.done), upNextSort))}</div>
+      <div class="dash-top">${dashNowCard()}</div>
       <div class="dash-split">
         <div class="dash-left">${dashCurrentCard()}</div>
         <div class="dash-right">${dashEarnCard() || `<p class="muted small" style="margin:6px 2px">💰 Earning ke 🎯 current projects yahan dikhenge${canEarn() && !earnCloud.code ? ' — pehle Earning unlock karo' : ''}.</p>`}
@@ -3727,6 +3744,7 @@ function normalizePage(raw = {}) {
       };
       const ind = Math.min(4, Math.max(0, Math.floor(Number(b.indent) || 0)));
       if (ind) blk.indent = ind;
+      if (Number(b.now) && !b.checked) blk.now = Number(b.now); // ⚡ current task (a project's feature)
       if (blk.type === 'image') blk.src = typeof b.src === 'string' && b.src.startsWith('data:image/') ? b.src : '';
       return blk;
     }).filter(b => b.type !== 'image' || b.src),
@@ -4363,7 +4381,7 @@ function addFeature(page, text) {
 function dashEarnCard() {
   const groups = earnCurrentGroups();
   if (!groups.length) return '';
-  const feat = (p, b) => `<li class="upnext-item"><button class="todo-check" data-action="dash-feat-done" data-page="${p.id}" data-id="${b.id}" aria-label="Feature ho gaya"></button><a class="dash-line-text" href="#/earn/${p.id}" style="color:inherit;text-decoration:none">${esc(b.text)}</a></li>`;
+  const feat = (p, b) => `<li class="upnext-item"><button class="todo-check" data-action="dash-feat-done" data-page="${p.id}" data-id="${b.id}" aria-label="Feature ho gaya"></button><span class="dash-line-text${b.now ? ' is-now' : ''}" data-action="feat-now" data-page="${p.id}" data-id="${b.id}" title="Click = current task">${esc(b.text)}</span></li>`;
   return groups.map(({ g, items }) => `
     <section class="card dash-current dash-earn">
       <div class="row-between"><span class="dash-cur-label">${esc(g.icon)} ${esc(g.title || 'Untitled')} · 🎯 ${items.length}</span><a class="muted small" href="#/earn/${g.id}">Kholo ›</a></div>
@@ -5685,6 +5703,19 @@ const extraActions = {
     toast(`✅ ${b.text.slice(0, 40)}`, () => { b.checked = false; p.updatedAt = Date.now(); saveEarn(); render(); });
   },
   'feat-pick'(el) { setFeatPick(el.dataset.id); render(); },
+  'feat-now'(el) {
+    const p = findPage(el.dataset.page), b = p && p.blocks.find(x => x.id === el.dataset.id); if (!b) return;
+    const now = Date.now();
+    clearFeatureNow(b);
+    b.now = now; p.updatedAt = now; saveEarn();
+    let ch = false; state.todos.forEach(x => { if (x.now) { x.now = 0; x.updatedAt = now; ch = true; } }); if (ch) saveState();
+    render(); toast(`⚡ Current: ${b.text.slice(0, 40)}`);
+  },
+  'feat-now-done'(el) {
+    const p = findPage(el.dataset.page), b = p && p.blocks.find(x => x.id === el.dataset.id); if (!b) return;
+    b.checked = true; delete b.now; p.updatedAt = Date.now(); saveEarn(); render(); toast('✅ Ho gaya!');
+  },
+  'feat-now-clear'() { clearFeatureNow(); saveEarn(); render(); },
   'proj-unbuilt'(el) { const p = findPage(el.dataset.id); if (!p) return; delete p.built; p.updatedAt = Date.now(); saveEarn(); render(); },
   'proj-toggle-built'() { ui.showBuilt = !ui.showBuilt; render(); },
   'idea-open'(el) { openIdeaSheet(el.dataset.page, el.dataset.id); },
@@ -8016,7 +8047,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13l';
+const APP_VERSION = '2026-11-13m';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {

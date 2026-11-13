@@ -29,3 +29,4 @@ NOTE: har deploy pe index.html me APP_VERSION bhi badlo (warna open app/PC tray 
 - 2026-11-13: ⚡ Current tasks card ab Dashboard ke sabse upar (full width, .dash-top), neeche 2 columns. APP_VERSION j, sw v35.
 - 2026-11-13: Dashboard Earning card: projects ab category ke heading (🥽 Meta apps, 🤖 Android apps…) ke neeche grouped; Feature box PC pe hover pe dikhta. APP_VERSION k, sw v36.
 - 2026-11-13: PC pe Dashboard rows me hover pe add box (step/feature) ab nahi aata. APP_VERSION l, sw v37.
+- 2026-11-13: ⚡ Current tasks card: 'Next / Shuru karo' hataya. Dashboard pe kisi bhi task / project / feature pe click = current task (todo.now ya earn block.now — normalizePage me 'now' field add). 📝 = details. APP_VERSION m, sw v38.
