@@ -295,6 +295,17 @@
   .inbox-quote { margin: -6px 0 6px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); white-space: pre-wrap; }
   .sheet-sub { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 8px; }
   .move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mv-tree { display: grid; gap: 6px; }
+  .mv-group { font-weight: 800; font-size: .9rem; margin: 8px 0 2px; }
+  .mv-cat { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+  .mv-cat > summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; font-weight: 650; list-style: none; }
+  .mv-cat > summary::-webkit-details-marker { display: none; }
+  .mv-cat > summary::before { content: '▸'; color: var(--muted); margin-right: -2px; }
+  .mv-cat[open] > summary::before { content: '▾'; }
+  .mv-cat > summary > span:first-child { flex: 1; }
+  .mv-acts, .mv-projs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 10px 10px; }
+  .mv-projs { grid-template-columns: 1fr; }
+  .mv-acts .btn, .mv-projs .btn { min-height: 38px; font-size: .88rem; justify-content: flex-start; text-align: left; }
   .move-grid .btn { min-height: 44px; font-size: .9rem; padding: 0 10px; justify-content: flex-start; text-align: left; }
   dialog.sheet { overflow-y: auto; }
   .move-list { display: grid; gap: 6px; }
@@ -2009,6 +2020,7 @@ function dashNowCard() {
             ? `<button class="btn primary small-btn" data-action="feat-now-done" data-page="${f.p.id}" data-id="${f.b.id}">✓ Ho gaya</button>
                <button class="icon-btn" data-action="feat-now-clear" aria-label="Hatao" title="Current se hatao (feature wahin rahega)">✕</button>`
             : `<button class="btn primary small-btn" data-action="now-done" data-id="${t.id}">✓ Ho gaya</button>
+               <button class="btn small-btn" data-action="now-to-project" data-id="${t.id}" title="Galti se task bana? Isko 🎯 Current Project bana do">🎯 Project banao</button>
                <button class="icon-btn" data-action="send-back" data-id="${t.id}" aria-label="Wapas bhejo" title="Hatao — jahan se aaya tha wahin wapas">↩️</button>
                <button class="icon-btn" data-action="now-clear" aria-label="Rok do" title="Current se hatao (task wahin rahega)">✕</button>`}</div>
         </div>`
@@ -2069,6 +2081,17 @@ function sendBack(id) {
 const nowActions = {
   'send-back'(el) { sendBack(el.dataset.id); },
   'set-now'(el) { setNow(el.dataset.id); },
+  // ⚡ Current task → 🎯 Current Project (it was meant to be a project).
+  'now-to-project'(el) {
+    const t = state.todos.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    const now = Date.now();
+    if (t.folder !== CURRENT || t.parentId) { t.prevFolder = t.folder; t.prevParent = t.parentId || null; }
+    t.parentId = null; t.now = 0;
+    [t, ...descendantsOf(t.id)].forEach(x => { x.folder = CURRENT; x.updatedAt = now; });
+    saveState(); render();
+    toast(`🎯 "${t.text.slice(0, 40)}" ab Current Project hai`);
+  },
   'now-clear'() { const t = nowTask(); if (t) { t.now = 0; t.updatedAt = Date.now(); saveState(); render(); } },
   'now-done'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
@@ -5427,6 +5450,43 @@ function addFeatureBlocks(page, blocks) {
   page.updatedAt = Date.now();
 }
 const asFeature = b => (['p', 'bullet', 'num', 'quote', 'callout'].includes(b.type) ? { ...b, type: 'todo' } : b);
+// 📂 "Kahan daalein?": every Earning section → its categories → their projects.
+// Category → 💡 idea / 🚀 new project · project → ☐ feature.
+function earnMoveTree(t) {
+  const groups = earn.pages.filter(p => !p.parentId).sort(byRank((a, b) => a.createdAt - b.createdAt));
+  return `<div class="mv-tree">${groups.map(g => {
+    const cats = childPages(g.id);
+    if (!cats.length) return '';
+    return `<div class="mv-group">${esc(g.icon)} ${esc(g.title || 'Untitled')}</div>${cats.map(cat => {
+      const projs = childPages(cat.id).filter(p => !p.built);
+      const cur = isEarnCategory(cat) ? curOfCat(cat) : [];
+      const sorted = [...cur, ...projs.filter(p => !cur.includes(p))];
+      return `<details class="mv-cat"><summary><span>${esc(cat.icon)} ${esc(cat.title || 'Untitled')}</span><span class="muted small">${projs.length ? projs.length + ' projects' : ''}</span></summary>
+        <div class="mv-acts">
+          <button type="button" class="btn" data-action="todo-to-cat" data-id="${t.id}" data-cat="${cat.id}" data-kind="idea">💡 Idea banao</button>
+          <button type="button" class="btn" data-action="todo-to-cat" data-id="${t.id}" data-cat="${cat.id}" data-kind="proj">🚀 Naya project</button>
+        </div>
+        ${sorted.length ? `<div class="mv-projs">${sorted.map(p => `<button type="button" class="btn" data-action="earn-feat-to" data-id="${t.id}" data-page="${p.id}">${cur.includes(p) ? '🎯 ' : ''}${esc(p.title || 'Untitled')} <span class="muted small">→ feature</span></button>`).join('')}</div>` : ''}
+      </details>`; }).join('')}`; }).join('')}</div>`;
+}
+function moveTodoToCat(id, catId, kind) {
+  const t = state.todos.find(x => x.id === id), cat = findPage(catId);
+  if (!t || !cat || !earnCloud.code) return;
+  const subs = descendantsOf(t.id);
+  const { title, rest } = splitNote(t.text);
+  const d = { id: uid(), text: title, desc: [rest, t.desc || ''].map(x => x.trim()).filter(Boolean).join('\n'),
+    items: subs.map(x => ({ id: uid(), text: x.text, done: !!x.done })), createdAt: Date.now() };
+  if (kind === 'proj') earn.pages.push(projectFromIdea(cat, d));
+  else { cat.dump = [d, ...(cat.dump || [])]; }
+  cat.updatedAt = Date.now();
+  saveEarn();
+  const now = Date.now();
+  [t, ...subs].forEach(x => { state.deleted[x.id] = now; });
+  const gone = new Set([t.id, ...subs.map(x => x.id)]);
+  state.todos = state.todos.filter(x => !gone.has(x.id));
+  saveState(); closeSheet(); render();
+  toast(kind === 'proj' ? `🚀 ${cat.icon} ${cat.title} me naya project ban gaya` : `💡 ${cat.icon} ${cat.title} me idea ban gaya`);
+}
 function moveTodoToEarn(id, pageId) {
   const t = state.todos.find(x => x.id === id);
   if (!t || !earnCloud.code) return;
@@ -5482,8 +5542,8 @@ const extraActions = {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
     const opt = (value, label) => `<button type="button" class="btn" data-action="inbox-to" data-id="${t.id}" data-value="${value}">${label}</button>`;
-    const earnPart = !canEarn() ? '' : `<h3 class="sheet-sub">🔒 Private</h3>` + (earnCloud.code
-      ? `<button type="button" class="btn block primary" data-action="todo-to-earn" data-id="${t.id}">🔍 Kisi bhi Earning page me daalo (search karo)</button>`
+    const earnPart = !canEarn() ? '' : `<h3 class="sheet-sub">💰 Earning</h3>` + (earnCloud.code
+      ? earnMoveTree(t) + `<button type="button" class="btn block" data-action="todo-to-earn" data-id="${t.id}" style="margin-top:10px">🔍 Kisi bhi Earning page me daalo (search karo)</button>`
       : '<p class="muted small" style="margin:0">💰 Earning me daalne ke liye pehle Earning unlock karo.</p>');
     const sheet = document.getElementById('sheet');
     sheet.innerHTML = `
@@ -5537,6 +5597,8 @@ const extraActions = {
   },
 
   // Any task / Inbox note (with its sub-tasks) → any Earning page (as ☐ features), or a new page.
+  'todo-to-cat'(el) { moveTodoToCat(el.dataset.id, el.dataset.cat, el.dataset.kind); },
+  'earn-feat-to'(el) { closeSheet(); moveTodoToEarn(el.dataset.id, el.dataset.page); },
   'todo-to-earn'(el) {
     const t = state.todos.find(x => x.id === el.dataset.id);
     if (!t) return;
@@ -8056,7 +8118,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13n';
+const APP_VERSION = '2026-11-13p';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
