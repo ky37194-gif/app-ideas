@@ -333,6 +333,18 @@
   .blk-check { flex: none; width: 20px; height: 20px; margin: 6px 4px 0 0; padding: 0; border: 2px solid var(--muted); border-radius: 5px;
     background: transparent; color: #fff; font-size: .75rem; font-weight: 800; cursor: pointer; display: grid; place-items: center; }
   .blk.checked .blk-check { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+  /* Sub-tasks: indented lines (Tab / Shift+Tab, or the ＋ next to a feature) */
+  .blk[data-ind] { margin-left: calc(var(--ind) * 26px); }
+  .blk-sub { flex: none; width: 26px; height: 26px; margin-top: 3px; padding: 0; border: 0; border-radius: 6px; background: transparent;
+    color: var(--muted); font-size: 1rem; cursor: pointer; opacity: 0; }
+  .blk:hover .blk-sub, .blk:focus-within .blk-sub { opacity: .8; }
+  .blk-sub:hover { background: var(--surface-2); opacity: 1; }
+  @media (hover: none) { .blk-sub { opacity: .55; } }
+  .proj-add { display: flex; gap: 8px; margin: 4px 0 12px; }
+  .proj-add input { flex: 1; min-width: 0; }
+  .dump-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
+  .dump-item { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .dump-item .dt { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; }
   .blk.checked .blk-text { text-decoration: line-through; color: var(--muted); }
   .blk-quote .blk-text { border-left: 3px solid var(--text); padding-left: 12px; }
   .blk-callout { background: var(--surface-2); padding: 6px 8px 6px 0; margin: 4px 0; border-radius: 10px; }
@@ -3659,12 +3671,15 @@ function normalizePage(raw = {}) {
         text: String(b.text || ''),
         checked: !!b.checked,
       };
+      const ind = Math.min(4, Math.max(0, Math.floor(Number(b.indent) || 0)));
+      if (ind) blk.indent = ind;
       if (blk.type === 'image') blk.src = typeof b.src === 'string' && b.src.startsWith('data:image/') ? b.src : '';
       return blk;
     }).filter(b => b.type !== 'image' || b.src),
     by: normPerson(raw.by),
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
+    ...(Array.isArray(raw.dump) && raw.dump.length ? { dump: raw.dump.filter(d => d && d.text).map(d => ({ id: d.id || uid(), text: String(d.text), createdAt: Number(d.createdAt) || now })) } : {}),
   };
 }
 const newBlock = (type = 'p', text = '') => ({ id: uid(), type, text, checked: false });
@@ -4038,6 +4053,7 @@ function renderEarnHome() {
       <p class="muted small" style="margin:0 0 12px"> Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
       ${state.ideas.length ? `<button class="card sm-card" data-action="ideas-to-earn" style="cursor:pointer;border-color:var(--primary)"><span class="big" style="font-size:1.8rem">💡</span><span style="flex:1"><b>Saare ideas (${state.ideas.length}) yahan shift karo</b><br><span class="muted small">Har folder Earning me folder banega — phir ⠿ se jahan chaho daalo</span></span><span class="muted">›</span></button>` : ''}
       <a class="card sm-card" href="#/sm"><span class="big" style="font-size:1.8rem">📱</span><span style="flex:1"><b>SM — Content Planner</b><br><span class="muted small">Social media ke saare ideas, posts aur plan</span></span><span class="muted">›</span></a>
+      ${findPage(CAT_EARN) ? dumpSection(findPage(CAT_EARN)) : ''}
       <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
       ${top.length > 1 ? '<p class="hint" style="margin:10px 0 0">🏆 <b>⠿</b> pakad ke kisi page ke <b>upar / neeche</b> chhodo = apna focus rank set karo (#1 = sabse zyada focus). <b>Beech me</b> chhodo = us page ke andar chala jayega.</p>' : ''}
       <div class="list" style="margin-top:12px">${top.length ? top.map(earnCard).join('')
@@ -4203,8 +4219,29 @@ function plannerCards(page) {
     </div>`;
 }
 
+// Digital Business → category (Extensions, Android apps…) → project → its features (☐ todo list with sub-tasks).
+const isEarnGroup = p => !!p && !p.parentId && p.id !== CAT_PASSION;
+const isEarnCategory = p => !!p && isEarnGroup(findPage(p.parentId));
+const isEarnProject = p => !!p && isEarnCategory(findPage(p.parentId));
+function dumpSection(page) {
+  const list = page.dump || [];
+  return `
+    <h3 style="margin:14px 0 8px">💡 Jaldi likho <span class="muted small">— koi bhi idea, baad me ➜ se category / project me bhejo</span></h3>
+    <form id="dump-form" class="proj-add" data-page="${page.id}" autocomplete="off">
+      <input name="text" required maxlength="2000" placeholder="Jo idea aaye likho… Enter dabao" aria-label="Quick idea">
+      <button type="submit" class="btn primary">+ Add</button>
+    </form>
+    ${list.length ? `<ul class="dump-list">${[...list].reverse().map(d => `
+      <li class="dump-item">
+        <span class="dt">${esc(d.text)}</span>
+        <button class="icon-btn" data-action="dump-copy" data-id="${d.id}" title="Copy" aria-label="Copy">📋</button>
+        <button class="icon-btn" data-action="dump-send" data-id="${d.id}" title="Category (naya project) ya project (feature) me bhejo" aria-label="Bhejo">➜</button>
+        <button class="icon-btn" data-action="dump-del" data-id="${d.id}" title="Hatao" aria-label="Delete">✕</button>
+      </li>`).join('')}</ul>` : ''}`;
+}
 function renderEarnPage(page) {
   const parent = findPage(page.parentId);
+  const isCat = isEarnCategory(page), isProj = isEarnProject(page);
   const crumbs = pageAncestors(page).map(p => `<a href="#/earn/${p.id}" data-drop-page="${p.id}">${esc(p.icon)} ${esc(p.title || 'Untitled')}</a><span>›</span>`).join('');
   const kids = childPages(page.id);
   return `
@@ -4222,18 +4259,28 @@ function renderEarnPage(page) {
         : page.id === 'cat-ig' ? channelBoard({ platform: 'instagram' })
         : page.id.startsWith('ch-') && smAccounts().some(a => 'ch-' + a.id === page.id) ? channelBoard({ accountId: page.id.slice(3) })
         : plannerCards(page)}
-      ${kids.length ? `
+      ${isCat ? `
+        <h3 style="margin:14px 0 8px">🚀 Projects (${kids.length})</h3>
+        <form id="proj-form" class="proj-add" data-parent="${page.id}" autocomplete="off">
+          <input name="text" required maxlength="200" placeholder="Naya project likho… Enter dabao" aria-label="Naya project">
+          <button type="submit" class="btn primary">+ Add</button>
+        </form>
+        ${kids.length ? `<div class="earn-kids">${kids.map(earnCard).join('')}</div>` : ''}
+        ${page.blocks.length ? '<h3 style="margin:18px 0 0">📝 Notes</h3>' : ''}`
+      : kids.length ? `
         <div class="row-between" style="margin:14px 0 8px"><h3 style="margin:0">📁 Andar (${kids.length})</h3>
           <button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Naya page</button></div>
         <div class="earn-kids">${kids.map(earnCard).join('')}</div>` : ''}
+      ${isProj ? '<h3 style="margin:18px 0 0">✨ Features <span class="muted small">— ☐ = feature · ＋ / Tab = sub-task · photo paste karo</span></h3>' : ''}
       <div id="blocks" class="blocks">${blocksHTML(page)}</div>
       <div class="row" style="gap:6px;flex-wrap:wrap">
+        ${isProj ? '<button class="add-block" data-action="earn-add-feature" style="flex:1">☐ Feature jodo</button>' : ''}
         <button class="add-block" data-action="earn-add-block" style="flex:1">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
         <button class="add-block" data-action="earn-add-photo" style="flex:none" title="Photo daalo (paste / drag-drop bhi chalta hai)">🖼️ Photo</button>
       </div>
       <section class="subpages">
         <div class="drop-root" ${page.parentId && findPage(page.parentId) ? `data-drop-page="${page.parentId}"` : 'data-drop-root'}>⬆️ Yahan chhodo — is folder se bahar nikalo</div>
-        ${kids.length ? '' : `<button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>`}
+        ${kids.length || isCat || isProj ? '' : `<button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>`}
         ${page.id.startsWith('ideas-folder-') && kids.some(k => !isFeatureList(k)) ? `<button class="btn block" data-action="earn-features-only" data-id="${page.id}" style="margin:6px 0 10px">🧹 Har idea page me sirf features rakho (baaki sab hatao)</button>` : ''}
       </section>
       <p class="hint" style="margin-top:22px">Shortcut: <b>#</b> heading · <b>-</b> list · <b>1.</b> number · <b>[]</b> checkbox · <b>&gt;</b> quote · <b>---</b> line · <b>/</b> sab options · <b>⋮⋮</b> se block badlo / hatao</p>
@@ -4276,7 +4323,9 @@ function blockHTML(b, n) {
   const body = b.type === 'code'
     ? `<textarea class="blk-text blk-code" data-id="${b.id}" rows="1" spellcheck="false" placeholder="Code…" aria-label="Code">${esc(b.text)}</textarea>`
     : `<div class="blk-text" contenteditable="${CE}" data-id="${b.id}" data-ph="${esc(BLOCK_PH[b.type] || '')}" role="textbox">${esc(b.text)}</div>`;
-  return `<div class="blk blk-${b.type}${b.checked ? ' checked' : ''}" data-id="${b.id}">${handle}${mark}${body}</div>`;
+  const ind = b.indent ? ` data-ind style="--ind:${b.indent}"` : '';
+  const sub = b.type === 'todo' && (b.indent || 0) < 4 ? `<button class="blk-sub" data-action="earn-sub" data-id="${b.id}" title="Iske andar sub-task" aria-label="Sub-task add karo" tabindex="-1">＋</button>` : '';
+  return `<div class="blk blk-${b.type}${b.checked ? ' checked' : ''}" data-id="${b.id}"${ind}>${handle}${mark}${body}${sub}</div>`;
 }
 
 /* ----- Editor helpers ----- */
@@ -4397,6 +4446,10 @@ function blockEnter(el) {
   if (!selCollapsed()) getSelection().deleteFromDocument();
   const text = textOf(el);
   const off = caretOffset(el);
+  if (b.indent && LIST_TYPES.includes(b.type) && !text.trim()) {
+    b.indent--; if (!b.indent) delete b.indent;
+    touchPage(page); redrawBlocks(b.id, 0); return;
+  }
   if (b.type !== 'p' && b.type !== 'code' && !text.trim()) {
     b.type = 'p'; b.checked = false; b.text = '';
     touchPage(page); redrawBlocks(b.id, 0); return;
@@ -4404,11 +4457,14 @@ function blockEnter(el) {
   const nextType = LIST_TYPES.includes(b.type) ? b.type : 'p';
   if (off === 0 && text) { // Enter at the very start → empty line above
     b.text = text;
-    page.blocks.splice(i, 0, newBlock(nextType));
+    const up = newBlock(nextType);
+    if (b.indent && LIST_TYPES.includes(nextType)) up.indent = b.indent;
+    page.blocks.splice(i, 0, up);
     touchPage(page); redrawBlocks(b.id, 0); return;
   }
   b.text = text.slice(0, off);
   const nb = newBlock(nextType, text.slice(off));
+  if (b.indent && LIST_TYPES.includes(nextType)) nb.indent = b.indent;
   page.blocks.splice(i + 1, 0, nb);
   touchPage(page); redrawBlocks(nb.id, 0);
 }
@@ -4420,6 +4476,7 @@ function blockBackspace(el) {
   if (el.tagName === 'TEXTAREA' && el.selectionEnd !== 0) return false;
   const text = textOf(el);
   if (b.type === 'code' && text) return false;
+  if (b.indent) { b.indent--; if (!b.indent) delete b.indent; touchPage(page); redrawBlocks(b.id, 0); return true; }
   if (b.type !== 'p') { b.type = 'p'; b.checked = false; touchPage(page); redrawBlocks(b.id, 0); return true; }
   if (i === 0) {
     if (text || page.blocks.length < 2) return false;
@@ -4968,6 +5025,19 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey && !isCode) { e.preventDefault(); blockEnter(el); return; }
   if (e.key === 'Enter' && isCode && (e.ctrlKey || e.metaKey)) { e.preventDefault(); blockEnter(el); return; }
   if (e.key === 'Enter' && e.shiftKey && !isCode) { e.preventDefault(); insertPlain('\n'); return; }
+  if (e.key === 'Tab' && !isCode) {
+    const { page, i, b } = blockOf(el);
+    if (b && LIST_TYPES.includes(b.type)) {
+      e.preventDefault();
+      const off = caretOffset(el);
+      b.text = textOf(el);
+      const max = Math.min(4, i > 0 ? (page.blocks[i - 1].indent || 0) + 1 : 0);
+      const ind = Math.max(0, Math.min(max, (b.indent || 0) + (e.shiftKey ? -1 : 1)));
+      if (ind) b.indent = ind; else delete b.indent;
+      touchPage(page); redrawBlocks(b.id, off);
+      return;
+    }
+  }
   if (e.key === 'Backspace' && blockBackspace(el)) { e.preventDefault(); return; }
   if (e.key === 'ArrowUp' && selCollapsed() && caretOffset(el) === 0 && focusNeighbour(el, -1)) { e.preventDefault(); return; }
   if (e.key === 'ArrowDown' && selCollapsed() && caretOffset(el) === textOf(el).length && focusNeighbour(el, 1)) e.preventDefault();
@@ -5262,6 +5332,63 @@ const extraActions = {
     if (!b) return;
     b.checked = !b.checked;
     touchPage(page); redrawBlocks();
+  },
+
+  'earn-add-feature'() {
+    const page = curPage();
+    if (!page) return;
+    const last = page.blocks[page.blocks.length - 1];
+    if (last && last.type === 'todo' && !last.text && !last.indent) { focusBlock(last.id, 0); return; }
+    const nb = newBlock('todo');
+    page.blocks.push(nb);
+    touchPage(page); redrawBlocks(nb.id, 0);
+  },
+
+  'earn-sub'(el) {
+    const page = curPage();
+    const i = page ? page.blocks.findIndex(b => b.id === el.dataset.id) : -1;
+    if (i < 0) return;
+    const ind = (page.blocks[i].indent || 0) + 1;
+    let at = i + 1; // after this task's own sub-tasks
+    while (at < page.blocks.length && (page.blocks[at].indent || 0) >= ind) at++;
+    const nb = newBlock('todo'); nb.indent = Math.min(4, ind);
+    page.blocks.splice(at, 0, nb);
+    touchPage(page); redrawBlocks(nb.id, 0);
+  },
+
+  'dump-copy'(el) {
+    const d = (findPage(CAT_EARN)?.dump || []).find(x => x.id === el.dataset.id);
+    if (d) copyText(d.text);
+  },
+  'dump-del'(el) {
+    const home = findPage(CAT_EARN);
+    if (!home || !home.dump) return;
+    home.dump = home.dump.filter(x => x.id !== el.dataset.id);
+    touchPage(home); render();
+  },
+  'dump-send'(el) {
+    const home = findPage(CAT_EARN);
+    const d = (home?.dump || []).find(x => x.id === el.dataset.id);
+    if (!d) return;
+    openEarnPicker({
+      heading: '➜ Kahan bhejun? Category chuno = naya project · Project chuno = naya feature',
+      quote: d.text,
+      onPick(id) {
+        const target = id && findPage(id);
+        if (!target) return;
+        if (isEarnCategory(target)) {
+          earn.pages.push(normalizePage({ parentId: target.id, icon: target.icon, title: d.text.split('\n')[0].slice(0, 200), by: myRef(),
+            blocks: [d.text.includes('\n') ? newBlock('p', d.text.split('\n').slice(1).join('\n')) : null, newBlock('todo')].filter(Boolean) }));
+          toast(`🚀 ${target.title} me naya project bana`);
+        } else {
+          target.blocks.push(newBlock('todo', d.text));
+          touchPage(target);
+          toast(`☐ ${target.title || 'Page'} me feature add hua`);
+        }
+        home.dump = home.dump.filter(x => x.id !== d.id);
+        touchPage(home); saveEarn(); render();
+      },
+    });
   },
 
   'earn-add-block'() {
@@ -6107,6 +6234,20 @@ function parseRoute() {
 const currentIdeaId = () => parseRoute().id;
 
 // One-time: the old side-hustle folder name → a clearer one. Once you rename it yourself, this never touches it again.
+const CAT_DPA = 'cat-dpa';
+function earnRegroup() {
+  const apps = earnCloud.code && findPage(CAT_EARN);
+  if (!apps || findPage(CAT_DPA)) return;
+  const now = Date.now();
+  apps.title = 'Apps & Websites'; apps.icon = '📱'; apps.order = 0; apps.updatedAt = now;
+  const dpa = normalizePage({ id: CAT_DPA, icon: '🛍️', title: 'Digital Products & Affiliate', parentId: null, order: 1, createdAt: now, updatedAt: now });
+  earn.pages.push(dpa);
+  earn.pages.filter(x => x.parentId === CAT_EARN && (['cat-ebooks', 'cat-notes', 'cat-pinterest', 'side-hustle'].includes(x.id) || /digital products|affiliat|e-?books?|\bnotes?\b|pinter/i.test(x.title)))
+    .forEach((x, i) => { x.parentId = CAT_DPA; x.order = i; x.updatedAt = now; });
+  const sm = findPage(CAT_PASSION);
+  if (sm) { sm.title = 'Social Media'; sm.icon = '📣'; sm.order = 2; sm.updatedAt = now; }
+  saveEarn();
+}
 function renameSideHustle() {
   // The 💸 Earning category holds apps, websites, extensions, e-books, notes, Pinterest, affiliate… → a clearer name (once).
   const cat = earnCloud.code && findPage(CAT_EARN);
@@ -6518,6 +6659,7 @@ function render() {
   const app = document.getElementById('app');
   const { page, id } = parseRoute();
   renameSideHustle();
+  earnRegroup();
   ensureUpNext();
   const panelScroll = document.getElementById('todo-panel')?.scrollTop || 0;
   document.body.classList.remove('panel-open');
@@ -7367,6 +7509,24 @@ document.addEventListener('submit', e => {
     f.status = form.elements.status.value;
     f.mvp = form.elements.mvp.value === '1';
     touch(idea); saveState(); closeSheet(); render();
+  }
+
+  if (form.id === 'proj-form') {
+    const text = form.elements.text.value.trim();
+    const cat = findPage(form.dataset.parent);
+    if (!text || !cat) return;
+    earn.pages.push(normalizePage({ parentId: cat.id, icon: cat.icon, title: text, by: myRef(), blocks: [newBlock('todo')] }));
+    touchPage(cat); saveEarn(); render();
+    document.querySelector('#proj-form input')?.focus();
+  }
+
+  if (form.id === 'dump-form') {
+    const text = form.elements.text.value.trim();
+    const home = findPage(form.dataset.page);
+    if (!text || !home) return;
+    (home.dump ||= []).push({ id: uid(), text, createdAt: Date.now() });
+    touchPage(home); saveEarn(); render();
+    document.querySelector('#dump-form input')?.focus();
   }
 
   if (form.id === 'todo-form') {

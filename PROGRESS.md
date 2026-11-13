@@ -12,3 +12,9 @@ Next: user refresh karke check kare; agar kuch off ho to CSS section "Text gets 
 
 ## Task row copy button (2026-11-13)
 Done: todoRow me 📋 button (data-action copy-todo) — right-click pe dikhta hai (hover hataya, .acts-open class), text (+desc) clipboard me copy. sw.js cache v27.
+
+## Earning: groups, projects, features, quick ideas (2026-11-13)
+Done: earnRegroup() one-time: cat-earn = 📱 Apps & Websites, new cat-dpa 🛍️ Digital Products & Affiliate (E-books, Notes, Pinterest, Digital Products, Affiliate moved in), cat-passion = 📣 Social Media.
+Category page (child of a top group, not Social Media) = 🚀 Projects list + inline add (proj-form), no "naya page". Project page = ✨ Features (todo blocks), ☐ Feature jodo, ＋/Tab = sub-task (block.indent 0-4), photo paste.
+Earning home: 💡 Jaldi likho (dump stored on cat-earn page .dump), ➜ bhejo = category→new project, project→feature. sw v28.
+Next: user check kare live site pe.
