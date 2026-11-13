@@ -342,6 +342,26 @@
   @media (hover: none) { .blk-sub { opacity: .55; } }
   .proj-add { display: flex; gap: 8px; margin: 4px 0 12px; }
   .proj-add input { flex: 1; min-width: 0; }
+  .idea-sh .is-title { width: 100%; font-size: 1.3rem; font-weight: 750; border: 0; background: transparent; color: var(--text); outline: none; padding: 4px 0; }
+  .idea-sh .is-desc { width: 100%; min-height: 60px; border: 0; background: transparent; color: var(--text); outline: none; resize: vertical; font: inherit; padding: 4px 0; }
+  .idea-sh .is-head { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: .9rem; margin: 14px 0 4px; }
+  .idea-sh .is-list { list-style: none; margin: 0; padding: 0; }
+  .idea-sh .is-item { display: flex; align-items: center; gap: 6px; }
+  .idea-sh .is-item input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); outline: none; padding: 8px 0; font: inherit; }
+  .idea-sh .is-item.done input { text-decoration: line-through; color: var(--muted); }
+  .idea-sh .is-item.done .blk-check { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+  .idea-sh .is-item .blk-check { margin: 0; }
+  .idea-sh .is-item .icon-btn { opacity: .5; }
+  .idea-sh #is-add input { width: 100%; border: 0; background: transparent; color: var(--text); outline: none; padding: 8px 0; font: inherit; }
+  .proj-cur { display: block; text-decoration: none; color: inherit; border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, var(--surface)), var(--surface)); margin-bottom: 8px; }
+  .proj-tag { font-size: .75rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .04em; }
+  .proj-cur-title { font-size: 1.45rem; font-weight: 800; line-height: 1.25; margin-top: 4px; }
+  .proj-rows { display: grid; gap: 4px; margin-bottom: 12px; }
+  .proj-row { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface); color: inherit; text-decoration: none; }
+  .proj-row:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
+  .proj-row-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dump-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
   .dump-item { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
   .dump-item .dt { flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; }
@@ -3679,7 +3699,9 @@ function normalizePage(raw = {}) {
     by: normPerson(raw.by),
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
-    ...(Array.isArray(raw.dump) && raw.dump.length ? { dump: raw.dump.filter(d => d && d.text).map(d => ({ id: d.id || uid(), text: String(d.text), createdAt: Number(d.createdAt) || now })) } : {}),
+    ...(Array.isArray(raw.dump) && raw.dump.length ? { dump: raw.dump.filter(d => d && d.text).map(d => ({ id: d.id || uid(), text: String(d.text), desc: String(d.desc || ''),
+      items: (Array.isArray(d.items) ? d.items : []).filter(x => x && typeof x.text === 'string').map(x => ({ id: x.id || uid(), text: x.text, done: !!x.done })),
+      createdAt: Number(d.createdAt) || now })) } : {}),
   };
 }
 const newBlock = (type = 'p', text = '') => ({ id: uid(), type, text, checked: false });
@@ -4223,20 +4245,98 @@ function plannerCards(page) {
 const isEarnGroup = p => !!p && !p.parentId && p.id !== CAT_PASSION;
 const isEarnCategory = p => !!p && isEarnGroup(findPage(p.parentId));
 const isEarnProject = p => !!p && isEarnCategory(findPage(p.parentId));
-function dumpSection(page) {
-  const list = page.dump || [];
+const ideaFeatures = d => (d.items || []).filter(x => x.text.trim()).map(x => ({ ...newBlock('todo', x.text), checked: x.done }));
+function projectFromIdea(cat, d) {
+  const rest = [d.text.split('\n').slice(1).join('\n'), d.desc || ''].map(x => x.trim()).filter(Boolean).join('\n');
+  const feats = ideaFeatures(d);
+  return normalizePage({ parentId: cat.id, icon: cat.icon, title: d.text.split('\n')[0].slice(0, 200), by: myRef(),
+    blocks: [rest ? newBlock('p', rest) : null, ...(feats.length ? feats : [newBlock('todo')])].filter(Boolean) });
+}
+// 💡 Idea sheet: title, description and a features todo list (like a task's detail).
+const ideaSheet = { page: null, id: null };
+const ideaOf = () => (findPage(ideaSheet.page)?.dump || []).find(x => x.id === ideaSheet.id);
+function openIdeaSheet(pageId, id, focusAdd = false) {
+  ideaSheet.page = pageId; ideaSheet.id = id;
+  const d = ideaOf();
+  if (!d) return;
+  d.items ||= []; d.desc ||= '';
+  const done = d.items.filter(x => x.done).length, n = d.items.length, pct = n ? Math.round(done / n * 100) : 0;
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = `
+    <div class="sheet-inner idea-sh">
+      <input id="is-title" class="is-title" value="${esc(d.text)}" maxlength="2000" aria-label="Idea">
+      <textarea id="is-desc" class="is-desc" placeholder="Description (notes, links…)" aria-label="Description">${esc(d.desc)}</textarea>
+      <div class="is-head">☑ Todo list <span>${done}/${n}</span></div>
+      <ul class="is-list">${d.items.map(x => `
+        <li class="is-item${x.done ? ' done' : ''}">
+          <button type="button" class="blk-check" data-action="idea-item-toggle" data-id="${x.id}" aria-label="${x.done ? 'Undo' : 'Done'}">${x.done ? '✓' : ''}</button>
+          <input class="is-it" data-id="${x.id}" value="${esc(x.text)}" aria-label="Feature">
+          <button type="button" class="icon-btn" data-action="idea-item-del" data-id="${x.id}" aria-label="Delete">✕</button>
+        </li>`).join('')}</ul>
+      <form id="is-add" autocomplete="off"><input name="text" placeholder="＋ Item jodo… Enter dabao" aria-label="Feature jodo"></form>
+      <div class="row" style="gap:10px;align-items:center;margin-top:12px">
+        <div class="progress" style="flex:1"><div class="bar" style="width:${pct}%;height:100%;background:var(--primary)"></div></div>
+        <span class="small"><b>${pct}%</b> hogya · ${n - done} baaki</span>
+      </div>
+      <div class="row" style="gap:8px;margin-top:14px">
+        ${isEarnCategory(findPage(pageId)) ? '<button type="button" class="btn" data-action="idea-to-project" style="flex:1">🚀 Project banao</button>' : ''}
+        <button type="button" class="btn primary" data-action="close-sheet" style="flex:1">Done</button>
+      </div>
+    </div>`;
+  if (!sheet.open) sheet.showModal();
+  if (focusAdd) sheet.querySelector('#is-add input')?.focus();
+}
+document.addEventListener('input', e => {
+  if (!ideaSheet.id || !e.target.closest?.('.idea-sh')) return;
+  const d = ideaOf(); if (!d) return;
+  if (e.target.id === 'is-title') d.text = e.target.value || ' ';
+  else if (e.target.id === 'is-desc') d.desc = e.target.value;
+  else if (e.target.classList.contains('is-it')) { const x = d.items.find(i => i.id === e.target.dataset.id); if (x) x.text = e.target.value; }
+  else return;
+  touchPage(findPage(ideaSheet.page));
+});
+document.getElementById('sheet')?.addEventListener('close', () => {
+  if (!ideaSheet.id) return;
+  const d = ideaOf();
+  if (d) { d.text = d.text.trim() || 'Idea'; d.items = d.items.filter(x => x.text.trim()); }
+  ideaSheet.id = null;
+  render();
+});
+// Projects of a category: #1 = current project (big), the rest = small plain rows. ⠿ drag re-ranks.
+function projectList(kids) {
+  const stat = p => { const t = p.blocks.filter(b => b.type === 'todo' && b.text.trim()); return t.length ? `☑ ${t.filter(b => b.checked).length}/${t.length}` : ''; };
+  const [cur, ...rest] = kids;
+  const t = cur.blocks.filter(b => b.type === 'todo' && b.text.trim()), pct = t.length ? Math.round(t.filter(b => b.checked).length / t.length * 100) : 0;
   return `
-    <h3 style="margin:14px 0 8px">💡 Jaldi likho <span class="muted small">— koi bhi idea, baad me ➜ se category / project me bhejo</span></h3>
+    <a class="card proj-cur" href="#/earn/${cur.id}" data-drop-page="${cur.id}" data-rank>
+      <div class="row-between"><span class="proj-tag">🎯 Current project</span><span class="pg-drag" data-drag-page="${cur.id}" title="Pakad ke upar / neeche chhodo = rank badlo" aria-label="Drag">⠿</span></div>
+      <div class="proj-cur-title">${esc(cur.icon)} ${esc(cur.title || 'Untitled')}</div>
+      ${pagePreview(cur) ? `<p class="card-desc" style="margin:4px 0 0">${esc(pagePreview(cur))}</p>` : ''}
+      ${t.length ? `<div class="row" style="gap:10px;align-items:center;margin-top:10px"><div class="progress" style="flex:1"><div style="width:${pct}%;height:100%;background:var(--primary)"></div></div><span class="small">${stat(cur)}</span></div>` : ''}
+    </a>
+    ${rest.length ? `<div class="proj-rows">${rest.map(p => `
+      <a class="proj-row" href="#/earn/${p.id}" data-drop-page="${p.id}" data-rank>
+        <span class="pg-drag" data-drag-page="${p.id}" title="Pakad ke upar / neeche chhodo = rank badlo" aria-label="Drag">⠿</span>
+        <span class="proj-row-t">${esc(p.icon)} ${esc(p.title || 'Untitled')}</span>
+        <span class="muted small">${stat(p)}</span>
+      </a>`).join('')}</div>` : ''}`;
+}
+function dumpSection(page, heading = '💡 Jaldi likho <span class="muted small">— koi bhi idea, baad me ➜ se category / project me bhejo</span>') {
+  const list = page.dump || [];
+  const here = isEarnCategory(page);
+  return `
+    <h3 style="margin:14px 0 8px">${heading}</h3>
     <form id="dump-form" class="proj-add" data-page="${page.id}" autocomplete="off">
       <input name="text" required maxlength="2000" placeholder="Jo idea aaye likho… Enter dabao" aria-label="Quick idea">
       <button type="submit" class="btn primary">+ Add</button>
     </form>
     ${list.length ? `<ul class="dump-list">${[...list].reverse().map(d => `
       <li class="dump-item">
-        <span class="dt">${esc(d.text)}</span>
-        <button class="icon-btn" data-action="dump-copy" data-id="${d.id}" title="Copy" aria-label="Copy">📋</button>
-        <button class="icon-btn" data-action="dump-send" data-id="${d.id}" title="Category (naya project) ya project (feature) me bhejo" aria-label="Bhejo">➜</button>
-        <button class="icon-btn" data-action="dump-del" data-id="${d.id}" title="Hatao" aria-label="Delete">✕</button>
+        <span class="dt" data-action="idea-open" data-page="${page.id}" data-id="${d.id}" style="cursor:pointer" title="Kholo — description + features todo list">${esc(d.text)}${(d.items || []).length ? ` <span class="muted small">☑ ${d.items.filter(x => x.done).length}/${d.items.length}</span>` : ''}${d.desc ? ' <span class="muted small">📝</span>' : ''}</span>
+        <button class="icon-btn" data-action="dump-copy" data-page="${page.id}" data-id="${d.id}" title="Copy" aria-label="Copy">📋</button>
+        ${here ? `<button class="icon-btn" data-action="dump-project" data-page="${page.id}" data-id="${d.id}" title="Isko yahin project banao" aria-label="Project banao">🚀</button>` : ''}
+        <button class="icon-btn" data-action="dump-send" data-page="${page.id}" data-id="${d.id}" title="Category (naya project) ya project (feature) me bhejo" aria-label="Bhejo">➜</button>
+        <button class="icon-btn" data-action="dump-del" data-page="${page.id}" data-id="${d.id}" title="Hatao" aria-label="Delete">✕</button>
       </li>`).join('')}</ul>` : ''}`;
 }
 function renderEarnPage(page) {
@@ -4259,13 +4359,14 @@ function renderEarnPage(page) {
         : page.id === 'cat-ig' ? channelBoard({ platform: 'instagram' })
         : page.id.startsWith('ch-') && smAccounts().some(a => 'ch-' + a.id === page.id) ? channelBoard({ accountId: page.id.slice(3) })
         : plannerCards(page)}
+      ${page.parentId && parent && !parent.parentId ? dumpSection(page, `💡 Ideas (${(page.dump || []).length}) <span class="muted small">— jo aaye likho · 🚀 = project banao · ➜ = kahin aur bhejo</span>`) : ''}
       ${isCat ? `
         <h3 style="margin:14px 0 8px">🚀 Projects (${kids.length})</h3>
         <form id="proj-form" class="proj-add" data-parent="${page.id}" autocomplete="off">
           <input name="text" required maxlength="200" placeholder="Naya project likho… Enter dabao" aria-label="Naya project">
           <button type="submit" class="btn primary">+ Add</button>
         </form>
-        ${kids.length ? `<div class="earn-kids">${kids.map(earnCard).join('')}</div>` : ''}
+        ${kids.length ? projectList(kids) : ''}
         ${page.blocks.length ? '<h3 style="margin:18px 0 0">📝 Notes</h3>' : ''}`
       : kids.length ? `
         <div class="row-between" style="margin:14px 0 8px"><h3 style="margin:0">📁 Andar (${kids.length})</h3>
@@ -4273,7 +4374,7 @@ function renderEarnPage(page) {
         <div class="earn-kids">${kids.map(earnCard).join('')}</div>` : ''}
       ${isProj ? '<h3 style="margin:18px 0 0">✨ Features <span class="muted small">— ☐ = feature · ＋ / Tab = sub-task · photo paste karo</span></h3>' : ''}
       <div id="blocks" class="blocks">${blocksHTML(page)}</div>
-      <div class="row" style="gap:6px;flex-wrap:wrap">
+      <div class="row" style="gap:6px;flex-wrap:wrap${isCat ? ';display:none' : ''}">
         ${isProj ? '<button class="add-block" data-action="earn-add-feature" style="flex:1">☐ Feature jodo</button>' : ''}
         <button class="add-block" data-action="earn-add-block" style="flex:1">＋ Yahan likho… <span class="small">( / dabao options ke liye )</span></button>
         <button class="add-block" data-action="earn-add-photo" style="flex:none" title="Photo daalo (paste / drag-drop bhi chalta hai)">🖼️ Photo</button>
@@ -4283,7 +4384,7 @@ function renderEarnPage(page) {
         ${kids.length || isCat || isProj ? '' : `<button class="btn small-btn" data-action="earn-new" data-parent="${page.id}">＋ Iske andar naya page</button>`}
         ${page.id.startsWith('ideas-folder-') && kids.some(k => !isFeatureList(k)) ? `<button class="btn block" data-action="earn-features-only" data-id="${page.id}" style="margin:6px 0 10px">🧹 Har idea page me sirf features rakho (baaki sab hatao)</button>` : ''}
       </section>
-      <p class="hint" style="margin-top:22px">Shortcut: <b>#</b> heading · <b>-</b> list · <b>1.</b> number · <b>[]</b> checkbox · <b>&gt;</b> quote · <b>---</b> line · <b>/</b> sab options · <b>⋮⋮</b> se block badlo / hatao</p>
+      <p class="hint" style="margin-top:22px${isCat ? ';display:none' : ''}">Shortcut: <b>#</b> heading · <b>-</b> list · <b>1.</b> number · <b>[]</b> checkbox · <b>&gt;</b> quote · <b>---</b> line · <b>/</b> sab options · <b>⋮⋮</b> se block badlo / hatao</p>
     </main>`;
 }
 
@@ -5356,18 +5457,46 @@ const extraActions = {
     touchPage(page); redrawBlocks(nb.id, 0);
   },
 
+  'idea-open'(el) { openIdeaSheet(el.dataset.page, el.dataset.id); },
+  'idea-item-toggle'(el) {
+    const d = ideaOf(); const x = d && d.items.find(i => i.id === el.dataset.id);
+    if (!x) return;
+    x.done = !x.done; touchPage(findPage(ideaSheet.page)); openIdeaSheet(ideaSheet.page, ideaSheet.id);
+  },
+  'idea-item-del'(el) {
+    const d = ideaOf(); if (!d) return;
+    d.items = d.items.filter(i => i.id !== el.dataset.id); touchPage(findPage(ideaSheet.page)); openIdeaSheet(ideaSheet.page, ideaSheet.id);
+  },
+  'idea-to-project'() {
+    const cat = findPage(ideaSheet.page), d = ideaOf();
+    if (!cat || !d) return;
+    earn.pages.push(projectFromIdea(cat, d));
+    cat.dump = cat.dump.filter(x => x.id !== d.id);
+    ideaSheet.id = null; closeSheet();
+    touchPage(cat); saveEarn(); render();
+    toast('🚀 Project ban gaya');
+  },
+  'dump-project'(el) {
+    const cat = findPage(el.dataset.page);
+    const d = (cat?.dump || []).find(x => x.id === el.dataset.id);
+    if (!d) return;
+    earn.pages.push(projectFromIdea(cat, d));
+    cat.dump = cat.dump.filter(x => x.id !== d.id);
+    touchPage(cat); saveEarn(); render();
+    toast('🚀 Project ban gaya');
+  },
   'dump-copy'(el) {
-    const d = (findPage(CAT_EARN)?.dump || []).find(x => x.id === el.dataset.id);
+    const d = (findPage(el.dataset.page || CAT_EARN)?.dump || []).find(x => x.id === el.dataset.id);
     if (d) copyText(d.text);
   },
   'dump-del'(el) {
-    const home = findPage(CAT_EARN);
+    const home = findPage(el.dataset.page || CAT_EARN);
     if (!home || !home.dump) return;
     home.dump = home.dump.filter(x => x.id !== el.dataset.id);
     touchPage(home); render();
   },
   'dump-send'(el) {
-    const home = findPage(CAT_EARN);
+    const home = findPage(el.dataset.page || CAT_EARN);
     const d = (home?.dump || []).find(x => x.id === el.dataset.id);
     if (!d) return;
     openEarnPicker({
@@ -5377,11 +5506,10 @@ const extraActions = {
         const target = id && findPage(id);
         if (!target) return;
         if (isEarnCategory(target)) {
-          earn.pages.push(normalizePage({ parentId: target.id, icon: target.icon, title: d.text.split('\n')[0].slice(0, 200), by: myRef(),
-            blocks: [d.text.includes('\n') ? newBlock('p', d.text.split('\n').slice(1).join('\n')) : null, newBlock('todo')].filter(Boolean) }));
+          earn.pages.push(projectFromIdea(target, d));
           toast(`🚀 ${target.title} me naya project bana`);
         } else {
-          target.blocks.push(newBlock('todo', d.text));
+          target.blocks.push(newBlock('todo', d.text), ...ideaFeatures(d).map(b => ({ ...b, indent: 1 })));
           touchPage(target);
           toast(`☐ ${target.title || 'Page'} me feature add hua`);
         }
@@ -7520,6 +7648,16 @@ document.addEventListener('submit', e => {
     document.querySelector('#proj-form input')?.focus();
   }
 
+  if (form.id === 'is-add') {
+    const text = form.elements.text.value.trim();
+    const d = ideaOf();
+    if (!text || !d) return;
+    d.items.push({ id: uid(), text, done: false });
+    touchPage(findPage(ideaSheet.page));
+    openIdeaSheet(ideaSheet.page, ideaSheet.id, true);
+    return;
+  }
+
   if (form.id === 'dump-form') {
     const text = form.elements.text.value.trim();
     const home = findPage(form.dataset.page);
@@ -7638,7 +7776,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13a';
+const APP_VERSION = '2026-11-13d';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
