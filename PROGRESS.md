@@ -18,3 +18,4 @@ Done: earnRegroup() one-time: cat-earn = 📱 Apps & Websites, new cat-dpa 🛍�
 Category page (child of a top group, not Social Media) = 🚀 Projects list + inline add (proj-form), no "naya page". Project page = ✨ Features (todo blocks), ☐ Feature jodo, ＋/Tab = sub-task (block.indent 0-4), photo paste.
 Earning home: 💡 Jaldi likho (dump stored on cat-earn page .dump), ➜ bhejo = category→new project, project→feature. sw v28.
 Next: user check kare live site pe.
+NOTE: har deploy pe index.html me APP_VERSION bhi badlo (warna open app/PC tray app auto-reload nahi karta). 2026-11-13a set.
