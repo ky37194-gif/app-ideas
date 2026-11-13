@@ -914,12 +914,16 @@
   /* Dashboard: left = 🎯 Current + ⏭️ Up next, right = 📥 Inbox */
   .dash-page { max-width: 1400px; }
   .dash-split { display: grid; gap: 18px; align-items: start; }
+  .dash-top { flex: none; margin-bottom: 14px; }
+  .dash-top > .card { margin: 0; }
   @media (min-width: 1000px) {
     /* Each side scrolls on its own: wherever the mouse is, only that column moves */
     .dash-page { padding-top: 12px; padding-bottom: 0; }
     .dash-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: calc(100dvh - 90px); }
     .dash-left, .dash-right { height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 40px 2px; scrollbar-width: thin; }
     body.dash-mode { overflow: hidden; padding-bottom: 0; } /* the page itself never scrolls here */
+    .dash-page.with-top { display: flex; flex-direction: column; height: calc(100dvh - 78px); }
+    .dash-page.with-top .dash-split { flex: 1; min-height: 0; height: auto; }
   }
   /* Smooth feel: a new page fades in, buttons / cards ease, scrolling glides */
   @media (prefers-reduced-motion: no-preference) {
@@ -2087,7 +2091,7 @@ function dashCurrentCard() {
       ${rows || '<p class="muted small" style="margin:6px 0">Abhi koi project nahi. Neeche likho, ya Inbox se ⠿ pakad ke yahan chhodo.</p>'}
       ${addBox('', '＋ Naya current project… Enter', CURRENT)}
     </section>
-    ${dashNowCard(upNext)}`; // ⏭️ Up next box removed from the Dashboard (still under 🎯 Current Project page)
+`; // ⏭️ Up next box removed from the Dashboard; ⚡ Current tasks sits on top of the whole Dashboard
 }
 
 // Tasks from other lists marked ☀️ for today.
@@ -2883,7 +2887,8 @@ function renderDashboard() {
 
   return `
     ${topBar('📊 Dashboard')}
-    <main class="page dash-page">
+    <main class="page dash-page with-top">
+      <div class="dash-top">${dashNowCard(ordered(childrenOf(UP_NEXT).filter(x => !x.done), upNextSort))}</div>
       <div class="dash-split">
         <div class="dash-left">${dashCurrentCard()}</div>
         <div class="dash-right">${dashEarnCard() || `<p class="muted small" style="margin:6px 2px">💰 Earning ke 🎯 current projects yahan dikhenge${canEarn() && !earnCloud.code ? ' — pehle Earning unlock karo' : ''}.</p>`}
@@ -8000,7 +8005,7 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13i';
+const APP_VERSION = '2026-11-13j';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
