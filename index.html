@@ -1567,9 +1567,6 @@ function bottomNav(active) {
       <a class="nav-item ${active === 'inbox' ? 'active' : ''}" href="#/inbox" data-drop-list="inbox"><span class="ico">📥</span>Inbox<span class="nav-count">${myInbox().length || ''}</span></a>
       <a class="fab" href="#/new" aria-label="Add new idea">+</a>
       ${canEarn() ? `<a class="nav-item ${active === 'earn' && !parseRoute().id ? 'active' : ''}" href="#/earn" data-drop-list="earn"><span class="ico">💰</span>Earning</a>${earnNavSubs()}` : ''}
-      ${earnCloud.code && findPage(CAT_PASSION) ? '' /* both live under ❤️ Passion + Earning in the Earning list */ : `
-      ${canEarn() ? `<a class="nav-item pc-only ${parseRoute().page === 'sm' ? 'active' : ''}" href="#/sm"><span class="ico">📣</span>Social Media</a>` : ''}
-      <a class="nav-item pc-only ${active === 'week' ? 'active' : ''}" href="#/week"><span class="ico">🗓️</span>YT &amp; IG plan</a>`}
       <a class="nav-item pc-only ${active === 'doubts' ? 'active' : ''}" href="#/doubts" data-drop-list="doubts"><span class="ico">❓</span>Doubts &amp; To Know<span class="nav-count">${openTodos(DOUBTS) || ''}</span></a>
       <a class="nav-item pc-only ${active === APPWORK ? 'active' : ''}" href="#/appwork" data-drop-list="appwork"><span class="ico">🛠️</span>Pending in this App<span class="nav-count">${openTodos(APPWORK) || ''}</span></a>
       <a class="nav-item pc-only ${active === 'account' ? 'active' : ''}" href="#/account"><span class="ico">👤</span>Account / Login${cloud.google ? '' : '<span class="nav-count">!</span>'}</a>
@@ -4179,7 +4176,6 @@ function renderEarnHome() {
       <div class="row-between" style="margin:0 0 8px"><span class="muted small">🔒 Private — sirf aap</span><span class="btn-row"><button class="btn" data-action="earn-auto-emoji" title="Har page ke naam ke hisaab se emoji lagao">✨ Auto emoji</button><button class="btn" data-action="earn-creds">🔑 Password badlo</button></span></div>
       <p class="muted small" style="margin:0 0 12px"> Har earning method ek page hai: uske andar Notion ki tarah kuch bhi likho, aur uske andar aur pages banao.</p>
       ${state.ideas.length ? `<button class="card sm-card" data-action="ideas-to-earn" style="cursor:pointer;border-color:var(--primary)"><span class="big" style="font-size:1.8rem">💡</span><span style="flex:1"><b>Saare ideas (${state.ideas.length}) yahan shift karo</b><br><span class="muted small">Har folder Earning me folder banega — phir ⠿ se jahan chaho daalo</span></span><span class="muted">›</span></button>` : ''}
-      <a class="card sm-card" href="#/sm"><span class="big" style="font-size:1.8rem">📱</span><span style="flex:1"><b>SM — Content Planner</b><br><span class="muted small">Social media ke saare ideas, posts aur plan</span></span><span class="muted">›</span></a>
       ${findPage(CAT_EARN) ? dumpSection(findPage(CAT_EARN)) : ''}
       <button class="btn primary block" data-action="earn-new">＋ Naya earning method</button>
       ${top.length > 1 ? '<p class="hint" style="margin:10px 0 0">🏆 <b>⠿</b> pakad ke kisi page ke <b>upar / neeche</b> chhodo = apna focus rank set karo (#1 = sabse zyada focus). <b>Beech me</b> chhodo = us page ke andar chala jayega.</p>' : ''}
@@ -6525,7 +6521,7 @@ function searchEverything(q) {
   let out = '';
   // App sections
   const sections = [['#/dashboard', '📊 Dashboard'], ['#/inbox', '📥 Inbox'],
-    ...Object.entries(LISTS).map(([k, L]) => ['#/' + k, `${L.emoji} ${L.label}`]), ...(canEarn() ? [['#/earn', '💰 Earning'], ['#/sm', '📣 Social Media (SM Planner)'], ['#/earn/' + APPS_PAGE, '📱 Apps']] : [])]
+    ...Object.entries(LISTS).map(([k, L]) => ['#/' + k, `${L.emoji} ${L.label}`]), ...(canEarn() ? [['#/earn', '💰 Earning'], ['#/earn/' + APPS_PAGE, '📱 Apps']] : [])]
     .filter(([, n]) => hit(n));
   if (sections.length) out += `<h3>📂 Sections</h3>` + sections.map(([h, n]) => item(h, hl(n, q), '')).join('');
   // Tasks (every list)
@@ -6585,11 +6581,9 @@ function drawerList() {
     <a class="drawer-item" href="#/quick"><span class="name">⚡ Jaldi likho</span></a>
     <a class="drawer-item" href="#/inbox"><span class="name">📥 Inbox kholo</span></a>
     <a class="drawer-item" href="#/account"><span class="name">👤 Account / Login (Google)</span></a>
-    <a class="drawer-item" href="#/week"><span class="name">🗓️ YouTube &amp; Instagram — Hafta plan</span></a>
     ${canEarn() ? `<h3>💰 Earning (private)</h3>` + (earnCloud.code
       ? topEarnPages().map(p => `<a class="drawer-item" href="#/earn/${p.id}"><span>${esc(p.icon)}</span><span class="name">${esc(p.title || 'Untitled')}</span></a>`).join('')
         + (findPage(APPS_PAGE) ? `<a class="drawer-item" href="#/earn/${APPS_PAGE}"><span>📱</span><span class="name">Apps (phone, Meta, PC)</span></a>` : '')
-        + '<a class="drawer-item" href="#/sm"><span>📣</span><span class="name">Social Media (SM Planner)</span></a>'
         + '<a class="drawer-item" href="#/earn"><span class="name">💰 Saare earning methods</span></a>'
       : '<a class="drawer-item" href="#/earn"><span class="name">🔒 Earning kholo</span></a>') : ''}
     <div class="drawer-links">
@@ -6732,6 +6726,17 @@ function earnRegroup() {
     .forEach((x, i) => { x.parentId = CAT_DPA; x.order = i; x.updatedAt = now; });
   const sm = findPage(CAT_PASSION);
   if (sm) { sm.title = 'Social Media'; sm.icon = '📣'; sm.order = 2; sm.updatedAt = now; }
+  saveEarn();
+}
+// User ne 📣 Social Media section hatwaya (2026-11-19): pura folder + andar ke pages delete (tombstone, sync pe bhi gayab). Pehle backup file.
+function removeSocial() {
+  const sm = earnCloud.code && findPage(CAT_PASSION);
+  if (!sm) return;
+  earnBackup('backup-earning-before-social-delete');
+  const ids = new Set([sm, ...pageDescendants(sm.id)].map(p => p.id));
+  const now = Date.now();
+  earn.pages = earn.pages.filter(p => !ids.has(p.id));
+  ids.forEach(id => (earn.deleted[id] = now));
   saveEarn();
 }
 function renameSideHustle() {
@@ -7146,6 +7151,7 @@ function render() {
   const { page, id } = parseRoute();
   renameSideHustle();
   earnRegroup();
+  removeSocial();
   ensureUpNext();
   const panelScroll = document.getElementById('todo-panel')?.scrollTop || 0;
   document.body.classList.remove('panel-open');
@@ -8144,12 +8150,12 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-13r';
+const APP_VERSION = '2026-11-19a';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
     const res = await fetch('./?v=' + Date.now(), { cache: 'no-store' });
-    const live = (/const APP_VERSION = '([^']+)'/.exec(await res.text()) || [])[1];
+    const live = (/const APP_VERSION = '2026-11-19a']+)'/.exec(await res.text()) || [])[1];
     if (!live || live === APP_VERSION) return;
     const a = document.activeElement;
     const typing = a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable);

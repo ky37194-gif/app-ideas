@@ -34,3 +34,5 @@ NOTE: har deploy pe index.html me APP_VERSION bhi badlo (warna open app/PC tray 
 - 2026-11-13: 'Kahan daalein?' sheet me 💰 Earning tree: section → category (▸ khulta) → 💡 Idea banao / 🚀 Naya project / project → feature (moveTodoToCat, earnMoveTree). ⚡ Current tasks card me '🎯 Project banao' (now-to-project). APP_VERSION p, sw v41.
 - 2026-11-13: Current projects pe 🚩 3 flags (🔴 High / 🟡 Medium / 🟢 Low, click cycle, cycle-flag action) — todo.flag + page.flag; Dashboard me flag ke hisaab se sort. APP_VERSION q, sw v42.
 - 2026-11-13: 🖼️ Photo buttons (earn page + task panel) aur 'Shortcut: # heading…' hint hataye. Ctrl+V: earn page pe kahin bhi = photo end me; task panel khula ho to kahin bhi = task ki photo. APP_VERSION r, sw v43.
+
+- 2026-11-19: 📣 Social Media section delete: removeSocial() (render me) cat-passion + saare andar ke pages tombstone karta (pehle backup-earning-before-social-delete json download). Nav/drawer/search/Earning home se SM Planner + YT&IG plan links hataye. APP_VERSION 2026-11-19a, sw v44.
