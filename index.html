@@ -8152,12 +8152,12 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-19b';
+const APP_VERSION = '2026-11-19c';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
     const res = await fetch('./?v=' + Date.now(), { cache: 'no-store' });
-    const live = (/const APP_VERSION = '2026-11-19b']+)'/.exec(await res.text()) || [])[1];
+    const live = (/const APP_VERSION = '([^']+)'/.exec(await res.text()) || [])[1];
     if (!live || live === APP_VERSION) return;
     const a = document.activeElement;
     const typing = a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable);
