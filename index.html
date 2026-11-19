@@ -6729,11 +6729,13 @@ function earnRegroup() {
   saveEarn();
 }
 // User ne 📣 Social Media section hatwaya (2026-11-19): pura folder + andar ke pages delete (tombstone, sync pe bhi gayab). Pehle backup file.
+// 2026-11-19: Digital Products se 📝 Notes aur 📚 E-books bhi hataye.
 function removeSocial() {
-  const sm = earnCloud.code && findPage(CAT_PASSION);
-  if (!sm) return;
-  earnBackup('backup-earning-before-social-delete');
-  const ids = new Set([sm, ...pageDescendants(sm.id)].map(p => p.id));
+  if (!earnCloud.code) return;
+  const roots = [findPage(CAT_PASSION), ...earn.pages.filter(p => p.parentId === CAT_DPA && (['cat-notes', 'cat-ebooks'].includes(p.id) || /^\s*(e-?books?|notes?)\s*$/i.test(p.title || '')))].filter(Boolean);
+  if (!roots.length) return;
+  earnBackup('backup-earning-before-delete');
+  const ids = new Set(roots.flatMap(r => [r, ...pageDescendants(r.id)]).map(p => p.id));
   const now = Date.now();
   earn.pages = earn.pages.filter(p => !ids.has(p.id));
   ids.forEach(id => (earn.deleted[id] = now));
@@ -8150,12 +8152,12 @@ document.getElementById('sheet').addEventListener('click', e => {
    When the app comes back on screen (and every 10 min), check the live page;
    if a newer version is out, reload — but never while you're typing.
    ===================================================================== */
-const APP_VERSION = '2026-11-19a';
+const APP_VERSION = '2026-11-19b';
 async function checkForUpdate() {
   if (location.protocol !== 'https:' || !navigator.onLine) return;
   try {
     const res = await fetch('./?v=' + Date.now(), { cache: 'no-store' });
-    const live = (/const APP_VERSION = '2026-11-19a']+)'/.exec(await res.text()) || [])[1];
+    const live = (/const APP_VERSION = '2026-11-19b']+)'/.exec(await res.text()) || [])[1];
     if (!live || live === APP_VERSION) return;
     const a = document.activeElement;
     const typing = a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable);

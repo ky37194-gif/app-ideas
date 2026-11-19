@@ -36,3 +36,4 @@ NOTE: har deploy pe index.html me APP_VERSION bhi badlo (warna open app/PC tray 
 - 2026-11-13: 🖼️ Photo buttons (earn page + task panel) aur 'Shortcut: # heading…' hint hataye. Ctrl+V: earn page pe kahin bhi = photo end me; task panel khula ho to kahin bhi = task ki photo. APP_VERSION r, sw v43.
 
 - 2026-11-19: 📣 Social Media section delete: removeSocial() (render me) cat-passion + saare andar ke pages tombstone karta (pehle backup-earning-before-social-delete json download). Nav/drawer/search/Earning home se SM Planner + YT&IG plan links hataye. APP_VERSION 2026-11-19a, sw v44.
+- 2026-11-19: removeSocial() ab Digital Products (cat-dpa) ke 📝 Notes + 📚 E-books bhi delete karta. APP_VERSION 19b, sw v45.
